@@ -3,6 +3,7 @@ package com.main.nexus.service;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.User;
+import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,7 @@ public class AuthService {
         User savedUser = userRepository.save(user);
 
         company.setUser(savedUser);
+        company.setStatus(CompanyStatus.PENDING); 
         companyService.save(company);
 
         return savedUser;

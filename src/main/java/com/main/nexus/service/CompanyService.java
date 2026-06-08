@@ -2,6 +2,7 @@ package com.main.nexus.service;
 
 import com.main.nexus.model.Company;
 import com.main.nexus.model.User;
+import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.repository.CompanyRepository;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,5 +40,37 @@ public class CompanyService {
         Company company = findById(companyId);
         company.setReputation(newAverage);
         companyRepository.save(company);
+    }
+
+    public List<Company> findPending() {
+        return companyRepository.findByStatus(CompanyStatus.PENDING);
+    }
+
+    public Company approve(Long companyId) {
+        Company company = findById(companyId);
+
+        if (company.getStatus() != CompanyStatus.PENDING) {
+            throw new RuntimeException("Company is not pending approval");
+        }
+
+        company.setStatus(CompanyStatus.APPROVED);
+        return companyRepository.save(company);
+    }
+
+    public Company reject(Long companyId) {
+        Company company = findById(companyId);
+
+        if (company.getStatus() != CompanyStatus.PENDING) {
+            throw new RuntimeException("Company is not pending approval");
+        }
+
+        company.setStatus(CompanyStatus.REJECTED);
+        return companyRepository.save(company);
+    }
+    
+    public boolean isApproved(Long userId) {
+        return companyRepository.findByUserId(userId)
+                .map(c -> c.getStatus() == CompanyStatus.APPROVED)
+                .orElse(false);
     }
 }

@@ -1,7 +1,10 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.CompanyStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -41,6 +44,10 @@ public class Company {
 
     private Double latitude;
     private Double longitude;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private CompanyStatus status = CompanyStatus.PENDING;
 
     public Long getId() {
         return id;
@@ -120,5 +127,13 @@ public class Company {
 
     public void setLongitude(Double longitude) {
         this.longitude = longitude;
+    }
+    
+    public CompanyStatus getStatus() {
+    return status;
+}
+
+    public void setStatus(CompanyStatus status) {
+        this.status = status;
     }
 }
