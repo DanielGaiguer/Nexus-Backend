@@ -1,5 +1,7 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.InterestStatus;
+import com.main.nexus.model.enums.StatusMatch;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -42,7 +44,7 @@ public class Match {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private MatchStatus status = MatchStatus.WAITING;
+    private StatusMatch status = StatusMatch.WAITING;
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -95,11 +97,11 @@ public class Match {
         this.professionalStatus = professionalStatus;
     }
 
-    public MatchStatus getStatus() {
+    public StatusMatch getStatus() {
         return status;
     }
 
-    public void setStatus(MatchStatus status) {
+    public void setStatus(StatusMatch status) {
         this.status = status;
     }
 

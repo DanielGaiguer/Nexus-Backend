@@ -1,5 +1,6 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.ReviewAuthor;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,10 +28,10 @@ public class Review {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private ReviewAuthorType authorType;
+    private ReviewAuthor authorType;
 
     @Column(nullable = false)
-    private Integer rating; // 1 to 5
+    private Integer rating;
 
     @Column(columnDefinition = "TEXT")
     private String comment;
@@ -54,11 +55,11 @@ public class Review {
         this.match = match;
     }
 
-    public ReviewAuthorType getAuthorType() {
+    public ReviewAuthor getAuthor() {
         return authorType;
     }
 
-    public void setAuthorType(ReviewAuthorType authorType) {
+    public void setAuthorType(ReviewAuthor authorType) {
         this.authorType = authorType;
     }
 

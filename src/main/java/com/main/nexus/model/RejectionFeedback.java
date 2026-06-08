@@ -1,5 +1,6 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.RejectionReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
