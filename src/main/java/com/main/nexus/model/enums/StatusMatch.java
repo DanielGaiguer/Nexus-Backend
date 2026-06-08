@@ -8,6 +8,9 @@ package com.main.nexus.model.enums;
  *
  * @author gaigu
  */
-public class StatusMatch {
-    
+public enum StatusMatch {
+    AGUARDANDO,
+    EMPRESA_INTERESSADA,
+    MATCH_REALIZADO,
+    RECUSADO
 }

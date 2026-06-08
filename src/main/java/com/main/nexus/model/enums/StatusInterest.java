@@ -8,6 +8,6 @@ package com.main.nexus.model.enums;
  *
  * @author gaigu
  */
-public class StatusInterest {
-    
+public enum StatusInterest {
+    PENDENTE, INTERESSADO, RECUSOU
 }

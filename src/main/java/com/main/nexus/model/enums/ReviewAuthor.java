@@ -8,6 +8,6 @@ package com.main.nexus.model.enums;
  *
  * @author gaigu
  */
-public enum TypeUser {
-    PROFISSIONAL, EMPRESA
+public enum ReviewAuthor {
+    EMPRESA, PROFISSIONAL
 }

@@ -8,6 +8,10 @@ package com.main.nexus.model.enums;
  *
  * @author gaigu
  */
-public class ReasonRejection {
-    
+public enum ReasonRejection {
+    VALOR_MUITO_BAIXO,
+    TECNOLOGIA_NAO_DESEJADA,
+    DISTANCIA_MUITO_GRANDE,
+    PRAZO_INSUFICIENTE,
+    OUTRO
 }

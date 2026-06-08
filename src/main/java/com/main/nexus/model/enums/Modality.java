@@ -8,6 +8,6 @@ package com.main.nexus.model.enums;
  *
  * @author gaigu
  */
-public class Modality {
-    
+public enum Modality {
+    PRESENCIAL, HIBRIDO, REMOTO
 }
