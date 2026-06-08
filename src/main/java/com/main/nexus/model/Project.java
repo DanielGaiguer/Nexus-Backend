@@ -1,7 +1,7 @@
 package com.main.nexus.model;
 
 import com.main.nexus.model.enums.Modality;
-import com.main.nexus.model.enums.StatusProject;
+import com.main.nexus.model.enums.ProjectStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -49,7 +49,7 @@ public class Project {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private StatusProject status = StatusProject.OPEN;
+    private ProjectStatus status = ProjectStatus.OPEN;
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -126,11 +126,11 @@ public class Project {
         this.modality = modality;
     }
 
-    public StatusProject getStatus() {
+    public ProjectStatus getStatus() {
         return status;
     }
 
-    public void setStatus(StatusProject status) {
+    public void setStatus(ProjectStatus status) {
         this.status = status;
     }
 

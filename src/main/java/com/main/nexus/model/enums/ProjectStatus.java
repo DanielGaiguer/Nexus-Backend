@@ -1,6 +1,6 @@
 package com.main.nexus.model.enums;
 
-public enum StatusProject {
+public enum ProjectStatus {
     OPEN,
     PAUSED,
     CLOSED
