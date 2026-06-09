@@ -1,5 +1,6 @@
 package com.main.nexus.service;
 
+import com.main.nexus.dto.PreviousProjectRequestDTO;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
 import com.main.nexus.repository.PreviousProjectRepository;
@@ -16,8 +17,17 @@ public class PreviousProjectService {
     @Autowired
     private PreviousProjectRepository previousProjectRepository;
 
-    public List<PreviousProject> findByProfessional(Long professionalId) {
-        return previousProjectRepository.findByProfessionalId(professionalId);
+    public List<PreviousProjectRequestDTO> findByProfessional(Long professionalId) {
+        return previousProjectRepository.findByProfessionalId(professionalId)
+                .stream()
+                .map(p -> new PreviousProjectRequestDTO(
+                        p.getId(),
+                        p.getTitle(),
+                        p.getDescription(),
+                        p.getTechnologies(),
+                        p.getYearOfCompletion()
+                ))
+                .toList();
     }
 
     public PreviousProject save(PreviousProject project) {
