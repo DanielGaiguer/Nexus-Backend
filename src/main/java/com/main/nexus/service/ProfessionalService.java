@@ -9,11 +9,9 @@ import com.main.nexus.repository.ProfessionalRepository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-/**
- *
- * @author gaigu
- */
+@Service
 public class ProfessionalService {
     @Autowired
     private ProfessionalRepository professionalRepository;
