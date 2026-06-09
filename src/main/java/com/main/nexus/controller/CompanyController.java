@@ -1,5 +1,6 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
@@ -7,6 +8,7 @@ import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProjectService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/company")
@@ -58,18 +61,18 @@ public class CompanyController {
     }
 
     // --- Dashboard resumido ---
-
     @GetMapping("/dashboard")
-    public ResponseEntity<?> dashboard() {
+    public ResponseEntity<CompanyDashboardDTO> dashboard() {
         UserDTO logged = getLoggedUser();
         Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new RuntimeException("Profile not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Company not found"));
 
-        return ResponseEntity.ok(new java.util.HashMap<>() {{
-            put("company", toProfileDTO(company));
-            put("totalProjects", projectService.findByCompany(company).size());
-            put("totalMatches", matchService.countConfirmedMatchesByCompany(company.getId()));
-        }});
+        return ResponseEntity.ok(new CompanyDashboardDTO(
+                toProfileDTO(company),
+                projectService.findByCompany(company).size(),
+                matchService.countConfirmedMatchesByCompany(company.getId())
+        ));
     }
 
     // --- Utilitários ---

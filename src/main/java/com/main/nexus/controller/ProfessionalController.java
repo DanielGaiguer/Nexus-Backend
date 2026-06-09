@@ -1,16 +1,21 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.PreviousProjectRequestDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.UserDTO;
+import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Skill;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.SkillService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/professional")
@@ -32,6 +38,47 @@ public class ProfessionalController {
 
     @Autowired
     private SkillService skillService;
+    
+    @Autowired
+    private PreviousProjectService previousProjectService;
+
+    @GetMapping("/projects")
+    public ResponseEntity<?> listPreviousProjects() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+        return ResponseEntity.ok(previousProjectService.findByProfessional(professional.getId()));
+    }
+
+    @PostMapping("/projects")
+    public ResponseEntity<String> addPreviousProject(
+            @RequestBody PreviousProjectRequestDTO request) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        PreviousProject project = new PreviousProject();
+        project.setProfessional(professional);
+        project.setTitle(request.title());
+        project.setDescription(request.description());
+        project.setTechnologies(request.technologies());
+        project.setYearOfCompletion(request.yearOfCompletion());
+        previousProjectService.save(project);
+
+        return ResponseEntity.ok("Previous project added.");
+    }
+
+    @DeleteMapping("/projects/{projectId}")
+    public ResponseEntity<String> deletePreviousProject(@PathVariable Long projectId) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+        previousProjectService.delete(projectId, professional.getId());
+        return ResponseEntity.ok("Previous project deleted.");
+    }
 
     // --- Perfil ---
 
@@ -54,8 +101,8 @@ public class ProfessionalController {
         existing.setName(request.name());
         existing.setPhone(request.phone());
         existing.setCity(request.city());
-        existing.setMinimumSalary(request.minimumSalary());
-        existing.setMaximumSalary(request.maximumSalary());
+        existing.setMinimumSalaryExpectation(request.minimumSalary());
+        existing.setMaximumSalaryExpectation(request.maximumSalary());
         existing.setAvailable(request.available());
         existing.setLatitude(request.latitude());
         existing.setLongitude(request.longitude());
@@ -129,8 +176,8 @@ public class ProfessionalController {
                 p.getUser().getEmail(),
                 p.getPhone(),
                 p.getCity(),
-                p.getMinimumSalary(),
-                p.getMaximumSalary(),
+                p.getMinimumSalaryExpectation(),
+                p.getMaximumSalaryExpectation(),
                 p.getAvailable(),
                 p.getReputation(),
                 p.getLatitude(),

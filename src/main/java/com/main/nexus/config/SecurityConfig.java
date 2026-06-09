@@ -26,23 +26,21 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-
-                // Rotas públicas
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register/professional").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register/company").permitAll()
 
-                // Admin
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                // Company
                 .requestMatchers("/api/company/**").hasRole("COMPANY")
                 .requestMatchers("/api/projects/**").hasRole("COMPANY")
-
-                // Professional
                 .requestMatchers("/api/professional/**").hasRole("PROFESSIONAL")
 
-                // Qualquer outra rota exige autenticação
+                // Match: tanto empresa quanto profissional acessam
+                .requestMatchers("/api/matches/**").hasAnyRole("COMPANY", "PROFESSIONAL")
+
+                // Reviews: ambos podem avaliar
+                .requestMatchers("/api/reviews/**").hasAnyRole("COMPANY", "PROFESSIONAL")
+
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

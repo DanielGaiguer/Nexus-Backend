@@ -1,17 +1,8 @@
+// Review.java
 package com.main.nexus.model;
 
-import com.main.nexus.model.enums.ReviewAuthor;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-
+import com.main.nexus.model.enums.AuthorType;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
@@ -28,7 +19,7 @@ public class Review {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private ReviewAuthor authorType;
+    private AuthorType authorType;
 
     @Column(nullable = false)
     private Integer rating;
@@ -55,11 +46,11 @@ public class Review {
         this.match = match;
     }
 
-    public ReviewAuthor getAuthor() {
+    public AuthorType getAuthorType() {
         return authorType;
     }
 
-    public void setAuthorType(ReviewAuthor authorType) {
+    public void setAuthorType(AuthorType authorType) {
         this.authorType = authorType;
     }
 

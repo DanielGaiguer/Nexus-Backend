@@ -6,7 +6,9 @@ import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.repository.ProjectRepository;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ProjectService {
@@ -49,5 +51,13 @@ public class ProjectService {
         Project project = findById(id);
         project.setStatus(ProjectStatus.CLOSED);
         projectRepository.save(project);
+    }
+    
+    public void delete(Long id) {
+        if (!projectRepository.existsById(id)) {
+            throw new ResponseStatusException(
+                    HttpStatusCode.valueOf(404), "Project not found: " + id);
+        }
+        projectRepository.deleteById(id);
     }
 }

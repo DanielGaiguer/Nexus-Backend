@@ -3,16 +3,21 @@ package com.main.nexus.service;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.InterestStatus;
+import com.main.nexus.model.enums.RejectionReason;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
+import com.main.nexus.repository.RejectionFeedbackRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MatchService {
@@ -22,6 +27,9 @@ public class MatchService {
 
     @Autowired
     private ProfessionalRepository professionalRepository;
+    
+    @Autowired
+    private RejectionFeedbackRepository rejectionFeedbackRepository;
 
     // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
@@ -183,5 +191,60 @@ public class MatchService {
 
     public long countConfirmedMatches() {
         return matchRepository.countByStatus(StatusMatch.MATCHED);
+    }
+    
+    // Busca um match pelo id
+    public Match findById(Long id) {
+        return matchRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Match not found: " + id));
+    }
+
+    // Convites pendentes para o profissional (empresa já demonstrou interesse)
+    public List<Match> getPendingInvitesForProfessional(Long professionalId) {
+        return matchRepository.findByProfessionalId(professionalId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.COMPANY_INTERESTED)
+                .toList();
+    }
+
+    // Matches confirmados para o profissional
+    public List<Match> getConfirmedMatchesForProfessional(Long professionalId) {
+        return matchRepository.findByProfessionalId(professionalId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.MATCHED)
+                .toList();
+    }
+
+    // Matches confirmados de uma empresa
+    public long countConfirmedMatchesByCompany(Long companyId) {
+        return matchRepository.findByProjectCompanyId(companyId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.MATCHED)
+                .count();
+    }
+
+    // Profissional rejeita e registra o motivo
+    public Match professionalRejectsWithFeedback(Long matchId, String reason) {
+        Match match = findById(matchId);
+        match.setProfessionalStatus(InterestStatus.REJECTED);
+        match.setStatus(StatusMatch.REJECTED);
+        Match saved = matchRepository.save(match);
+
+        // Registra o feedback para o aprendizado contínuo
+        RejectionReason rejectionReason;
+        try {
+            rejectionReason = RejectionReason.valueOf(reason.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            rejectionReason = RejectionReason.OTHER;
+        }
+
+        RejectionFeedback feedback = new RejectionFeedback();
+        feedback.setProfessional(match.getProfessional());
+        feedback.setProject(match.getProject());
+        feedback.setReason(rejectionReason);
+        rejectionFeedbackRepository.save(feedback);
+
+        return saved;
     }
 }

@@ -1,5 +1,6 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.UserSummaryDTO;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.UserRepository;
@@ -7,6 +8,7 @@ import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.SkillService;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -90,10 +92,17 @@ public class AdminController {
     }
 
     // --- Usuários ---
-
     @GetMapping("/users")
-    public ResponseEntity<?> listUsers() {
-        return ResponseEntity.ok(userRepository.findAll());
+    public ResponseEntity<List<UserSummaryDTO>> listUsers() {
+        List<UserSummaryDTO> users = userRepository.findAll()
+                .stream()
+                .map(u -> new UserSummaryDTO(
+                        u.getId(),
+                        u.getEmail(),
+                        u.getType().name(),
+                        u.getActive()))
+                .toList();
+        return ResponseEntity.ok(users);
     }
 
     @PostMapping("/users/{id}/toggle")
