@@ -5,6 +5,7 @@ import com.main.nexus.model.User;
 import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.repository.CompanyRepository;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -72,5 +73,9 @@ public class CompanyService {
         return companyRepository.findByUserId(userId)
                 .map(c -> c.getStatus() == CompanyStatus.APPROVED)
                 .orElse(false);
+    }
+    
+    public Optional<Company> findByUserId(Long userId) {
+        return companyRepository.findByUserId(userId);
     }
 }
