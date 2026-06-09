@@ -5,6 +5,7 @@ import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.Skill;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProjectService;

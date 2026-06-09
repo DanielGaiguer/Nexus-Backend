@@ -1,6 +1,6 @@
 package com.main.nexus.model.enums;
 
-public enum ReviewAuthor {
+public enum AuthorType {
     COMPANY,
     PROFESSIONAL
 }

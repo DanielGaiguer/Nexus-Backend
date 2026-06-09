@@ -38,7 +38,7 @@ public class ReviewService {
     private void recalculateReputation(Review review) {
         Match match = review.getMatch();
 
-        switch (review.getAuthor()) {
+        switch (review.getAuthorType()) {
             case COMPANY -> {
                 // Empresa avaliou profissional — atualiza reputação do profissional
                 Long professionalId = match.getProfessional().getId();
