@@ -7,6 +7,7 @@ package com.main.nexus.service;
 import com.main.nexus.model.Professional;
 import com.main.nexus.repository.ProfessionalRepository;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
@@ -42,5 +43,9 @@ public class ProfessionalService {
         Professional professional = findById(professionalId);
         professional.setReputation(newAverage);
         professionalRepository.save(professional);
+    }
+    
+    public Optional<Professional> findByUserId(Long userId) {
+        return professionalRepository.findByUserId(userId);
     }
 }

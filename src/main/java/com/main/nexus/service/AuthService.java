@@ -104,9 +104,21 @@ public class AuthService {
             });
         }
 
+        String name = switch (user.getType()) {
+            case PROFESSIONAL -> professionalService
+                    .findByUserId(user.getId())
+                    .map(Professional::getName)
+                    .orElse(user.getEmail());
+            case COMPANY -> companyService
+                    .findByUserId(user.getId())
+                    .map(Company::getCompanyName)
+                    .orElse(user.getEmail());
+            case ADMIN -> "Admin";
+        };
+
         UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), user.getType().name());
         String token = tokenService.generateToken(userDTO);
 
-        return new LoginResponseDTO(user.getId(), user.getEmail(), user.getType().name(), token);
+        return new LoginResponseDTO(user.getId(), user.getEmail(), name, user.getType().name(), token);
     }
 }
