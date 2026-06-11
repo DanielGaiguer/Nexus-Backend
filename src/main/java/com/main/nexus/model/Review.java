@@ -1,4 +1,4 @@
-// Review.java
+
 package com.main.nexus.model;
 
 import com.main.nexus.model.enums.AuthorType;

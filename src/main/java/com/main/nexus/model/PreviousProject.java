@@ -28,7 +28,7 @@ public class PreviousProject {
     private String description;
 
     @Column(length = 500)
-    private String technologies; // "Java, Spring, MySQL"
+    private String technologies;
 
     private Integer yearOfCompletion;
 

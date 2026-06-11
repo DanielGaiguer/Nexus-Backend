@@ -31,8 +31,6 @@ public class CompanyController {
     @Autowired
     private MatchService matchService;
 
-    // --- Perfil ---
-
     @GetMapping("/profile")
     public ResponseEntity<CompanyProfileDTO> getProfile() {
         UserDTO logged = getLoggedUser();
@@ -60,7 +58,6 @@ public class CompanyController {
         return ResponseEntity.ok(toProfileDTO(existing));
     }
 
-    // --- Dashboard resumido ---
     @GetMapping("/dashboard")
     public ResponseEntity<CompanyDashboardDTO> dashboard() {
         UserDTO logged = getLoggedUser();
@@ -74,8 +71,6 @@ public class CompanyController {
                 matchService.countConfirmedMatchesByCompany(company.getId())
         ));
     }
-
-    // --- Utilitários ---
 
     private UserDTO getLoggedUser() {
         return (UserDTO) SecurityContextHolder.getContext()

@@ -1,8 +1,7 @@
-// RejectionFeedbackRepository
+
 package com.main.nexus.repository;
 
 import com.main.nexus.model.RejectionFeedback;
-import com.main.nexus.model.enums.RejectionReason;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
