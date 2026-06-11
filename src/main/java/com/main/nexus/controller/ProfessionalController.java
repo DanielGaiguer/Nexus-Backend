@@ -80,8 +80,6 @@ public class ProfessionalController {
         return ResponseEntity.ok("Previous project deleted.");
     }
 
-    // --- Perfil ---
-
     @GetMapping("/profile")
     public ResponseEntity<ProfessionalProfileDTO> getProfile() {
         UserDTO logged = getLoggedUser();
@@ -111,8 +109,6 @@ public class ProfessionalController {
         return ResponseEntity.ok(toProfileDTO(existing));
     }
 
-    // --- Skills ---
-
     @PutMapping("/skills")
     public ResponseEntity<String> updateSkills(@RequestBody List<Long> skillIds) {
         UserDTO logged = getLoggedUser();
@@ -125,8 +121,6 @@ public class ProfessionalController {
 
         return ResponseEntity.ok("Skills updated successfully.");
     }
-
-    // --- Matches / Convites ---
 
     @GetMapping("/matches")
     public ResponseEntity<?> getMatches() {
@@ -160,8 +154,6 @@ public class ProfessionalController {
         matchService.professionalRejectsWithFeedback(matchId, reason);
         return ResponseEntity.ok("Invite rejected.");
     }
-
-    // --- Utilitários ---
 
     private UserDTO getLoggedUser() {
         return (UserDTO) SecurityContextHolder.getContext()

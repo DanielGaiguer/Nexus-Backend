@@ -41,8 +41,6 @@ public class ProjectController {
     @Autowired
     private SkillService skillService;
 
-    // --- Listagem ---
-
     @GetMapping
     public ResponseEntity<List<ProjectResponseDTO>> listMyProjects() {
         UserDTO logged = getLoggedUser();
@@ -102,8 +100,7 @@ public class ProjectController {
 
         return ResponseEntity.ok(toResponseDTO(projectService.update(existing)));
     }
-
-    // Método de conversão
+    
     private ProjectResponseDTO toResponseDTO(Project p) {
         return new ProjectResponseDTO(
                 p.getId(),
@@ -120,22 +117,17 @@ public class ProjectController {
                 p.getCompany().getCompanyName()
         );
     }
-    // --- Fechar ---
-
+    
     @PutMapping("/{id}/close")
     public ResponseEntity<String> closeProject(@PathVariable Long id) {
         projectService.closeProject(id);
         return ResponseEntity.ok("Project closed.");
     }
 
-    // --- Ranking de profissionais ---
-
     @GetMapping("/{id}/ranking")
     public ResponseEntity<?> getRanking(@PathVariable Long id) {
         return ResponseEntity.ok(matchService.getRankingByProject(id));
     }
-
-    // --- Empresa demonstra interesse ---
 
     @PostMapping("/{projectId}/interest/{matchId}")
     public ResponseEntity<String> showInterest(
@@ -145,15 +137,11 @@ public class ProjectController {
         return ResponseEntity.ok("Interest sent to professional.");
     }
 
-    // --- Deletar ---
-
     @DeleteMapping("/{id}")
     public ResponseEntity<String> delete(@PathVariable Long id) {
         projectService.delete(id);
         return ResponseEntity.ok("Project deleted.");
     }
-
-    // --- Utilitários ---
 
     private UserDTO getLoggedUser() {
         return (UserDTO) SecurityContextHolder.getContext()

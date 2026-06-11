@@ -1,7 +1,6 @@
 package com.main.nexus.controller;
 
 import com.main.nexus.dto.UserSummaryDTO;
-import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.UserRepository;
 import com.main.nexus.service.CompanyService;
@@ -39,8 +38,6 @@ public class AdminController {
     @Autowired
     private SkillService skillService;
 
-    // --- Dashboard ---
-
     @GetMapping("/dashboard")
     public ResponseEntity<Map<String, Object>> dashboard() {
         Map<String, Object> data = new HashMap<>();
@@ -50,8 +47,6 @@ public class AdminController {
         data.put("pendingCompanies", companyService.findPending().size());
         return ResponseEntity.ok(data);
     }
-
-    // --- Aprovação de empresas ---
 
     @GetMapping("/companies/pending")
     public ResponseEntity<?> pendingCompanies() {
@@ -69,8 +64,6 @@ public class AdminController {
         companyService.reject(id);
         return ResponseEntity.ok("Company rejected.");
     }
-
-    // --- Skills ---
 
     @GetMapping("/skills")
     public ResponseEntity<?> listSkills() {
@@ -91,7 +84,6 @@ public class AdminController {
         return ResponseEntity.ok("Skill deleted.");
     }
 
-    // --- Usuários ---
     @GetMapping("/users")
     public ResponseEntity<List<UserSummaryDTO>> listUsers() {
         List<UserSummaryDTO> users = userRepository.findAll()
