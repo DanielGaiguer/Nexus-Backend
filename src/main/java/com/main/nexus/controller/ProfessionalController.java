@@ -104,6 +104,7 @@ public class ProfessionalController {
         existing.setAvailable(request.available());
         existing.setLatitude(request.latitude());
         existing.setLongitude(request.longitude());
+        existing.setPreferredTypes(request.preferredTypes());
 
         professionalService.update(existing);
         return ResponseEntity.ok(toProfileDTO(existing));
@@ -174,7 +175,8 @@ public class ProfessionalController {
                 p.getReputation(),
                 p.getLatitude(),
                 p.getLongitude(),
-                p.getSkills().stream().map(Skill::getName).toList()
+                p.getSkills().stream().map(Skill::getName).toList(),
+                p.getPreferredTypes()
         );
     }
 }

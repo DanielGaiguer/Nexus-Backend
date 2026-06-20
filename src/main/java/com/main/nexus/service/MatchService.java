@@ -107,16 +107,19 @@ public class MatchService {
     private double calculateAvailabilityScore(Professional professional) {
         return Boolean.TRUE.equals(professional.getAvailable()) ? 100.0 : 0.0;
     }
-
-    // -------------------------------------------------------
+    
     // Gera ranking de profissionais para um projeto
-    // -------------------------------------------------------
     public List<Match> generateRankingForProject(Project project) {
         List<Professional> allProfessionals = professionalRepository.findAll();
         List<Match> matches = new ArrayList<>();
 
         for (Professional professional : allProfessionals) {
-            // Verifica se já existe um match para esse par
+
+            // Filtro de pré-requisito — se o profissional não aceita esse tipo de projeto, nem entra no ranking
+            if (!matchesProjectType(professional, project)) {
+                continue;
+            }
+
             boolean alreadyExists = matchRepository
                     .findByProjectIdAndProfessionalId(project.getId(), professional.getId())
                     .isPresent();
@@ -132,14 +135,15 @@ public class MatchService {
             matches.add(match);
         }
 
-        // Ordena por score decrescente e salva
         matches.sort(Comparator.comparingDouble(Match::getMatchScore).reversed());
         return matchRepository.saveAll(matches);
     }
 
-    // -------------------------------------------------------
+    private boolean matchesProjectType(Professional professional, Project project) {
+        return professional.getPreferredTypes().contains(project.getType());
+    }
+
     // Fluxo bilateral de interesse
-    // -------------------------------------------------------
 
     // Empresa demonstra interesse em um profissional
     public Match companyShowsInterest(Long matchId) {
@@ -174,9 +178,7 @@ public class MatchService {
         return matchRepository.save(match);
     }
 
-    // -------------------------------------------------------
     // Consultas
-    // -------------------------------------------------------
 
     public List<Match> getRankingByProject(Long projectId) {
         return matchRepository.findByProjectId(projectId)

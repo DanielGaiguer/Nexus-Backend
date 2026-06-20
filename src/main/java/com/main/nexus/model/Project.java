@@ -2,6 +2,7 @@ package com.main.nexus.model;
 
 import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.model.enums.ProjectType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -53,6 +54,10 @@ public class Project {
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ProjectType type;
 
     @ManyToMany
     @JoinTable(
@@ -148,5 +153,21 @@ public class Project {
 
     public void setRequiredSkills(List<Skill> requiredSkills) {
         this.requiredSkills = requiredSkills;
+    }
+
+    public Modality getModality() {
+        return modality;
+    }
+
+    public void setModality(Modality modality) {
+        this.modality = modality;
+    }
+
+    public ProjectType getType() {
+        return type;
+    }
+
+    public void setType(ProjectType type) {
+        this.type = type;
     }
 }

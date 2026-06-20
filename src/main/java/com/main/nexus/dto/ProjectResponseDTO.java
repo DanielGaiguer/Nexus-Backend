@@ -3,6 +3,7 @@ package com.main.nexus.dto;
 
 import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.model.enums.ProjectType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +16,7 @@ public record ProjectResponseDTO(
         Double maximumBudget,
         LocalDate deadline,
         Modality workMode,
+        ProjectType type,
         ProjectStatus status,
         LocalDateTime createdAt,
         List<String> requiredSkills,

@@ -1,6 +1,7 @@
 
 package com.main.nexus.dto;
 
+import com.main.nexus.model.enums.ProjectType;
 import java.util.List;
 
 public record ProfessionalProfileDTO(
@@ -15,5 +16,6 @@ public record ProfessionalProfileDTO(
         Double reputation,
         Double latitude,
         Double longitude,
-        List<String> skills
+        List<String> skills,
+        List<ProjectType> preferredTypes
 ) {}

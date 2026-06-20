@@ -4,6 +4,7 @@ package com.main.nexus.dto;
 import com.main.nexus.model.enums.Modality;
 import java.time.LocalDate;
 import java.util.List;
+import com.main.nexus.model.enums.ProjectType;
 
 public record ProjectRequestDTO(
         String title,
@@ -12,5 +13,6 @@ public record ProjectRequestDTO(
         Double maximumBudget,
         LocalDate deadline,
         Modality workMode,
+        ProjectType type,
         List<Long> skillIds
 ) {}

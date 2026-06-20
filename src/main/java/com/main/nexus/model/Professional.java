@@ -1,8 +1,13 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.ProjectType;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -49,7 +54,16 @@ public class Professional {
     private Double latitude;
     private Double longitude;
 
-    private String resume; // PDF file path
+    private String resume; 
+    
+    @ElementCollection(targetClass = ProjectType.class)
+    @CollectionTable(
+        name = "tb_professional_project_type",
+        joinColumns = @JoinColumn(name = "professional_id")
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "project_type", length = 20)
+    private List<ProjectType> preferredTypes = new ArrayList<>();
 
     @ManyToMany
     @JoinTable(
@@ -172,5 +186,13 @@ public class Professional {
 
     public void setProjects(List<PreviousProject> projects) {
         this.projects = projects;
+    }
+
+    public List<ProjectType> getPreferredTypes() {
+        return preferredTypes;
+    }
+
+    public void setPreferredTypes(List<ProjectType> preferredTypes) {
+        this.preferredTypes = preferredTypes;
     }
 }

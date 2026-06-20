@@ -74,6 +74,7 @@ public class ProjectController {
         project.setMaximumBudget(request.maximumBudget());
         project.setDeadline(request.deadline());
         project.setWorkMode(request.workMode());
+        project.setType(request.type());
 
         if (request.skillIds() != null) {
             project.setRequiredSkills(skillService.findAllById(request.skillIds()));
@@ -93,6 +94,7 @@ public class ProjectController {
         existing.setMaximumBudget(request.maximumBudget());
         existing.setDeadline(request.deadline());
         existing.setWorkMode(request.workMode());
+        existing.setType(request.type());
 
         if (request.skillIds() != null) {
             existing.setRequiredSkills(skillService.findAllById(request.skillIds()));
@@ -110,6 +112,7 @@ public class ProjectController {
                 p.getMaximumBudget(),
                 p.getDeadline(),
                 p.getWorkMode(),
+                p.getType(),
                 p.getStatus(),
                 p.getCreatedAt(),
                 p.getRequiredSkills().stream().map(Skill::getName).toList(),
