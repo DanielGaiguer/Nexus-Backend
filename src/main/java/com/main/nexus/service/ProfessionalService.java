@@ -9,7 +9,9 @@ import com.main.nexus.repository.ProfessionalRepository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ProfessionalService {
@@ -18,10 +20,6 @@ public class ProfessionalService {
     
     public Professional save(Professional professional){
         return professionalRepository.save(professional);
-    }
-    
-    public Professional findById(Long id){
-        return professionalRepository.findByUserId(id).orElseThrow(() -> new RuntimeException("Professional profile not found."));
     }
     
     public List<Professional> findAll() {
@@ -43,6 +41,12 @@ public class ProfessionalService {
         professionalRepository.save(professional);
     }
     
+    public Professional findById(Long professionalId) {
+        return professionalRepository.findById(professionalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Professional not found: " + professionalId));
+    }
+
     public Optional<Professional> findByUserId(Long userId) {
         return professionalRepository.findByUserId(userId);
     }
