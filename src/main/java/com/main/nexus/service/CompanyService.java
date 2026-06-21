@@ -78,4 +78,8 @@ public class CompanyService {
     public Optional<Company> findByUserId(Long userId) {
         return companyRepository.findByUserId(userId);
     }
+    
+    public boolean existsByTaxId(String taxId) {
+        return companyRepository.existsByTaxId(taxId);
+    }
 }

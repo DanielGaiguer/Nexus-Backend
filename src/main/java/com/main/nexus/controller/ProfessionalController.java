@@ -142,30 +142,6 @@ public class ProfessionalController {
                 matchService.getPendingInvitesForProfessional(professional.getId()));
     }
 
-    @PostMapping("/matches/{matchId}/accept")
-    public ResponseEntity<String> acceptMatch(@PathVariable Long matchId) {
-        UserDTO logged = getLoggedUser();
-        Professional professional = professionalService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Profile not found"));
-
-        matchService.professionalAccepts(matchId, professional.getId());
-        return ResponseEntity.ok("Match confirmed! Contact details are now available.");
-    }
-
-    @PostMapping("/matches/{matchId}/reject")
-    public ResponseEntity<String> rejectMatch(
-            @PathVariable Long matchId,
-            @RequestParam String reason) {
-        UserDTO logged = getLoggedUser();
-        Professional professional = professionalService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Profile not found"));
-
-        matchService.professionalRejectsWithFeedback(matchId, professional.getId(), reason);
-        return ResponseEntity.ok("Invite rejected.");
-    }
-
     private UserDTO getLoggedUser() {
         return (UserDTO) SecurityContextHolder.getContext()
                 .getAuthentication()

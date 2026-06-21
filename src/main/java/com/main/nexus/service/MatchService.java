@@ -13,6 +13,7 @@ import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.RejectionFeedbackRepository;
+import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -75,22 +76,24 @@ public class MatchService {
     // Orçamento: pretensão do profissional está dentro do range da vaga?
     private double calculateBudgetScore(Professional professional, Project project) {
         Double profMin = professional.getMinimumSalaryExpectation();
+        Double profMax = professional.getMaximumSalaryExpectation();
         Double projMax = project.getMaximumBudget();
         Double projMin = project.getMinimumBudget();
 
-        if (profMin == null || projMax == null) return 50.0; // sem info = neutro
+        if (profMin == null || projMax == null) return 50.0;
 
-        if (profMin <= projMax) {
-            // Dentro do orçamento — quanto mais próximo do mínimo, melhor
+        // Usa a média da faixa do profissional como referência, em vez de só o mínimo
+        double profExpectation = (profMax != null) ? (profMin + profMax) / 2.0 : profMin;
+
+        if (profExpectation <= projMax) {
             if (projMin != null && projMin > 0) {
-                double ratio = profMin / projMax;
-                return Math.max(0, 100.0 - (ratio * 20)); // penaliza levemente quem pede mais
+                double ratio = profExpectation / projMax;
+                return Math.max(0, 100.0 - (ratio * 20));
             }
             return 100.0;
         }
 
-        // Acima do orçamento — penalidade progressiva
-        double excesso = (profMin - projMax) / projMax;
+        double excesso = (profExpectation - projMax) / projMax;
         return Math.max(0, 100.0 - (excesso * 100));
     }
 
@@ -142,6 +145,24 @@ public class MatchService {
 
         matches.sort(Comparator.comparingDouble(Match::getMatchScore).reversed());
         return matchRepository.saveAll(matches);
+    }
+    
+    @Transactional
+    public void recalculateRankingForProject(Project project) {
+        List<Match> existingMatches = matchRepository.findByProjectId(project.getId());
+
+        for (Match match : existingMatches) {
+            // Só recalcula matches que ainda não avançaram no fluxo de interesse
+            // Não sobrescreve matches já confirmados ou rejeitados
+            if (match.getStatus() == StatusMatch.WAITING) {
+                double newScore = calculateScore(match.getProfessional(), project);
+                match.setMatchScore(newScore);
+            }
+        }
+        matchRepository.saveAll(existingMatches);
+
+        // Gera matches novos para profissionais que ainda não tinham (ex: cadastrados depois)
+        generateRankingForProject(project);
     }
 
     private boolean matchesProjectType(Professional professional, Project project) {
@@ -254,6 +275,26 @@ public class MatchService {
     // ── Profissional vê oportunidades compatíveis ──────────────────────────────
 
     public List<Match> getOpportunitiesForProfessional(Long professionalId) {
+        Professional professional = professionalRepository.findById(professionalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Professional not found"));
+
+        List<Project> openProjects = projectRepository.findByStatus(ProjectStatus.OPEN);
+
+        for (Project project : openProjects) {
+            boolean alreadyExists = matchRepository
+                    .findByProjectIdAndProfessionalId(project.getId(), professionalId)
+                    .isPresent();
+
+            if (!alreadyExists && matchesProjectType(professional, project)) {
+                Match match = new Match();
+                match.setProject(project);
+                match.setProfessional(professional);
+                match.setMatchScore(calculateScore(professional, project));
+                matchRepository.save(match);
+            }
+        }
+
         return matchRepository.findByProfessionalId(professionalId)
                 .stream()
                 .filter(m -> m.getProject().getStatus() == ProjectStatus.OPEN)
@@ -264,7 +305,7 @@ public class MatchService {
     }
 
     // ── Profissional demonstra interesse num projeto ───────────────────────────
-
+    @Transactional
     public Match professionalShowsInterest(Long professionalId, Long projectId) {
         Professional professional = professionalRepository.findById(professionalId)
                 .orElseThrow(() -> new ResponseStatusException(

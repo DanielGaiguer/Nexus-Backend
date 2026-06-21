@@ -1,6 +1,7 @@
 package com.main.nexus.repository;
 
 import com.main.nexus.model.Review;
+import com.main.nexus.model.enums.AuthorType;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,4 +16,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.match.project.company.id = :companyId")
     Double findAverageRatingByCompanyId(Long companyId);
+    
+    boolean existsByMatchIdAndAuthorType(Long matchId, AuthorType authorType);
 }

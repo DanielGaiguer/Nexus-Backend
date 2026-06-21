@@ -46,6 +46,10 @@ public class CompanyController {
         UserDTO logged = getLoggedUser();
         Company existing = companyService.findByUserId(logged.id())
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
+        
+        if (!existing.getTaxId().equals(request.taxId()) && companyService.existsByTaxId(request.taxId())) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Tax ID already in use.");
+        }
 
         existing.setCompanyName(request.companyName());
         existing.setPhone(request.phone());

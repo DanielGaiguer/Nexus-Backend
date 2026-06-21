@@ -5,6 +5,7 @@ import com.main.nexus.model.enums.StatusMatch;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -16,4 +17,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByProjectCompanyId(Long companyId);
     
     long countByStatus(StatusMatch status);
+
+    @Query("SELECT m FROM Match m WHERE m.project.id = :projectId ORDER BY m.matchScore DESC")
+    List<Match> findByProjectIdOrderByMatchScoreDesc(Long projectId);
 }

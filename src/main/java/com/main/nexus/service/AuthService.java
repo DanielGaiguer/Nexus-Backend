@@ -10,6 +10,7 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.User;
 import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.UserType;
+import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -31,6 +32,9 @@ public class AuthService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    private CompanyRepository companyRepository;
 
     @Autowired
     private TokenService tokenService;
@@ -59,6 +63,10 @@ public class AuthService {
     public void registerCompany(RegisterCompanyRequestDTO request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Email already in use.");
+        }
+        
+        if (companyRepository.existsByTaxId(request.taxId())) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Tax ID already registered.");
         }
 
         User user = new User();
@@ -96,12 +104,14 @@ public class AuthService {
         }
 
         if (user.getType() == UserType.COMPANY) {
-            companyService.findByUserId(user.getId()).ifPresent(company -> {
-                if (company.getStatus() != CompanyStatus.APPROVED) {
-                    throw new ResponseStatusException(
-                            HttpStatusCode.valueOf(403), "Company account is pending admin approval.");
-                }
-            });
+            Company company = companyService.findByUserId(user.getId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatusCode.valueOf(500), "Company profile missing for this user."));
+
+            if (company.getStatus() != CompanyStatus.APPROVED) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                        "Company account is pending admin approval.");
+            }
         }
 
         String name = switch (user.getType()) {

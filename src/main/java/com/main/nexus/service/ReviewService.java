@@ -5,7 +5,9 @@ import com.main.nexus.model.Review;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.ReviewRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ReviewService {
@@ -19,19 +21,22 @@ public class ReviewService {
     @Autowired
     private CompanyService companyService;
 
+    // ReviewService.java
     public Review save(Review review) {
         Match match = review.getMatch();
 
-        // Só permite avaliação se o match foi confirmado
         if (match.getStatus() != StatusMatch.MATCHED) {
-            throw new RuntimeException("Reviews are only allowed after a confirmed match");
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Reviews are only allowed after a confirmed match.");
+        }
+
+        if (reviewRepository.existsByMatchIdAndAuthorType(match.getId(), review.getAuthorType())) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(409),
+                    "A review from this author type already exists for this match.");
         }
 
         Review saved = reviewRepository.save(review);
-
-        // Recalcula reputação após salvar
         recalculateReputation(review);
-
         return saved;
     }
 

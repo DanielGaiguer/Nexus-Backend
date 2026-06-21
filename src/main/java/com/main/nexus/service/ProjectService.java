@@ -24,7 +24,13 @@ public class ProjectService {
         matchService.generateRankingForProject(saved);
         return saved;
     }
-
+    
+    public Project update(Project project) {
+        Project saved = projectRepository.save(project);
+        matchService.recalculateRankingForProject(saved);
+        return saved;
+    }
+    
     public Project findById(Long id) {
         return projectRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -48,10 +54,6 @@ public class ProjectService {
 
     public List<Project> findAll() {
         return projectRepository.findAll();
-    }
-
-    public Project update(Project project) {
-        return projectRepository.save(project);
     }
 
     public void closeProject(Long id, Long companyId) {
