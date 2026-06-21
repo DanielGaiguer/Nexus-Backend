@@ -21,14 +21,21 @@ public class ProjectService {
 
     public Project save(Project project) {
         Project saved = projectRepository.save(project);
-        // Ao criar uma vaga, já gera o ranking automaticamente
         matchService.generateRankingForProject(saved);
         return saved;
     }
 
     public Project findById(Long id) {
         return projectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Project not found: " + id));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Project not found: " + id));
+    }
+
+    // ── Novo: busca validando que o projeto pertence à empresa ──────────────
+    public Project findByIdAndCompany(Long id, Long companyId) {
+        Project project = findById(id);
+        validateOwnership(project, companyId);
+        return project;
     }
 
     public List<Project> findByCompany(Company company) {
@@ -47,17 +54,23 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
-    public void closeProject(Long id) {
-        Project project = findById(id);
+    public void closeProject(Long id, Long companyId) {
+        Project project = findByIdAndCompany(id, companyId);
         project.setStatus(ProjectStatus.CLOSED);
         projectRepository.save(project);
     }
-    
-    public void delete(Long id) {
-        if (!projectRepository.existsById(id)) {
+
+    public void delete(Long id, Long companyId) {
+        Project project = findByIdAndCompany(id, companyId);
+        projectRepository.delete(project);
+    }
+
+    // ── Validação de posse ───────────────────────────────────────────────────
+    private void validateOwnership(Project project, Long companyId) {
+        if (!project.getCompany().getId().equals(companyId)) {
             throw new ResponseStatusException(
-                    HttpStatusCode.valueOf(404), "Project not found: " + id);
+                    HttpStatusCode.valueOf(403),
+                    "This project does not belong to your company.");
         }
-        projectRepository.deleteById(id);
     }
 }

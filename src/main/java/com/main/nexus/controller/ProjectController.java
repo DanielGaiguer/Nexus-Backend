@@ -43,10 +43,7 @@ public class ProjectController {
 
     @GetMapping
     public ResponseEntity<List<ProjectResponseDTO>> listMyProjects() {
-        UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company not found"));
+        Company company = getLoggedCompany();
         return ResponseEntity.ok(
                 projectService.findByCompany(company)
                         .stream()
@@ -56,15 +53,14 @@ public class ProjectController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ProjectResponseDTO> findById(@PathVariable Long id) {
-        return ResponseEntity.ok(toResponseDTO(projectService.findById(id)));
+        Company company = getLoggedCompany();
+        Project project = projectService.findByIdAndCompany(id, company.getId());
+        return ResponseEntity.ok(toResponseDTO(project));
     }
 
     @PostMapping
     public ResponseEntity<ProjectResponseDTO> create(@RequestBody ProjectRequestDTO request) {
-        UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company not found"));
+        Company company = getLoggedCompany();
 
         Project project = new Project();
         project.setCompany(company);
@@ -87,7 +83,9 @@ public class ProjectController {
     public ResponseEntity<ProjectResponseDTO> update(
             @PathVariable Long id,
             @RequestBody ProjectRequestDTO request) {
-        Project existing = projectService.findById(id);
+        Company company = getLoggedCompany();
+        Project existing = projectService.findByIdAndCompany(id, company.getId());
+
         existing.setTitle(request.title());
         existing.setDescription(request.description());
         existing.setMinimumBudget(request.minimumBudget());
@@ -105,22 +103,25 @@ public class ProjectController {
 
     @PutMapping("/{id}/close")
     public ResponseEntity<String> closeProject(@PathVariable Long id) {
-        projectService.closeProject(id);
+        Company company = getLoggedCompany();
+        projectService.closeProject(id, company.getId());
         return ResponseEntity.ok("Project closed.");
     }
 
     @GetMapping("/{id}/ranking")
     public ResponseEntity<?> getRanking(@PathVariable Long id) {
+        Company company = getLoggedCompany();
+        // Garante que só o dono do projeto vê o ranking dele
+        projectService.findByIdAndCompany(id, company.getId());
         return ResponseEntity.ok(matchService.getRankingByProject(id));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<String> delete(@PathVariable Long id) {
-        projectService.delete(id);
+        Company company = getLoggedCompany();
+        projectService.delete(id, company.getId());
         return ResponseEntity.ok("Project deleted.");
     }
-
-    // ── showInterest foi removido — use POST /api/matches/{matchId}/company-interest no MatchController ──
 
     private ProjectResponseDTO toResponseDTO(Project p) {
         return new ProjectResponseDTO(
@@ -144,5 +145,12 @@ public class ProjectController {
         return (UserDTO) SecurityContextHolder.getContext()
                 .getAuthentication()
                 .getPrincipal();
+    }
+
+    private Company getLoggedCompany() {
+        UserDTO logged = getLoggedUser();
+        return companyService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Company not found"));
     }
 }
