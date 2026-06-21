@@ -102,7 +102,26 @@ public class ProjectController {
 
         return ResponseEntity.ok(toResponseDTO(projectService.update(existing)));
     }
-    
+
+    @PutMapping("/{id}/close")
+    public ResponseEntity<String> closeProject(@PathVariable Long id) {
+        projectService.closeProject(id);
+        return ResponseEntity.ok("Project closed.");
+    }
+
+    @GetMapping("/{id}/ranking")
+    public ResponseEntity<?> getRanking(@PathVariable Long id) {
+        return ResponseEntity.ok(matchService.getRankingByProject(id));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> delete(@PathVariable Long id) {
+        projectService.delete(id);
+        return ResponseEntity.ok("Project deleted.");
+    }
+
+    // ── showInterest foi removido — use POST /api/matches/{matchId}/company-interest no MatchController ──
+
     private ProjectResponseDTO toResponseDTO(Project p) {
         return new ProjectResponseDTO(
                 p.getId(),
@@ -119,31 +138,6 @@ public class ProjectController {
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName()
         );
-    }
-    
-    @PutMapping("/{id}/close")
-    public ResponseEntity<String> closeProject(@PathVariable Long id) {
-        projectService.closeProject(id);
-        return ResponseEntity.ok("Project closed.");
-    }
-
-    @GetMapping("/{id}/ranking")
-    public ResponseEntity<?> getRanking(@PathVariable Long id) {
-        return ResponseEntity.ok(matchService.getRankingByProject(id));
-    }
-
-    @PostMapping("/{projectId}/interest/{matchId}")
-    public ResponseEntity<String> showInterest(
-            @PathVariable Long projectId,
-            @PathVariable Long matchId) {
-        matchService.companyShowsInterest(matchId);
-        return ResponseEntity.ok("Interest sent to professional.");
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<String> delete(@PathVariable Long id) {
-        projectService.delete(id);
-        return ResponseEntity.ok("Project deleted.");
     }
 
     private UserDTO getLoggedUser() {

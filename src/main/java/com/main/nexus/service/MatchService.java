@@ -6,10 +6,12 @@ import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.InterestStatus;
+import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.RejectionReason;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
+import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.RejectionFeedbackRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,6 +32,9 @@ public class MatchService {
     
     @Autowired
     private RejectionFeedbackRepository rejectionFeedbackRepository;
+    
+    @Autowired
+    private ProjectRepository projectRepository;
 
     // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
@@ -145,25 +150,188 @@ public class MatchService {
 
     // Fluxo bilateral de interesse
 
-    // Empresa demonstra interesse em um profissional
-    public Match companyShowsInterest(Long matchId) {
-        Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> new RuntimeException("Match not found"));
+    // empresa demonstra interesse
+    public Match companyShowsInterest(Long matchId, Long companyId) {
+        Match match = findById(matchId);
+        validateCompanyOwnership(match, companyId);
+
+        if (match.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED) {
+            match.setCompanyStatus(InterestStatus.INTERESTED);
+            match.setStatus(StatusMatch.MATCHED);
+        } else {
+            match.setCompanyStatus(InterestStatus.INTERESTED);
+            match.setStatus(StatusMatch.COMPANY_INTERESTED);
+        }
+        return matchRepository.save(match);
+    }
+
+    public Match companyAccepts(Long matchId, Long companyId) {
+        Match match = findById(matchId);
+        validateCompanyOwnership(match, companyId);
+
+        if (match.getStatus() != StatusMatch.PROFESSIONAL_INTERESTED) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "This match is not awaiting a company response.");
+        }
 
         match.setCompanyStatus(InterestStatus.INTERESTED);
-        match.setStatus(StatusMatch.COMPANY_INTERESTED);
+        match.setStatus(StatusMatch.MATCHED);
+        return matchRepository.save(match);
+    }
+
+    public Match companyRejectsWithFeedback(Long matchId, Long companyId, String reason) {
+        Match match = findById(matchId);
+        validateCompanyOwnership(match, companyId);
+
+        match.setCompanyStatus(InterestStatus.REJECTED);
+        match.setStatus(StatusMatch.REJECTED);
+        Match saved = matchRepository.save(match);
+
+        saveRejectionFeedback(match, reason);
+        return saved;
+    }
+
+    public Match professionalAccepts(Long matchId, Long professionalId) {
+        Match match = findById(matchId);
+        validateProfessionalOwnership(match, professionalId);
+
+        if (match.getStatus() != StatusMatch.COMPANY_INTERESTED) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "This match is not awaiting a professional response.");
+        }
+
+        match.setProfessionalStatus(InterestStatus.INTERESTED);
+        match.setStatus(StatusMatch.MATCHED);
+        return matchRepository.save(match);
+    }
+
+    public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, String reason) {
+        Match match = findById(matchId);
+        validateProfessionalOwnership(match, professionalId);
+
+        match.setProfessionalStatus(InterestStatus.REJECTED);
+        match.setStatus(StatusMatch.REJECTED);
+        Match saved = matchRepository.save(match);
+
+        saveRejectionFeedback(match, reason);
+        return saved;
+    }
+
+    // ── Validações de posse ───────────────────────────────────────────────────
+
+    private void validateCompanyOwnership(Match match, Long companyId) {
+        if (!match.getProject().getCompany().getId().equals(companyId)) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "This match does not belong to your company.");
+        }
+    }
+
+    private void validateProfessionalOwnership(Match match, Long professionalId) {
+        if (!match.getProfessional().getId().equals(professionalId)) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "This match does not belong to you.");
+        }
+    }
+
+    // ── Helper de feedback reaproveitado pelos dois lados ──────────────────────
+
+    private void saveRejectionFeedback(Match match, String reason) {
+        RejectionReason rejectionReason;
+        try {
+            rejectionReason = RejectionReason.valueOf(reason.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            rejectionReason = RejectionReason.OTHER;
+        }
+
+        RejectionFeedback feedback = new RejectionFeedback();
+        feedback.setProfessional(match.getProfessional());
+        feedback.setProject(match.getProject());
+        feedback.setReason(rejectionReason);
+        rejectionFeedbackRepository.save(feedback);
+    }
+
+    // profissional demonstra interesse
+    // ── Profissional vê oportunidades compatíveis ──────────────────────────────
+
+    public List<Match> getOpportunitiesForProfessional(Long professionalId) {
+        return matchRepository.findByProfessionalId(professionalId)
+                .stream()
+                .filter(m -> m.getProject().getStatus() == ProjectStatus.OPEN)
+                .filter(m -> m.getStatus() == StatusMatch.WAITING
+                          || m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
+                .sorted(Comparator.comparingDouble(Match::getMatchScore).reversed())
+                .toList();
+    }
+
+    // ── Profissional demonstra interesse num projeto ───────────────────────────
+
+    public Match professionalShowsInterest(Long professionalId, Long projectId) {
+        Professional professional = professionalRepository.findById(professionalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Professional not found"));
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Project not found"));
+
+        // Busca match existente, ou cria um novo se não existir
+        Match match = matchRepository
+                .findByProjectIdAndProfessionalId(projectId, professionalId)
+                .orElseGet(() -> {
+                    Match newMatch = new Match();
+                    newMatch.setProject(project);
+                    newMatch.setProfessional(professional);
+                    newMatch.setMatchScore(calculateScore(professional, project));
+                    return newMatch;
+                });
+
+        // Se a empresa já tinha demonstrado interesse, isso já confirma o match
+        if (match.getStatus() == StatusMatch.COMPANY_INTERESTED) {
+            match.setProfessionalStatus(InterestStatus.INTERESTED);
+            match.setStatus(StatusMatch.MATCHED);
+        } else {
+            match.setProfessionalStatus(InterestStatus.INTERESTED);
+            match.setStatus(StatusMatch.PROFESSIONAL_INTERESTED);
+        }
 
         return matchRepository.save(match);
     }
 
+    public Match companyRejectsWithFeedback(Long matchId, String reason) {
+        Match match = findById(matchId);
+        match.setCompanyStatus(InterestStatus.REJECTED);
+        match.setStatus(StatusMatch.REJECTED);
+        Match saved = matchRepository.save(match);
+
+        // Empresas também podem gerar feedback de rejeição — mesmo mecanismo de aprendizado
+        RejectionReason rejectionReason;
+        try {
+            rejectionReason = RejectionReason.valueOf(reason.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            rejectionReason = RejectionReason.OTHER;
+        }
+
+        RejectionFeedback feedback = new RejectionFeedback();
+        feedback.setProfessional(match.getProfessional());
+        feedback.setProject(match.getProject());
+        feedback.setReason(rejectionReason);
+        rejectionFeedbackRepository.save(feedback);
+
+        return saved;
+    }
+
     // Profissional aceita o convite
     public Match professionalAccepts(Long matchId) {
-        Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> new RuntimeException("Match not found"));
+        Match match = findById(matchId);
+
+        if (match.getStatus() != StatusMatch.COMPANY_INTERESTED) {
+            throw new ResponseStatusException(
+                    HttpStatusCode.valueOf(400),
+                    "This match is not awaiting a professional response.");
+        }
 
         match.setProfessionalStatus(InterestStatus.INTERESTED);
-        match.setStatus(StatusMatch.MATCHED); // contatos liberados
-
+        match.setStatus(StatusMatch.MATCHED);
         return matchRepository.save(match);
     }
 

@@ -179,4 +179,27 @@ public class ProfessionalController {
                 p.getPreferredTypes()
         );
     }
+    
+    // Lista oportunidades compatíveis — "projetos vistos por mim"
+    @GetMapping("/opportunities")
+    public ResponseEntity<?> getOpportunities() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        return ResponseEntity.ok(matchService.getOpportunitiesForProfessional(professional.getId()));
+    }
+
+    // Profissional demonstra interesse em um projeto
+    @PostMapping("/opportunities/{projectId}/interest")
+    public ResponseEntity<String> showInterestInProject(@PathVariable Long projectId) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        matchService.professionalShowsInterest(professional.getId(), projectId);
+        return ResponseEntity.ok("Interest sent to company.");
+    }
 }
