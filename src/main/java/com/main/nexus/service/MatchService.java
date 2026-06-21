@@ -297,44 +297,6 @@ public class MatchService {
         return matchRepository.save(match);
     }
 
-    public Match companyRejectsWithFeedback(Long matchId, String reason) {
-        Match match = findById(matchId);
-        match.setCompanyStatus(InterestStatus.REJECTED);
-        match.setStatus(StatusMatch.REJECTED);
-        Match saved = matchRepository.save(match);
-
-        // Empresas também podem gerar feedback de rejeição — mesmo mecanismo de aprendizado
-        RejectionReason rejectionReason;
-        try {
-            rejectionReason = RejectionReason.valueOf(reason.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            rejectionReason = RejectionReason.OTHER;
-        }
-
-        RejectionFeedback feedback = new RejectionFeedback();
-        feedback.setProfessional(match.getProfessional());
-        feedback.setProject(match.getProject());
-        feedback.setReason(rejectionReason);
-        rejectionFeedbackRepository.save(feedback);
-
-        return saved;
-    }
-
-    // Profissional aceita o convite
-    public Match professionalAccepts(Long matchId) {
-        Match match = findById(matchId);
-
-        if (match.getStatus() != StatusMatch.COMPANY_INTERESTED) {
-            throw new ResponseStatusException(
-                    HttpStatusCode.valueOf(400),
-                    "This match is not awaiting a professional response.");
-        }
-
-        match.setProfessionalStatus(InterestStatus.INTERESTED);
-        match.setStatus(StatusMatch.MATCHED);
-        return matchRepository.save(match);
-    }
-
     // Profissional recusa o convite
     public Match professionalRejects(Long matchId) {
         Match match = matchRepository.findById(matchId)
@@ -392,29 +354,5 @@ public class MatchService {
                 .stream()
                 .filter(m -> m.getStatus() == StatusMatch.MATCHED)
                 .count();
-    }
-
-    // Profissional rejeita e registra o motivo
-    public Match professionalRejectsWithFeedback(Long matchId, String reason) {
-        Match match = findById(matchId);
-        match.setProfessionalStatus(InterestStatus.REJECTED);
-        match.setStatus(StatusMatch.REJECTED);
-        Match saved = matchRepository.save(match);
-
-        // Registra o feedback para o aprendizado contínuo
-        RejectionReason rejectionReason;
-        try {
-            rejectionReason = RejectionReason.valueOf(reason.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            rejectionReason = RejectionReason.OTHER;
-        }
-
-        RejectionFeedback feedback = new RejectionFeedback();
-        feedback.setProfessional(match.getProfessional());
-        feedback.setProject(match.getProject());
-        feedback.setReason(rejectionReason);
-        rejectionFeedbackRepository.save(feedback);
-
-        return saved;
     }
 }

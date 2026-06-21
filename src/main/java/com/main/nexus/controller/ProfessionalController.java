@@ -144,7 +144,12 @@ public class ProfessionalController {
 
     @PostMapping("/matches/{matchId}/accept")
     public ResponseEntity<String> acceptMatch(@PathVariable Long matchId) {
-        matchService.professionalAccepts(matchId);
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        matchService.professionalAccepts(matchId, professional.getId());
         return ResponseEntity.ok("Match confirmed! Contact details are now available.");
     }
 
@@ -152,7 +157,12 @@ public class ProfessionalController {
     public ResponseEntity<String> rejectMatch(
             @PathVariable Long matchId,
             @RequestParam String reason) {
-        matchService.professionalRejectsWithFeedback(matchId, reason);
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        matchService.professionalRejectsWithFeedback(matchId, professional.getId(), reason);
         return ResponseEntity.ok("Invite rejected.");
     }
 
