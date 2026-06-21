@@ -38,6 +38,9 @@ public class AuthService {
 
     @Autowired
     private TokenService tokenService;
+    
+    @Autowired
+    private EmailService emailService;
 
     public void registerProfessional(RegisterProfessionalRequestDTO request) {
         if (userRepository.existsByEmail(request.email())) {
@@ -58,6 +61,13 @@ public class AuthService {
         professional.setMinimumSalaryExpectation(request.minimumSalary());
         professional.setMaximumSalaryExpectation(request.maximumSalary());
         professionalService.save(professional);
+        
+        emailService.send(
+            savedUser.getEmail(),
+            "Bem-vindo ao Nexus!",
+            "Olá " + request.name() + ",\n\nSua conta foi criada com sucesso. " +
+            "Complete seu perfil e suas skills para começar a receber oportunidades compatíveis.\n\nEquipe Nexus"
+        );
     }
 
     public void registerCompany(RegisterCompanyRequestDTO request) {
@@ -84,6 +94,13 @@ public class AuthService {
         company.setDescription(request.description());
         company.setStatus(CompanyStatus.PENDING);
         companyService.save(company);
+        
+        emailService.send(
+            savedUser.getEmail(),
+            "Cadastro recebido — Nexus",
+            "Olá " + request.companyName() + ",\n\nSeu cadastro foi recebido e está em análise pelo administrador. " +
+            "Você receberá um e-mail assim que sua conta for aprovada.\n\nEquipe Nexus"
+        );
     }
 
     public LoginResponseDTO login(LoginRequestDTO request) {
