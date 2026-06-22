@@ -1,5 +1,6 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.InitiatedBy;
 import com.main.nexus.model.enums.InterestStatus;
 import com.main.nexus.model.enums.StatusMatch;
 import jakarta.persistence.Column;
@@ -48,6 +49,17 @@ public class Match {
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+    
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private InitiatedBy initiatedBy;
+
+    public InitiatedBy getInitiatedBy() { 
+        return initiatedBy; 
+    }
+    public void setInitiatedBy(InitiatedBy initiatedBy) { 
+        this.initiatedBy = initiatedBy; 
+    }
 
     public Long getId() {
         return id;

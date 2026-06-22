@@ -5,6 +5,7 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
+import com.main.nexus.model.enums.InitiatedBy;
 import com.main.nexus.model.enums.InterestStatus;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.RejectionReason;
@@ -36,6 +37,9 @@ public class MatchService {
     
     @Autowired
     private ProjectRepository projectRepository;
+    
+    @Autowired
+    private EmailService emailService;
 
     // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
@@ -122,16 +126,11 @@ public class MatchService {
         List<Match> matches = new ArrayList<>();
 
         for (Professional professional : allProfessionals) {
-
-            // Filtro de pré-requisito — se o profissional não aceita esse tipo de projeto, nem entra no ranking
-            if (!matchesProjectType(professional, project)) {
-                continue;
-            }
+            if (!matchesProjectType(professional, project)) continue;
 
             boolean alreadyExists = matchRepository
                     .findByProjectIdAndProfessionalId(project.getId(), professional.getId())
                     .isPresent();
-
             if (alreadyExists) continue;
 
             double score = calculateScore(professional, project);
@@ -141,6 +140,17 @@ public class MatchService {
             match.setProfessional(professional);
             match.setMatchScore(score);
             matches.add(match);
+
+            if (score >= 90.0) {
+                emailService.send(
+                    professional.getUser().getEmail(),
+                    "Nova oportunidade muito compatível com você!",
+                    "Olá " + professional.getName() + ",\n\n" +
+                    "Encontramos um projeto com " + String.format("%.0f", score) + "% de compatibilidade com seu perfil:\n\n" +
+                    "\"" + project.getTitle() + "\" — " + project.getCompany().getCompanyName() + "\n\n" +
+                    "Acesse o Nexus para ver os detalhes e demonstrar interesse.\n\nEquipe Nexus"
+                );
+            }
         }
 
         matches.sort(Comparator.comparingDouble(Match::getMatchScore).reversed());
@@ -176,16 +186,35 @@ public class MatchService {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
 
-        if (match.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED) {
+        boolean wasAlreadyProfessionalInterested = match.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED;
+
+        if (wasAlreadyProfessionalInterested) {
             match.setCompanyStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.MATCHED);
         } else {
             match.setCompanyStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.COMPANY_INTERESTED);
+            match.setInitiatedBy(InitiatedBy.COMPANY);
         }
-        return matchRepository.save(match);
-    }
 
+        Match saved = matchRepository.save(match);
+
+        if (wasAlreadyProfessionalInterested) {
+            notifyMutualMatch(saved);
+        } else {
+            Professional professional = match.getProfessional();
+            emailService.send(
+                professional.getUser().getEmail(),
+                "Você recebeu um convite — Nexus",
+                "Olá " + professional.getName() + ",\n\n" +
+                match.getProject().getCompany().getCompanyName() + " demonstrou interesse no seu perfil " +
+                "para o projeto \"" + match.getProject().getTitle() + "\".\n\n" +
+                "Acesse o Nexus para aceitar ou recusar o convite.\n\nEquipe Nexus"
+            );
+        }
+
+        return saved;
+    }
     public Match companyAccepts(Long matchId, Long companyId) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
@@ -315,7 +344,6 @@ public class MatchService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Project not found"));
 
-        // Busca match existente, ou cria um novo se não existir
         Match match = matchRepository
                 .findByProjectIdAndProfessionalId(projectId, professionalId)
                 .orElseGet(() -> {
@@ -323,11 +351,14 @@ public class MatchService {
                     newMatch.setProject(project);
                     newMatch.setProfessional(professional);
                     newMatch.setMatchScore(calculateScore(professional, project));
+                    newMatch.setInitiatedBy(InitiatedBy.PROFESSIONAL);
                     return newMatch;
                 });
 
-        // Se a empresa já tinha demonstrado interesse, isso já confirma o match
-        if (match.getStatus() == StatusMatch.COMPANY_INTERESTED) {
+        // Verifica o estado ANTES de qualquer alteração
+        boolean wasAlreadyCompanyInterested = match.getStatus() == StatusMatch.COMPANY_INTERESTED;
+
+        if (wasAlreadyCompanyInterested) {
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.MATCHED);
         } else {
@@ -335,18 +366,13 @@ public class MatchService {
             match.setStatus(StatusMatch.PROFESSIONAL_INTERESTED);
         }
 
-        return matchRepository.save(match);
-    }
+        Match saved = matchRepository.save(match);
 
-    // Profissional recusa o convite
-    public Match professionalRejects(Long matchId) {
-        Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> new RuntimeException("Match not found"));
+        if (wasAlreadyCompanyInterested) {
+            notifyMutualMatch(saved);
+        }
 
-        match.setProfessionalStatus(InterestStatus.REJECTED);
-        match.setStatus(StatusMatch.REJECTED);
-
-        return matchRepository.save(match);
+        return saved;
     }
 
     // Consultas
@@ -395,5 +421,33 @@ public class MatchService {
                 .stream()
                 .filter(m -> m.getStatus() == StatusMatch.MATCHED)
                 .count();
+    }
+    
+    private void notifyMutualMatch(Match match) {
+        String professionalEmail = match.getProfessional().getUser().getEmail();
+        String companyEmail = match.getProject().getCompany().getUser().getEmail();
+        String professionalName = match.getProfessional().getName();
+        String companyName = match.getProject().getCompany().getCompanyName();
+        String projectTitle = match.getProject().getTitle();
+
+        if (match.getInitiatedBy() == InitiatedBy.PROFESSIONAL) {
+            // Profissional iniciou, empresa correspondeu agora — avisa o profissional
+            emailService.send(
+                professionalEmail,
+                "Seu interesse foi correspondido! — Nexus",
+                "Olá " + professionalName + ",\n\n" +
+                companyName + " também demonstrou interesse em você para o projeto \"" + projectTitle + "\".\n\n" +
+                "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
+            );
+        } else if (match.getInitiatedBy() == InitiatedBy.COMPANY) {
+            // Empresa iniciou, profissional correspondeu agora — avisa a empresa
+            emailService.send(
+                companyEmail,
+                "Seu interesse foi correspondido! — Nexus",
+                "Olá " + companyName + ",\n\n" +
+                professionalName + " também demonstrou interesse no projeto \"" + projectTitle + "\".\n\n" +
+                "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
+            );
+        }
     }
 }
