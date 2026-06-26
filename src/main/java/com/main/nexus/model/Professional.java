@@ -41,6 +41,12 @@ public class Professional {
 
     @Column(length = 100)
     private String city;
+ 
+    @Column(length = 3)
+    private String uf;
+    
+    @Column(length = 9)
+    private String cep;
 
     private Double minimumSalaryExpectation;
     private Double maximumSalaryExpectation;
@@ -115,6 +121,24 @@ public class Professional {
     public void setCity(String city) {
         this.city = city;
     }
+
+    public String getUf() {
+        return uf;
+    }
+
+    public void setUf(String uf) {
+        this.uf = uf;
+    }
+
+    public String getCep() {
+        return cep;
+    }
+
+    public void setCep(String cep) {
+        this.cep = cep;
+    }
+    
+    
 
     public Double getMinimumSalaryExpectation() {
         return minimumSalaryExpectation;

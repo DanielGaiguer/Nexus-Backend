@@ -35,6 +35,12 @@ public class Company {
 
     @Column(length = 100)
     private String city;
+    
+    @Column(length = 3)
+    private String uf;
+    
+    @Column(length = 9)
+    private String cep;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -95,6 +101,22 @@ public class Company {
 
     public void setCity(String city) {
         this.city = city;
+    }
+
+    public String getUf() {
+        return uf;
+    }
+
+    public void setUf(String uf) {
+        this.uf = uf;
+    }
+
+    public String getCep() {
+        return cep;
+    }
+
+    public void setCep(String cep) {
+        this.cep = cep;
     }
 
     public String getDescription() {

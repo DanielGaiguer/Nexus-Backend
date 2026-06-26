@@ -5,6 +5,7 @@ import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProjectService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,9 @@ public class CompanyController {
     @Autowired
     private MatchService matchService;
 
+    @Autowired
+    private GeolocationService geolocationService;
+
     @GetMapping("/profile")
     public ResponseEntity<CompanyProfileDTO> getProfile() {
         UserDTO logged = getLoggedUser();
@@ -53,10 +57,16 @@ public class CompanyController {
 
         existing.setCompanyName(request.companyName());
         existing.setPhone(request.phone());
-        existing.setCity(request.city());
+        existing.setCep(request.cep());
         existing.setDescription(request.description());
-        existing.setLatitude(request.latitude());
-        existing.setLongitude(request.longitude());
+
+        if (request.cep() != null && !request.cep().isBlank()) {
+            GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
+            existing.setLatitude(address.latitude());
+            existing.setLongitude(address.longitude());
+            existing.setCity(address.city());
+            existing.setUf(address.state());
+        }
 
         companyService.update(existing);
         return ResponseEntity.ok(toProfileDTO(existing));
@@ -90,6 +100,8 @@ public class CompanyController {
                 c.getTaxId(),
                 c.getPhone(),
                 c.getCity(),
+                c.getUf(),
+                c.getCep(),
                 c.getDescription(),
                 c.getReputation(),
                 c.getLatitude(),

@@ -6,6 +6,7 @@ import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Skill;
+import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.ProfessionalService;
@@ -22,7 +23,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -41,6 +41,9 @@ public class ProfessionalController {
     
     @Autowired
     private PreviousProjectService previousProjectService;
+    
+    @Autowired
+    private GeolocationService geolocationService;
 
     @GetMapping("/projects")
     public ResponseEntity<?> listPreviousProjects() {
@@ -98,13 +101,21 @@ public class ProfessionalController {
 
         existing.setName(request.name());
         existing.setPhone(request.phone());
-        existing.setCity(request.city());
+        existing.setCep(request.cep());
         existing.setMinimumSalaryExpectation(request.minimumSalary());
         existing.setMaximumSalaryExpectation(request.maximumSalary());
         existing.setAvailable(request.available());
         existing.setLatitude(request.latitude());
         existing.setLongitude(request.longitude());
         existing.setPreferredTypes(request.preferredTypes());
+        
+        if (request.cep() != null && !request.cep().isBlank()) {
+            GeolocationService.AddressData coords = geolocationService.resolveFromCep(request.cep());
+            existing.setLatitude(coords.latitude());
+            existing.setLongitude(coords.longitude());
+            existing.setCity(coords.city());
+            existing.setUf(coords.state());
+        }
 
         professionalService.update(existing);
         return ResponseEntity.ok(toProfileDTO(existing));
@@ -155,6 +166,8 @@ public class ProfessionalController {
                 p.getUser().getEmail(),
                 p.getPhone(),
                 p.getCity(),
+                p.getUf(),
+                p.getCep(),
                 p.getMinimumSalaryExpectation(),
                 p.getMaximumSalaryExpectation(),
                 p.getAvailable(),

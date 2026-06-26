@@ -7,6 +7,6 @@ public record RegisterCompanyRequestDTO(
         String companyName,
         String taxId,
         String phone,
-        String city,
+        String cep,
         String description
 ) {}

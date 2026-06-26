@@ -6,7 +6,7 @@ public record RegisterProfessionalRequestDTO(
         String password,
         String name,
         String phone,
-        String city,
+        String cep,
         Double minimumSalary,
         Double maximumSalary
 ) {}

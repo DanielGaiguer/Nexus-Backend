@@ -42,6 +42,9 @@ public class AuthService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private GeolocationService geolocationService;
+
     public void registerProfessional(RegisterProfessionalRequestDTO request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Email already in use.");
@@ -57,7 +60,16 @@ public class AuthService {
         professional.setUser(savedUser);
         professional.setName(request.name());
         professional.setPhone(request.phone());
-        professional.setCity(request.city());
+        professional.setCep(request.cep());
+
+        if (request.cep() != null && !request.cep().isBlank()) {
+            GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
+            professional.setLatitude(address.latitude());
+            professional.setLongitude(address.longitude());
+            professional.setCity(address.city());
+            professional.setUf(address.state());
+        }
+
         professional.setMinimumSalaryExpectation(request.minimumSalary());
         professional.setMaximumSalaryExpectation(request.maximumSalary());
         professionalService.save(professional);
@@ -90,7 +102,16 @@ public class AuthService {
         company.setCompanyName(request.companyName());
         company.setTaxId(request.taxId());
         company.setPhone(request.phone());
-        company.setCity(request.city());
+        company.setCep(request.cep());
+
+        if (request.cep() != null && !request.cep().isBlank()) {
+            GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
+            company.setLatitude(address.latitude());
+            company.setLongitude(address.longitude());
+            company.setCity(address.city());
+            company.setUf(address.state());
+        }
+
         company.setDescription(request.description());
         company.setStatus(CompanyStatus.PENDING);
         companyService.save(company);

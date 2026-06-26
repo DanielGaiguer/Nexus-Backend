@@ -8,6 +8,8 @@ public record CompanyProfileDTO(
         String taxId,
         String phone,
         String city,
+        String uf,
+        String cep,
         String description,
         Double reputation,
         Double latitude,

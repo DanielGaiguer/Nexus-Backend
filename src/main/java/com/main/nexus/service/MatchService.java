@@ -7,6 +7,7 @@ import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.InitiatedBy;
 import com.main.nexus.model.enums.InterestStatus;
+import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.RejectionReason;
 import com.main.nexus.model.enums.StatusMatch;
@@ -52,12 +53,68 @@ public class MatchService {
         double historyScore     = calculateHistoryScore(professional);
         double reputationScore  = calculateReputationScore(professional);
         double availabilityScore = calculateAvailabilityScore(professional);
+        
+        boolean considersDistance = project.getWorkMode() == Modality.ONSITE || project.getWorkMode() == Modality.HYBRID;
 
-        return (skillScore       * 0.35)
-             + (budgetScore      * 0.25)
-             + (historyScore     * 0.20)
-             + (reputationScore  * 0.10)
+        if (considersDistance) {
+            double distanceScore = calculateDistanceScore(professional, project);
+
+            return (skillScore        * 0.30)
+                + (budgetScore       * 0.20)
+                + (historyScore      * 0.17)
+                + (reputationScore   * 0.09)
+                + (availabilityScore * 0.09)
+                + (distanceScore     * 0.15);
+        }
+
+        return (skillScore        * 0.35)
+             + (budgetScore       * 0.25)
+             + (historyScore      * 0.20)
+             + (reputationScore   * 0.10)
              + (availabilityScore * 0.10);
+    }
+
+    private double calculateDistanceScore(Professional professional, Project project) {
+        Double profLat = professional.getLatitude();
+        Double profLon = professional.getLongitude();
+        Double companyLat = project.getCompany().getLatitude();
+        Double companyLon = project.getCompany().getLongitude();
+
+        // Sem dados de localização de algum dos dois lados — pontuação neutra
+        if (profLat == null || profLon == null || companyLat == null || companyLon == null) {
+            return 50.0;
+        }
+
+        double distanceKm = haversineDistance(profLat, profLon, companyLat, companyLon);
+
+        return scoreFromDistance(distanceKm);
+    }
+
+    private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        final double EARTH_RADIUS_KM = 6371.0;
+
+        double latRad1 = Math.toRadians(lat1);
+        double latRad2 = Math.toRadians(lat2);
+        double deltaLat = Math.toRadians(lat2 - lat1);
+        double deltaLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+                 + Math.cos(latRad1) * Math.cos(latRad2)
+                 * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return EARTH_RADIUS_KM * c;
+    }
+
+    // Converte distância em km para uma pontuação de 0 a 100
+    private double scoreFromDistance(double distanceKm) {
+        if (distanceKm <= 5)   return 100.0;
+        if (distanceKm <= 10)  return 90.0;
+        if (distanceKm <= 20)  return 75.0;
+        if (distanceKm <= 50)  return 50.0;
+        if (distanceKm <= 100) return 25.0;
+        return 10.0; // muito distante, mas não zera — ainda pode ser viável dependendo do caso
     }
 
     // Skills: quantas skills da vaga o profissional possui / total exigido * 100
