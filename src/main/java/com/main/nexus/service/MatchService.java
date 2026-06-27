@@ -1,24 +1,32 @@
 package com.main.nexus.service;
 
+import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
+import com.main.nexus.model.Review;
 import com.main.nexus.model.Skill;
+import com.main.nexus.model.enums.AuthorType;
+import com.main.nexus.model.enums.CompanyRejectionReason;
 import com.main.nexus.model.enums.InitiatedBy;
 import com.main.nexus.model.enums.InterestStatus;
 import com.main.nexus.model.enums.Modality;
+import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.model.enums.ProjectStatus;
-import com.main.nexus.model.enums.RejectionReason;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.RejectionFeedbackRepository;
+import com.main.nexus.repository.ReviewRepository;
 import jakarta.transaction.Transactional;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
@@ -32,89 +40,67 @@ public class MatchService {
 
     @Autowired
     private ProfessionalRepository professionalRepository;
-    
+
     @Autowired
     private RejectionFeedbackRepository rejectionFeedbackRepository;
-    
+
     @Autowired
     private ProjectRepository projectRepository;
-    
+
+    @Autowired
+    private ReviewRepository reviewRepository;
+
     @Autowired
     private EmailService emailService;
+
+    // ── Constantes de penalidade comportamental ──────────────────────────────
+    private static final int MIN_OCCURRENCES_TO_COUNT = 3;
+    private static final double MAX_TOTAL_PENALTY = 0.25;
 
     // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
     // ScoreMatch = (Skills*0.35) + (Budget*0.25) + (History*0.20) + (Reputation*0.10) + (Availability*0.10)
+    // ou, para ONSITE/HYBRID:
+    // ScoreMatch = (Skills*0.30) + (Budget*0.20) + (History*0.17) + (Reputation*0.09) + (Availability*0.09) + (Distance*0.15)
     // -------------------------------------------------------
     public double calculateScore(Professional professional, Project project) {
 
-        double skillScore       = calculateSkillScore(professional, project);
-        double budgetScore      = calculateBudgetScore(professional, project);
-        double historyScore     = calculateHistoryScore(professional);
-        double reputationScore  = calculateReputationScore(professional);
+        double skillScore        = calculateSkillScore(professional, project);
+        double budgetScore       = calculateBudgetScore(professional, project);
+        double historyScore      = calculateHistoryScore(professional);
+        double reputationScore   = calculateReputationScore(professional);
         double availabilityScore = calculateAvailabilityScore(professional);
-        
-        boolean considersDistance = project.getWorkMode() == Modality.ONSITE || project.getWorkMode() == Modality.HYBRID;
+
+        boolean considersDistance = project.getWorkMode() == Modality.ONSITE
+                                  || project.getWorkMode() == Modality.HYBRID;
+
+        double baseScore;
 
         if (considersDistance) {
             double distanceScore = calculateDistanceScore(professional, project);
 
-            return (skillScore        * 0.30)
-                + (budgetScore       * 0.20)
-                + (historyScore      * 0.17)
-                + (reputationScore   * 0.09)
-                + (availabilityScore * 0.09)
-                + (distanceScore     * 0.15);
+            baseScore = (skillScore        * 0.30)
+                      + (budgetScore       * 0.20)
+                      + (historyScore      * 0.17)
+                      + (reputationScore   * 0.09)
+                      + (availabilityScore * 0.09)
+                      + (distanceScore     * 0.15);
+        } else {
+            baseScore = (skillScore        * 0.35)
+                      + (budgetScore       * 0.25)
+                      + (historyScore      * 0.20)
+                      + (reputationScore   * 0.10)
+                      + (availabilityScore * 0.10);
         }
 
-        return (skillScore        * 0.35)
-             + (budgetScore       * 0.25)
-             + (historyScore      * 0.20)
-             + (reputationScore   * 0.10)
-             + (availabilityScore * 0.10);
-    }
+        // ── Camada de penalidade comportamental (pós-cálculo, fora da fórmula formal) ──
+        double professionalPenalty = calculateProfessionalBehaviorPenalty(professional);
+        double companyPenalty = calculateCompanyBehaviorPenalty(project.getCompany());
 
-    private double calculateDistanceScore(Professional professional, Project project) {
-        Double profLat = professional.getLatitude();
-        Double profLon = professional.getLongitude();
-        Double companyLat = project.getCompany().getLatitude();
-        Double companyLon = project.getCompany().getLongitude();
+        double totalPenalty = Math.min(professionalPenalty + companyPenalty, MAX_TOTAL_PENALTY);
+        double finalMultiplier = 1.0 - totalPenalty;
 
-        // Sem dados de localização de algum dos dois lados — pontuação neutra
-        if (profLat == null || profLon == null || companyLat == null || companyLon == null) {
-            return 50.0;
-        }
-
-        double distanceKm = haversineDistance(profLat, profLon, companyLat, companyLon);
-
-        return scoreFromDistance(distanceKm);
-    }
-
-    private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
-        final double EARTH_RADIUS_KM = 6371.0;
-
-        double latRad1 = Math.toRadians(lat1);
-        double latRad2 = Math.toRadians(lat2);
-        double deltaLat = Math.toRadians(lat2 - lat1);
-        double deltaLon = Math.toRadians(lon2 - lon1);
-
-        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
-                 + Math.cos(latRad1) * Math.cos(latRad2)
-                 * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return EARTH_RADIUS_KM * c;
-    }
-
-    // Converte distância em km para uma pontuação de 0 a 100
-    private double scoreFromDistance(double distanceKm) {
-        if (distanceKm <= 5)   return 100.0;
-        if (distanceKm <= 10)  return 90.0;
-        if (distanceKm <= 20)  return 75.0;
-        if (distanceKm <= 50)  return 50.0;
-        if (distanceKm <= 100) return 25.0;
-        return 10.0; // muito distante, mas não zera — ainda pode ser viável dependendo do caso
+        return baseScore * finalMultiplier;
     }
 
     // Skills: quantas skills da vaga o profissional possui / total exigido * 100
@@ -143,7 +129,6 @@ public class MatchService {
 
         if (profMin == null || projMax == null) return 50.0;
 
-        // Usa a média da faixa do profissional como referência, em vez de só o mínimo
         double profExpectation = (profMax != null) ? (profMin + profMax) / 2.0 : profMin;
 
         if (profExpectation <= projMax) {
@@ -160,7 +145,7 @@ public class MatchService {
 
     // Histórico: baseado na quantidade de projetos anteriores (máx 10 projetos = 100)
     private double calculateHistoryScore(Professional professional) {
-        int count = professional.getProjects()!= null
+        int count = professional.getProjects() != null
                 ? professional.getProjects().size()
                 : 0;
         return Math.min(count * 10.0, 100.0);
@@ -176,8 +161,151 @@ public class MatchService {
     private double calculateAvailabilityScore(Professional professional) {
         return Boolean.TRUE.equals(professional.getAvailable()) ? 100.0 : 0.0;
     }
-    
-    // Gera ranking de profissionais para um projeto
+
+    // Distância: calculada via Haversine entre profissional e empresa
+    private double calculateDistanceScore(Professional professional, Project project) {
+        Double profLat = professional.getLatitude();
+        Double profLon = professional.getLongitude();
+        Double companyLat = project.getCompany().getLatitude();
+        Double companyLon = project.getCompany().getLongitude();
+
+        if (profLat == null || profLon == null || companyLat == null || companyLon == null) {
+            return 50.0;
+        }
+
+        double distanceKm = haversineDistance(profLat, profLon, companyLat, companyLon);
+        return scoreFromDistance(distanceKm);
+    }
+
+    private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        final double EARTH_RADIUS_KM = 6371.0;
+
+        double latRad1 = Math.toRadians(lat1);
+        double latRad2 = Math.toRadians(lat2);
+        double deltaLat = Math.toRadians(lat2 - lat1);
+        double deltaLon = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+                 + Math.cos(latRad1) * Math.cos(latRad2)
+                 * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return EARTH_RADIUS_KM * c;
+    }
+
+    private double scoreFromDistance(double distanceKm) {
+        if (distanceKm <= 5)   return 100.0;
+        if (distanceKm <= 10)  return 90.0;
+        if (distanceKm <= 20)  return 75.0;
+        if (distanceKm <= 50)  return 50.0;
+        if (distanceKm <= 100) return 25.0;
+        return 10.0;
+    }
+
+    // =========================================================
+    // PENALIDADE COMPORTAMENTAL — camada pós-cálculo
+    // =========================================================
+
+    // ── Penalidade do PROFISSIONAL (baseada em como o mercado reage a ele) ──
+
+    private double calculateProfessionalBehaviorPenalty(Professional professional) {
+        LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
+
+        List<RejectionFeedback> rejections = rejectionFeedbackRepository
+                .findCompanyRejectionsAgainstProfessional(professional.getId(), sixMonthsAgo);
+
+        double volumePenalty = calculateVolumePenalty(rejections.size());
+        double repetitionPenalty = calculateProfessionalRepetitionPenalty(rejections);
+
+        List<Review> reviews = reviewRepository
+                .findCompanyReviewsOfProfessional(professional.getId(), sixMonthsAgo);
+        double reviewPenalty = calculateReviewPenalty(reviews);
+
+        double totalPenalty = volumePenalty + repetitionPenalty + reviewPenalty;
+        return Math.min(totalPenalty, MAX_TOTAL_PENALTY);
+    }
+
+    // ── Penalidade da EMPRESA (baseada em como profissionais reagem a ela) ──
+
+    private double calculateCompanyBehaviorPenalty(Company company) {
+        LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
+
+        List<RejectionFeedback> rejections = rejectionFeedbackRepository
+                .findProfessionalRejectionsAgainstCompany(company.getId(), sixMonthsAgo);
+
+        double volumePenalty = calculateVolumePenalty(rejections.size());
+        double repetitionPenalty = calculateCompanyRepetitionPenalty(rejections);
+
+        List<Review> reviews = reviewRepository
+                .findProfessionalReviewsOfCompany(company.getId(), sixMonthsAgo);
+        double reviewPenalty = calculateReviewPenalty(reviews);
+
+        double totalPenalty = volumePenalty + repetitionPenalty + reviewPenalty;
+        return Math.min(totalPenalty, MAX_TOTAL_PENALTY);
+    }
+
+    // ── Componente A — volume geral de rejeições recebidas ──
+
+    private double calculateVolumePenalty(int totalRejections) {
+        if (totalRejections < MIN_OCCURRENCES_TO_COUNT) return 0.0;
+        if (totalRejections <= 5)  return 0.03;
+        if (totalRejections <= 10) return 0.06;
+        return 0.10;
+    }
+
+    // ── Componente B — repetição do mesmo motivo (profissional sendo rejeitado pela empresa) ──
+
+    private double calculateProfessionalRepetitionPenalty(List<RejectionFeedback> rejections) {
+        Map<CompanyRejectionReason, Long> frequency = rejections.stream()
+                .filter(r -> r.getCompanyReasons() != null)
+                .flatMap(r -> r.getCompanyReasons().stream())
+                .collect(Collectors.groupingBy(reason -> reason, Collectors.counting()));
+
+        long maxFrequency = frequency.values().stream().max(Long::compare).orElse(0L);
+        return repetitionPenaltyFromFrequency(maxFrequency);
+    }
+
+    // ── Componente B — repetição do mesmo motivo (empresa sendo rejeitada pelo profissional) ──
+
+    private double calculateCompanyRepetitionPenalty(List<RejectionFeedback> rejections) {
+        Map<ProfessionalRejectionReason, Long> frequency = rejections.stream()
+                .filter(r -> r.getProfessionalReasons() != null)
+                .flatMap(r -> r.getProfessionalReasons().stream())
+                .collect(Collectors.groupingBy(reason -> reason, Collectors.counting()));
+
+        long maxFrequency = frequency.values().stream().max(Long::compare).orElse(0L);
+        return repetitionPenaltyFromFrequency(maxFrequency);
+    }
+
+    private double repetitionPenaltyFromFrequency(long maxFrequency) {
+        if (maxFrequency < MIN_OCCURRENCES_TO_COUNT) return 0.0;
+        if (maxFrequency <= 4) return 0.05;
+        if (maxFrequency <= 7) return 0.10;
+        return 0.15;
+    }
+
+    // ── Componente C — proporção de reviews negativos (notas 1-2) ──
+
+    private double calculateReviewPenalty(List<Review> reviews) {
+        if (reviews.size() < MIN_OCCURRENCES_TO_COUNT) return 0.0;
+
+        long negativeCount = reviews.stream()
+                .filter(r -> r.getRating() <= 2)
+                .count();
+
+        double negativeRatio = (double) negativeCount / reviews.size();
+
+        if (negativeRatio >= 0.60) return 0.15;
+        if (negativeRatio >= 0.40) return 0.08;
+        if (negativeRatio >= 0.25) return 0.03;
+        return 0.0;
+    }
+
+    // =========================================================
+    // RANKING — geração e recálculo
+    // =========================================================
+
     public List<Match> generateRankingForProject(Project project) {
         List<Professional> allProfessionals = professionalRepository.findAll();
         List<Match> matches = new ArrayList<>();
@@ -213,14 +341,12 @@ public class MatchService {
         matches.sort(Comparator.comparingDouble(Match::getMatchScore).reversed());
         return matchRepository.saveAll(matches);
     }
-    
+
     @Transactional
     public void recalculateRankingForProject(Project project) {
         List<Match> existingMatches = matchRepository.findByProjectId(project.getId());
 
         for (Match match : existingMatches) {
-            // Só recalcula matches que ainda não avançaram no fluxo de interesse
-            // Não sobrescreve matches já confirmados ou rejeitados
             if (match.getStatus() == StatusMatch.WAITING) {
                 double newScore = calculateScore(match.getProfessional(), project);
                 match.setMatchScore(newScore);
@@ -228,7 +354,6 @@ public class MatchService {
         }
         matchRepository.saveAll(existingMatches);
 
-        // Gera matches novos para profissionais que ainda não tinham (ex: cadastrados depois)
         generateRankingForProject(project);
     }
 
@@ -236,9 +361,10 @@ public class MatchService {
         return professional.getPreferredTypes().contains(project.getType());
     }
 
-    // Fluxo bilateral de interesse
+    // =========================================================
+    // FLUXO BILATERAL DE INTERESSE
+    // =========================================================
 
-    // empresa demonstra interesse
     public Match companyShowsInterest(Long matchId, Long companyId) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
@@ -272,6 +398,7 @@ public class MatchService {
 
         return saved;
     }
+
     public Match companyAccepts(Long matchId, Long companyId) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
@@ -286,7 +413,7 @@ public class MatchService {
         return matchRepository.save(match);
     }
 
-    public Match companyRejectsWithFeedback(Long matchId, Long companyId, String reason) {
+    public Match companyRejectsWithFeedback(Long matchId, Long companyId, List<String> reasons) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
 
@@ -294,7 +421,7 @@ public class MatchService {
         match.setStatus(StatusMatch.REJECTED);
         Match saved = matchRepository.save(match);
 
-        saveRejectionFeedback(match, reason);
+        saveCompanyRejection(match, reasons);
         return saved;
     }
 
@@ -312,7 +439,7 @@ public class MatchService {
         return matchRepository.save(match);
     }
 
-    public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, String reason) {
+    public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, List<String> reasons) {
         Match match = findById(matchId);
         validateProfessionalOwnership(match, professionalId);
 
@@ -320,7 +447,7 @@ public class MatchService {
         match.setStatus(StatusMatch.REJECTED);
         Match saved = matchRepository.save(match);
 
-        saveRejectionFeedback(match, reason);
+        saveProfessionalRejection(match, reasons);
         return saved;
     }
 
@@ -340,25 +467,49 @@ public class MatchService {
         }
     }
 
-    // ── Helper de feedback reaproveitado pelos dois lados ──────────────────────
+    // ── Persistência de feedback de rejeição, separado por quem rejeita ────────
 
-    private void saveRejectionFeedback(Match match, String reason) {
-        RejectionReason rejectionReason;
-        try {
-            rejectionReason = RejectionReason.valueOf(reason.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            rejectionReason = RejectionReason.OTHER;
-        }
+    private void saveProfessionalRejection(Match match, List<String> reasonStrings) {
+        List<ProfessionalRejectionReason> reasons = reasonStrings.stream()
+                .map(r -> {
+                    try {
+                        return ProfessionalRejectionReason.valueOf(r.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        return ProfessionalRejectionReason.OTHER;
+                    }
+                })
+                .toList();
 
         RejectionFeedback feedback = new RejectionFeedback();
         feedback.setProfessional(match.getProfessional());
         feedback.setProject(match.getProject());
-        feedback.setReason(rejectionReason);
+        feedback.setRejectedBy(AuthorType.PROFESSIONAL);
+        feedback.setProfessionalReasons(reasons);
         rejectionFeedbackRepository.save(feedback);
     }
 
-    // profissional demonstra interesse
-    // ── Profissional vê oportunidades compatíveis ──────────────────────────────
+    private void saveCompanyRejection(Match match, List<String> reasonStrings) {
+        List<CompanyRejectionReason> reasons = reasonStrings.stream()
+                .map(r -> {
+                    try {
+                        return CompanyRejectionReason.valueOf(r.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        return CompanyRejectionReason.OTHER;
+                    }
+                })
+                .toList();
+
+        RejectionFeedback feedback = new RejectionFeedback();
+        feedback.setProfessional(match.getProfessional());
+        feedback.setProject(match.getProject());
+        feedback.setRejectedBy(AuthorType.COMPANY);
+        feedback.setCompanyReasons(reasons);
+        rejectionFeedbackRepository.save(feedback);
+    }
+
+    // =========================================================
+    // PROFISSIONAL — OPORTUNIDADES E INICIATIVA
+    // =========================================================
 
     public List<Match> getOpportunitiesForProfessional(Long professionalId) {
         Professional professional = professionalRepository.findById(professionalId)
@@ -390,7 +541,6 @@ public class MatchService {
                 .toList();
     }
 
-    // ── Profissional demonstra interesse num projeto ───────────────────────────
     @Transactional
     public Match professionalShowsInterest(Long professionalId, Long projectId) {
         Professional professional = professionalRepository.findById(professionalId)
@@ -412,7 +562,6 @@ public class MatchService {
                     return newMatch;
                 });
 
-        // Verifica o estado ANTES de qualquer alteração
         boolean wasAlreadyCompanyInterested = match.getStatus() == StatusMatch.COMPANY_INTERESTED;
 
         if (wasAlreadyCompanyInterested) {
@@ -432,7 +581,9 @@ public class MatchService {
         return saved;
     }
 
-    // Consultas
+    // =========================================================
+    // CONSULTAS
+    // =========================================================
 
     public List<Match> getRankingByProject(Long projectId) {
         return matchRepository.findByProjectId(projectId)
@@ -448,15 +599,13 @@ public class MatchService {
     public long countConfirmedMatches() {
         return matchRepository.countByStatus(StatusMatch.MATCHED);
     }
-    
-    // Busca um match pelo id
+
     public Match findById(Long id) {
         return matchRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Match not found: " + id));
     }
 
-    // Convites pendentes para o profissional (empresa já demonstrou interesse)
     public List<Match> getPendingInvitesForProfessional(Long professionalId) {
         return matchRepository.findByProfessionalId(professionalId)
                 .stream()
@@ -464,7 +613,6 @@ public class MatchService {
                 .toList();
     }
 
-    // Matches confirmados para o profissional
     public List<Match> getConfirmedMatchesForProfessional(Long professionalId) {
         return matchRepository.findByProfessionalId(professionalId)
                 .stream()
@@ -472,14 +620,17 @@ public class MatchService {
                 .toList();
     }
 
-    // Matches confirmados de uma empresa
     public long countConfirmedMatchesByCompany(Long companyId) {
         return matchRepository.findByProjectCompanyId(companyId)
                 .stream()
                 .filter(m -> m.getStatus() == StatusMatch.MATCHED)
                 .count();
     }
-    
+
+    // =========================================================
+    // NOTIFICAÇÕES
+    // =========================================================
+
     private void notifyMutualMatch(Match match) {
         String professionalEmail = match.getProfessional().getUser().getEmail();
         String companyEmail = match.getProject().getCompany().getUser().getEmail();
@@ -488,7 +639,6 @@ public class MatchService {
         String projectTitle = match.getProject().getTitle();
 
         if (match.getInitiatedBy() == InitiatedBy.PROFESSIONAL) {
-            // Profissional iniciou, empresa correspondeu agora — avisa o profissional
             emailService.send(
                 professionalEmail,
                 "Seu interesse foi correspondido! — Nexus",
@@ -497,7 +647,6 @@ public class MatchService {
                 "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
             );
         } else if (match.getInitiatedBy() == InitiatedBy.COMPANY) {
-            // Empresa iniciou, profissional correspondeu agora — avisa a empresa
             emailService.send(
                 companyEmail,
                 "Seu interesse foi correspondido! — Nexus",

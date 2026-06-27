@@ -4,6 +4,7 @@ import com.main.nexus.dto.UserDTO;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -11,8 +12,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -55,9 +56,9 @@ public class MatchController {
     @PostMapping("/{matchId}/company-reject")
     public ResponseEntity<String> companyRejects(
             @PathVariable Long matchId,
-            @RequestParam String reason) {
+            @RequestBody List<String> reasons) {
         Long companyId = getLoggedCompanyId();
-        matchService.companyRejectsWithFeedback(matchId, companyId, reason);
+        matchService.companyRejectsWithFeedback(matchId, companyId, reasons);
         return ResponseEntity.ok("Invite rejected.");
     }
 
@@ -73,9 +74,9 @@ public class MatchController {
     @PostMapping("/{matchId}/professional-reject")
     public ResponseEntity<String> professionalRejects(
             @PathVariable Long matchId,
-            @RequestParam String reason) {
+            @RequestBody List<String> reasons) {
         Long professionalId = getLoggedProfessionalId();
-        matchService.professionalRejectsWithFeedback(matchId, professionalId, reason);
+        matchService.professionalRejectsWithFeedback(matchId, professionalId, reasons);
         return ResponseEntity.ok("Invite rejected.");
     }
 

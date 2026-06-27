@@ -62,12 +62,12 @@ public class Professional {
 
     private String resume; 
     
-    @ElementCollection(targetClass = ProjectType.class)
-    @CollectionTable(
-        name = "tb_professional_project_type",
-        joinColumns = @JoinColumn(name = "professional_id")
+    @ElementCollection(targetClass = ProjectType.class) //Diz que essa é uma coleção de valores simples (enum)
+    @CollectionTable( // Define a tabela auxiliar/secundaria, para os tipos de projeto
+        name = "tb_professional_project_type", // Nome da tabela
+        joinColumns = @JoinColumn(name = "professional_id") // Cria a foregn key para o profissional
     )
-    @Enumerated(EnumType.STRING)
+    @Enumerated(EnumType.STRING) // Salva o Enum como String no banco
     @Column(name = "project_type", length = 20)
     private List<ProjectType> preferredTypes = new ArrayList<>();
 
