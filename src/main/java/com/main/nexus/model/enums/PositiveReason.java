@@ -1,0 +1,14 @@
+package com.main.nexus.model.enums;
+
+public enum PositiveReason {
+    EXCELLENT_COMMUNICATION,
+    HIGH_TECHNICAL_SKILL,
+    DELIVERED_ON_TIME,
+    TEAM_PLAYER,
+    PROACTIVE,
+    EXCEEDED_EXPECTATIONS,
+    RELIABLE,
+    PUNCTUAL,
+    HIGH_CODE_QUALITY,
+    GOOD_PROBLEM_SOLVING
+}

@@ -48,14 +48,10 @@ public class MatchService {
     private ProjectRepository projectRepository;
 
     @Autowired
-    private ReviewRepository reviewRepository;
+    private ReputationService reputationService;
 
     @Autowired
     private EmailService emailService;
-
-    // ── Constantes de penalidade comportamental ──────────────────────────────
-    private static final int MIN_OCCURRENCES_TO_COUNT = 3;
-    private static final double MAX_TOTAL_PENALTY = 0.25;
 
     // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
@@ -93,14 +89,10 @@ public class MatchService {
                       + (availabilityScore * 0.10);
         }
 
-        // ── Camada de penalidade comportamental (pós-cálculo, fora da fórmula formal) ──
-        double professionalPenalty = calculateProfessionalBehaviorPenalty(professional);
-        double companyPenalty = calculateCompanyBehaviorPenalty(project.getCompany());
+        double professionalAdjustment = reputationService.getScoreAdjustment(professional.getId(), AuthorType.PROFESSIONAL);
+        double companyAdjustment = reputationService.getScoreAdjustment(project.getCompany().getId(), AuthorType.COMPANY);
 
-        double totalPenalty = Math.min(professionalPenalty + companyPenalty, MAX_TOTAL_PENALTY);
-        double finalMultiplier = 1.0 - totalPenalty;
-
-        return baseScore * finalMultiplier;
+        return baseScore * (1 + professionalAdjustment + companyAdjustment);
     }
 
     // Skills: quantas skills da vaga o profissional possui / total exigido * 100
@@ -207,101 +199,7 @@ public class MatchService {
     // PENALIDADE COMPORTAMENTAL — camada pós-cálculo
     // =========================================================
 
-    // ── Penalidade do PROFISSIONAL (baseada em como o mercado reage a ele) ──
-
-    private double calculateProfessionalBehaviorPenalty(Professional professional) {
-        LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
-
-        List<RejectionFeedback> rejections = rejectionFeedbackRepository
-                .findCompanyRejectionsAgainstProfessional(professional.getId(), sixMonthsAgo);
-
-        double volumePenalty = calculateVolumePenalty(rejections.size());
-        double repetitionPenalty = calculateProfessionalRepetitionPenalty(rejections);
-
-        List<Review> reviews = reviewRepository
-                .findCompanyReviewsOfProfessional(professional.getId(), sixMonthsAgo);
-        double reviewPenalty = calculateReviewPenalty(reviews);
-
-        double totalPenalty = volumePenalty + repetitionPenalty + reviewPenalty;
-        return Math.min(totalPenalty, MAX_TOTAL_PENALTY);
-    }
-
-    // ── Penalidade da EMPRESA (baseada em como profissionais reagem a ela) ──
-
-    private double calculateCompanyBehaviorPenalty(Company company) {
-        LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
-
-        List<RejectionFeedback> rejections = rejectionFeedbackRepository
-                .findProfessionalRejectionsAgainstCompany(company.getId(), sixMonthsAgo);
-
-        double volumePenalty = calculateVolumePenalty(rejections.size());
-        double repetitionPenalty = calculateCompanyRepetitionPenalty(rejections);
-
-        List<Review> reviews = reviewRepository
-                .findProfessionalReviewsOfCompany(company.getId(), sixMonthsAgo);
-        double reviewPenalty = calculateReviewPenalty(reviews);
-
-        double totalPenalty = volumePenalty + repetitionPenalty + reviewPenalty;
-        return Math.min(totalPenalty, MAX_TOTAL_PENALTY);
-    }
-
-    // ── Componente A — volume geral de rejeições recebidas ──
-
-    private double calculateVolumePenalty(int totalRejections) {
-        if (totalRejections < MIN_OCCURRENCES_TO_COUNT) return 0.0;
-        if (totalRejections <= 5)  return 0.03;
-        if (totalRejections <= 10) return 0.06;
-        return 0.10;
-    }
-
-    // ── Componente B — repetição do mesmo motivo (profissional sendo rejeitado pela empresa) ──
-
-    private double calculateProfessionalRepetitionPenalty(List<RejectionFeedback> rejections) {
-        Map<CompanyRejectionReason, Long> frequency = rejections.stream()
-                .filter(r -> r.getCompanyReasons() != null)
-                .flatMap(r -> r.getCompanyReasons().stream())
-                .collect(Collectors.groupingBy(reason -> reason, Collectors.counting()));
-
-        long maxFrequency = frequency.values().stream().max(Long::compare).orElse(0L);
-        return repetitionPenaltyFromFrequency(maxFrequency);
-    }
-
-    // ── Componente B — repetição do mesmo motivo (empresa sendo rejeitada pelo profissional) ──
-
-    private double calculateCompanyRepetitionPenalty(List<RejectionFeedback> rejections) {
-        Map<ProfessionalRejectionReason, Long> frequency = rejections.stream()
-                .filter(r -> r.getProfessionalReasons() != null)
-                .flatMap(r -> r.getProfessionalReasons().stream())
-                .collect(Collectors.groupingBy(reason -> reason, Collectors.counting()));
-
-        long maxFrequency = frequency.values().stream().max(Long::compare).orElse(0L);
-        return repetitionPenaltyFromFrequency(maxFrequency);
-    }
-
-    private double repetitionPenaltyFromFrequency(long maxFrequency) {
-        if (maxFrequency < MIN_OCCURRENCES_TO_COUNT) return 0.0;
-        if (maxFrequency <= 4) return 0.05;
-        if (maxFrequency <= 7) return 0.10;
-        return 0.15;
-    }
-
-    // ── Componente C — proporção de reviews negativos (notas 1-2) ──
-
-    private double calculateReviewPenalty(List<Review> reviews) {
-        if (reviews.size() < MIN_OCCURRENCES_TO_COUNT) return 0.0;
-
-        long negativeCount = reviews.stream()
-                .filter(r -> r.getRating() <= 2)
-                .count();
-
-        double negativeRatio = (double) negativeCount / reviews.size();
-
-        if (negativeRatio >= 0.60) return 0.15;
-        if (negativeRatio >= 0.40) return 0.08;
-        if (negativeRatio >= 0.25) return 0.03;
-        return 0.0;
-    }
-
+    
     // =========================================================
     // RANKING — geração e recálculo
     // =========================================================
@@ -486,6 +384,7 @@ public class MatchService {
         feedback.setRejectedBy(AuthorType.PROFESSIONAL);
         feedback.setProfessionalReasons(reasons);
         rejectionFeedbackRepository.save(feedback);
+        reputationService.recalculateForCompany(match.getProject().getCompany().getId());
     }
 
     private void saveCompanyRejection(Match match, List<String> reasonStrings) {
@@ -505,6 +404,7 @@ public class MatchService {
         feedback.setRejectedBy(AuthorType.COMPANY);
         feedback.setCompanyReasons(reasons);
         rejectionFeedbackRepository.save(feedback);
+        reputationService.recalculateForProfessional(match.getProfessional().getId());
     }
 
     // =========================================================

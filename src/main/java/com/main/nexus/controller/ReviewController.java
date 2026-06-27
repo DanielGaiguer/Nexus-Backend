@@ -36,7 +36,6 @@ public class ReviewController {
         UserDTO logged = getLoggedUser();
         Match match = matchService.findById(matchId);
 
-        // Valida que quem está avaliando é participante do match
         boolean isCompany = match.getProject().getCompany().getUser().getId().equals(logged.id());
         boolean isProfessional = match.getProfessional().getUser().getId().equals(logged.id());
 
@@ -44,7 +43,7 @@ public class ReviewController {
             throw new ResponseStatusException(HttpStatusCode.valueOf(403),
                     "You are not a participant of this match.");
         }
-        
+
         if (request.authorType() == AuthorType.COMPANY && !isCompany) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(403),
                     "Only the company of this match can submit a COMPANY review.");
@@ -59,6 +58,8 @@ public class ReviewController {
         review.setRating(request.rating());
         review.setComment(request.comment());
         review.setAuthorType(request.authorType());
+        review.setPositiveReasons(request.positiveReasons());
+        review.setNegativeReasons(request.negativeReasons());
 
         reviewService.save(review);
         return ResponseEntity.ok("Review submitted successfully.");

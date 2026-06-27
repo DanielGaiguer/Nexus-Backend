@@ -2,6 +2,7 @@ package com.main.nexus.service;
 
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Review;
+import com.main.nexus.model.enums.AuthorType;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.ReviewRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,12 +17,8 @@ public class ReviewService {
     private ReviewRepository reviewRepository;
 
     @Autowired
-    private ProfessionalService professionalService;
+    private ReputationService reputationService;
 
-    @Autowired
-    private CompanyService companyService;
-
-    // ReviewService.java
     public Review save(Review review) {
         Match match = review.getMatch();
 
@@ -36,30 +33,16 @@ public class ReviewService {
         }
 
         Review saved = reviewRepository.save(review);
-        recalculateReputation(review);
-        return saved;
-    }
 
-    private void recalculateReputation(Review review) {
-        Match match = review.getMatch();
-
-        switch (review.getAuthorType()) {
-            case COMPANY -> {
-                // Empresa avaliou profissional — atualiza reputação do profissional
-                Long professionalId = match.getProfessional().getId();
-                Double avg = reviewRepository.findAverageRatingByProfessionalId(professionalId);
-                if (avg != null) {
-                    professionalService.updateReputation(professionalId, avg);
-                }
-            }
-            case PROFESSIONAL -> {
-                // Profissional avaliou empresa — atualiza reputação da empresa
-                Long companyId = match.getProject().getCompany().getId();
-                Double avg = reviewRepository.findAverageRatingByCompanyId(companyId);
-                if (avg != null) {
-                    companyService.updateReputation(companyId, avg);
-                }
-            }
+        // Dispara o recálculo de reputação de quem foi avaliado
+        if (review.getAuthorType() == AuthorType.COMPANY) {
+            // Empresa avaliou o profissional → recalcula o profissional
+            reputationService.recalculateForProfessional(match.getProfessional().getId());
+        } else {
+            // Profissional avaliou a empresa → recalcula a empresa
+            reputationService.recalculateForCompany(match.getProject().getCompany().getId());
         }
+
+        return saved;
     }
 }
