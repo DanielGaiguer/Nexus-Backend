@@ -27,12 +27,8 @@ public class RejectionFeedback {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "professional_id", nullable = false)
-    private Professional professional;
-
-    @ManyToOne
-    @JoinColumn(name = "project_id", nullable = false)
-    private Project project;
+    @JoinColumn(name = "match_id", nullable = false)
+    private Match match;
 
     @Column(nullable = false)
     private AuthorType rejectedBy;
@@ -60,47 +56,61 @@ public class RejectionFeedback {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public Long getId() { 
-        return id; 
+    public Long getId() {
+        return id;
     }
-    
-    public void setId(Long id) { 
-        this.id = id; 
+
+    public void setId(Long id) {
+        this.id = id;
     }
-    public Professional getProfessional() { 
-        return professional; 
+
+    public Match getMatch() {
+        return match;
     }
-    public void setProfessional(Professional professional) { 
-        this.professional = professional; 
+
+    public void setMatch(Match match) {
+        this.match = match;
     }
-    public Project getProject() { 
-        return project; 
+
+    public AuthorType getRejectedBy() {
+        return rejectedBy;
     }
-    public void setProject(Project project) { 
-        this.project = project; 
+
+    public void setRejectedBy(AuthorType rejectedBy) {
+        this.rejectedBy = rejectedBy;
     }
-    public AuthorType getRejectedBy() { 
-        return rejectedBy; 
+
+    public List<ProfessionalRejectionReason> getProfessionalReasons() {
+        return professionalReasons;
     }
-    public void setRejectedBy(AuthorType rejectedBy) { 
-        this.rejectedBy = rejectedBy; 
+
+    public void setProfessionalReasons(List<ProfessionalRejectionReason> professionalReasons) {
+        this.professionalReasons = professionalReasons;
     }
-    public List<ProfessionalRejectionReason> getProfessionalReasons() { 
-        return professionalReasons; 
+
+    public List<CompanyRejectionReason> getCompanyReasons() {
+        return companyReasons;
     }
-    public void setProfessionalReasons(List<ProfessionalRejectionReason> professionalReasons) { 
-        this.professionalReasons = professionalReasons; 
+
+    public void setCompanyReasons(List<CompanyRejectionReason> companyReasons) {
+        this.companyReasons = companyReasons;
     }
-    public List<CompanyRejectionReason> getCompanyReasons() { 
-        return companyReasons; 
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
     }
-    public void setCompanyReasons(List<CompanyRejectionReason> companyReasons) { 
-        this.companyReasons = companyReasons; 
-    }
-    public LocalDateTime getCreatedAt() { 
-        return createdAt; 
-    }
+
     public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt; 
+        this.createdAt = createdAt;
+    }
+
+    // ── Atalhos para navegação ───────────────────────────────────────────────
+
+    public Professional getProfessional() {
+        return match != null ? match.getProfessional() : null;
+    }
+
+    public Project getProject() {
+        return match != null ? match.getProject() : null;
     }
 }

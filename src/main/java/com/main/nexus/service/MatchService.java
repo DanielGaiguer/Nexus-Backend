@@ -379,8 +379,7 @@ public class MatchService {
                 .toList();
 
         RejectionFeedback feedback = new RejectionFeedback();
-        feedback.setProfessional(match.getProfessional());
-        feedback.setProject(match.getProject());
+        feedback.setMatch(match);
         feedback.setRejectedBy(AuthorType.PROFESSIONAL);
         feedback.setProfessionalReasons(reasons);
         rejectionFeedbackRepository.save(feedback);
@@ -399,8 +398,7 @@ public class MatchService {
                 .toList();
 
         RejectionFeedback feedback = new RejectionFeedback();
-        feedback.setProfessional(match.getProfessional());
-        feedback.setProject(match.getProject());
+        feedback.setMatch(match);
         feedback.setRejectedBy(AuthorType.COMPANY);
         feedback.setCompanyReasons(reasons);
         rejectionFeedbackRepository.save(feedback);
