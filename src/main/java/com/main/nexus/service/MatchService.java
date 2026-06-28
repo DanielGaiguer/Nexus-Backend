@@ -1,14 +1,13 @@
 package com.main.nexus.service;
 
-import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
-import com.main.nexus.model.Review;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.AuthorType;
 import com.main.nexus.model.enums.CompanyRejectionReason;
+import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.InitiatedBy;
 import com.main.nexus.model.enums.InterestStatus;
 import com.main.nexus.model.enums.Modality;
@@ -19,14 +18,10 @@ import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.RejectionFeedbackRepository;
-import com.main.nexus.repository.ReviewRepository;
 import jakarta.transaction.Transactional;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
@@ -67,12 +62,27 @@ public class MatchService {
         double reputationScore   = calculateReputationScore(professional);
         double availabilityScore = calculateAvailabilityScore(professional);
 
-        boolean considersDistance = project.getWorkMode() == Modality.ONSITE
-                                  || project.getWorkMode() == Modality.HYBRID;
+        boolean considersDistance   = project.getWorkMode() == Modality.ONSITE
+                                    || project.getWorkMode() == Modality.HYBRID;
+        boolean considersExperience = project.getExperienceLevel() != null;
 
         double baseScore;
 
-        if (considersDistance) {
+        if (considersDistance && considersExperience) {
+            // Cenário 4 — ONSITE/HYBRID com experiência (7 componentes)
+            double distanceScore   = calculateDistanceScore(professional, project);
+            double experienceScore = calculateExperienceScore(professional, project);
+
+            baseScore = (skillScore        * 0.26)
+                      + (budgetScore       * 0.18)
+                      + (historyScore      * 0.15)
+                      + (reputationScore   * 0.08)
+                      + (availabilityScore * 0.08)
+                      + (distanceScore     * 0.13)
+                      + (experienceScore   * 0.12);
+
+        } else if (considersDistance) {
+            // Cenário 3 — ONSITE/HYBRID sem experiência (6 componentes)
             double distanceScore = calculateDistanceScore(professional, project);
 
             baseScore = (skillScore        * 0.30)
@@ -81,7 +91,20 @@ public class MatchService {
                       + (reputationScore   * 0.09)
                       + (availabilityScore * 0.09)
                       + (distanceScore     * 0.15);
+
+        } else if (considersExperience) {
+            // Cenário 2 — REMOTO com experiência (6 componentes)
+            double experienceScore = calculateExperienceScore(professional, project);
+
+            baseScore = (skillScore        * 0.30)
+                      + (budgetScore       * 0.22)
+                      + (historyScore      * 0.18)
+                      + (reputationScore   * 0.09)
+                      + (availabilityScore * 0.09)
+                      + (experienceScore   * 0.12);
+
         } else {
+            // Cenário 1 — REMOTO sem experiência (5 componentes, fórmula original)
             baseScore = (skillScore        * 0.35)
                       + (budgetScore       * 0.25)
                       + (historyScore      * 0.20)
@@ -193,6 +216,32 @@ public class MatchService {
         if (distanceKm <= 50)  return 50.0;
         if (distanceKm <= 100) return 25.0;
         return 10.0;
+    }
+    
+    private double calculateExperienceScore(Professional professional, Project project) {
+        ExperienceLevel profLevel = professional.getExperienceLevel();
+        ExperienceLevel projLevel = project.getExperienceLevel();
+
+        if (profLevel == null || projLevel == null) {
+            return 50.0;
+        }
+
+        int distance = profLevel.ordinal() - projLevel.ordinal();
+
+        if (distance == 0) return 100.0;
+
+        if (distance > 0) {
+            // Profissional ACIMA do nível pedido — penalidade leve
+            if (distance == 1) return 85.0;
+            if (distance == 2) return 65.0;
+            return 45.0; // distance >= 3
+        } else {
+            // Profissional ABAIXO do nível pedido — penalidade mais forte
+            int absDistance = Math.abs(distance);
+            if (absDistance == 1) return 70.0;
+            if (absDistance == 2) return 40.0;
+            return 15.0; // absDistance >= 3
+        }
     }
 
     // =========================================================
@@ -560,7 +609,6 @@ public class MatchService {
     }
     
     private void incrementFilledPositions(Project project) {
-        project.setFilledPositions(project.getFilledPositions() + 1);
-        projectRepository.save(project);
+        projectRepository.incrementFilledPositions(project.getId());
     }
 }

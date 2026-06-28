@@ -1,5 +1,6 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.ProjectType;
@@ -72,6 +73,10 @@ public class Project {
 
     @Column(nullable = false)
     private Integer filledPositions = 0;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ExperienceLevel experienceLevel; 
 
     public Long getId() {
         return id;
@@ -196,4 +201,13 @@ public class Project {
     public boolean hasOpenPositions() {
         return filledPositions < maxPositions;
     }
+
+    public ExperienceLevel getExperienceLevel() {
+        return experienceLevel;
+    }
+
+    public void setExperienceLevel(ExperienceLevel experienceLevel) {
+        this.experienceLevel = experienceLevel;
+    }
+
 }

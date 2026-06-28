@@ -2,6 +2,7 @@
 package com.main.nexus.dto;
 
 import com.main.nexus.model.enums.ProjectType;
+import com.main.nexus.model.enums.ExperienceLevel;
 import java.util.List;
 
 public record ProfessionalProfileDTO(
@@ -19,5 +20,6 @@ public record ProfessionalProfileDTO(
         Double latitude,
         Double longitude,
         List<String> skills,
-        List<ProjectType> preferredTypes
+        List<ProjectType> preferredTypes,
+        ExperienceLevel experienceLevel
 ) {}

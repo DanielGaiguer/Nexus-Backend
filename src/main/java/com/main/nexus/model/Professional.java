@@ -1,5 +1,6 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.ProjectType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
@@ -62,12 +63,12 @@ public class Professional {
 
     private String resume; 
     
-    @ElementCollection(targetClass = ProjectType.class) //Diz que essa é uma coleção de valores simples (enum)
-    @CollectionTable( // Define a tabela auxiliar/secundaria, para os tipos de projeto
-        name = "tb_professional_project_type", // Nome da tabela
-        joinColumns = @JoinColumn(name = "professional_id") // Cria a foregn key para o profissional
+    @ElementCollection(targetClass = ProjectType.class) 
+    @CollectionTable( 
+        name = "tb_professional_project_type", 
+        joinColumns = @JoinColumn(name = "professional_id") 
     )
-    @Enumerated(EnumType.STRING) // Salva o Enum como String no banco
+    @Enumerated(EnumType.STRING) 
     @Column(name = "project_type", length = 20)
     private List<ProjectType> preferredTypes = new ArrayList<>();
 
@@ -81,6 +82,10 @@ public class Professional {
 
     @OneToMany(mappedBy = "professional", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PreviousProject> projects = new ArrayList<>();
+    
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ExperienceLevel experienceLevel;
 
     public Long getId() {
         return id;
@@ -138,8 +143,6 @@ public class Professional {
         this.cep = cep;
     }
     
-    
-
     public Double getMinimumSalaryExpectation() {
         return minimumSalaryExpectation;
     }
@@ -218,5 +221,13 @@ public class Professional {
 
     public void setPreferredTypes(List<ProjectType> preferredTypes) {
         this.preferredTypes = preferredTypes;
+    }
+
+    public ExperienceLevel getExperienceLevel() {
+        return experienceLevel;
+    }
+
+    public void setExperienceLevel(ExperienceLevel experienceLevel) {
+        this.experienceLevel = experienceLevel;
     }
 }

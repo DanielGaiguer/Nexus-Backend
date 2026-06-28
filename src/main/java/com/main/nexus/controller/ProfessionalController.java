@@ -108,6 +108,7 @@ public class ProfessionalController {
         existing.setLatitude(request.latitude());
         existing.setLongitude(request.longitude());
         existing.setPreferredTypes(request.preferredTypes());
+        existing.setExperienceLevel(request.experienceLevel());
         
         if (request.cep() != null && !request.cep().isBlank()) {
             GeolocationService.AddressData coords = geolocationService.resolveFromCep(request.cep());
@@ -175,7 +176,8 @@ public class ProfessionalController {
                 p.getLatitude(),
                 p.getLongitude(),
                 p.getSkills().stream().map(Skill::getName).toList(),
-                p.getPreferredTypes()
+                p.getPreferredTypes(),
+                p.getExperienceLevel()
         );
     }
     

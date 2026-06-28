@@ -72,6 +72,7 @@ public class ProjectController {
         project.setWorkMode(request.workMode());
         project.setType(request.type());
         project.setMaxPositions(request.maxPositions() != null ? request.maxPositions() : 1);
+        project.setExperienceLevel(request.experienceLevel());
 
         if (request.skillIds() != null) {
             project.setRequiredSkills(skillService.findAllById(request.skillIds()));
@@ -94,6 +95,15 @@ public class ProjectController {
         existing.setDeadline(request.deadline());
         existing.setWorkMode(request.workMode());
         existing.setType(request.type());
+        existing.setExperienceLevel(request.experienceLevel());
+
+        if (request.maxPositions() != null) {
+            if (request.maxPositions() < existing.getFilledPositions()) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Maximum positions cannot be less than the number of positions already filled.");
+            }
+            existing.setMaxPositions(request.maxPositions());
+        }
 
         if (request.skillIds() != null) {
             existing.setRequiredSkills(skillService.findAllById(request.skillIds()));
@@ -138,6 +148,7 @@ public class ProjectController {
                 p.getCreatedAt(),
                 p.getFilledPositions(),
                 p.getMaxPositions(),
+                p.getExperienceLevel(),
                 p.getRequiredSkills().stream().map(Skill::getName).toList(),
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName()

@@ -5,6 +5,7 @@ import com.main.nexus.model.enums.Modality;
 import java.time.LocalDate;
 import java.util.List;
 import com.main.nexus.model.enums.ProjectType;
+import com.main.nexus.model.enums.ExperienceLevel;
 
 public record ProjectRequestDTO(
         String title,
@@ -15,5 +16,6 @@ public record ProjectRequestDTO(
         Modality workMode,
         ProjectType type,
         Integer maxPositions,
+        ExperienceLevel experienceLevel,
         List<Long> skillIds
 ) {}
