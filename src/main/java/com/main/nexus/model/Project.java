@@ -66,6 +66,12 @@ public class Project {
         inverseJoinColumns = @JoinColumn(name = "skill_id")
     )
     private List<Skill> requiredSkills = new ArrayList<>();
+    
+    @Column(nullable = false)
+    private Integer maxPositions = 1;
+
+    @Column(nullable = false)
+    private Integer filledPositions = 0;
 
     public Long getId() {
         return id;
@@ -169,5 +175,25 @@ public class Project {
 
     public void setType(ProjectType type) {
         this.type = type;
+    }
+
+    public Integer getMaxPositions() {
+        return maxPositions;
+    }
+
+    public void setMaxPositions(Integer maxPositions) {
+        this.maxPositions = maxPositions;
+    }
+
+    public Integer getFilledPositions() {
+        return filledPositions;
+    }
+
+    public void setFilledPositions(Integer filledPositions) {
+        this.filledPositions = filledPositions;
+    }
+    
+    public boolean hasOpenPositions() {
+        return filledPositions < maxPositions;
     }
 }

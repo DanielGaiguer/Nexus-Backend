@@ -71,6 +71,7 @@ public class ProjectController {
         project.setDeadline(request.deadline());
         project.setWorkMode(request.workMode());
         project.setType(request.type());
+        project.setMaxPositions(request.maxPositions() != null ? request.maxPositions() : 1);
 
         if (request.skillIds() != null) {
             project.setRequiredSkills(skillService.findAllById(request.skillIds()));
@@ -135,6 +136,8 @@ public class ProjectController {
                 p.getType(),
                 p.getStatus(),
                 p.getCreatedAt(),
+                p.getFilledPositions(),
+                p.getMaxPositions(),
                 p.getRequiredSkills().stream().map(Skill::getName).toList(),
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName()

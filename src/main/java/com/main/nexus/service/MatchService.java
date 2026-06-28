@@ -272,6 +272,7 @@ public class MatchService {
         if (wasAlreadyProfessionalInterested) {
             match.setCompanyStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.MATCHED);
+            incrementFilledPositions(match.getProject());
         } else {
             match.setCompanyStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.COMPANY_INTERESTED);
@@ -308,6 +309,7 @@ public class MatchService {
 
         match.setCompanyStatus(InterestStatus.INTERESTED);
         match.setStatus(StatusMatch.MATCHED);
+        incrementFilledPositions(match.getProject());
         return matchRepository.save(match);
     }
 
@@ -334,6 +336,7 @@ public class MatchService {
 
         match.setProfessionalStatus(InterestStatus.INTERESTED);
         match.setStatus(StatusMatch.MATCHED);
+        incrementFilledPositions(match.getProject());
         return matchRepository.save(match);
     }
 
@@ -465,6 +468,7 @@ public class MatchService {
         if (wasAlreadyCompanyInterested) {
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.MATCHED);
+            incrementFilledPositions(match.getProject());
         } else {
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.PROFESSIONAL_INTERESTED);
@@ -553,5 +557,10 @@ public class MatchService {
                 "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
             );
         }
+    }
+    
+    private void incrementFilledPositions(Project project) {
+        project.setFilledPositions(project.getFilledPositions() + 1);
+        projectRepository.save(project);
     }
 }

@@ -14,5 +14,6 @@ public record ProjectRequestDTO(
         LocalDate deadline,
         Modality workMode,
         ProjectType type,
+        Integer maxPositions,
         List<Long> skillIds
 ) {}

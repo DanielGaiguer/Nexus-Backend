@@ -19,6 +19,8 @@ public record ProjectResponseDTO(
         ProjectType type,
         ProjectStatus status,
         LocalDateTime createdAt,
+        Integer maxPositions,       
+        Integer filledPositions,
         List<String> requiredSkills,
         Long companyId,
         String companyName
