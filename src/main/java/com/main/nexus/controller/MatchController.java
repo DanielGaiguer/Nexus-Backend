@@ -1,6 +1,8 @@
 package com.main.nexus.controller;
 
 import com.main.nexus.dto.UserDTO;
+import com.main.nexus.model.enums.CompanyRejectionReason;
+import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
@@ -56,7 +58,7 @@ public class MatchController {
     @PostMapping("/{matchId}/company-reject")
     public ResponseEntity<String> companyRejects(
             @PathVariable Long matchId,
-            @RequestBody List<String> reasons) {
+            @RequestBody List<CompanyRejectionReason> reasons) {
         Long companyId = getLoggedCompanyId();
         matchService.companyRejectsWithFeedback(matchId, companyId, reasons);
         return ResponseEntity.ok("Invite rejected.");
@@ -74,7 +76,7 @@ public class MatchController {
     @PostMapping("/{matchId}/professional-reject")
     public ResponseEntity<String> professionalRejects(
             @PathVariable Long matchId,
-            @RequestBody List<String> reasons) {
+            @RequestBody List<ProfessionalRejectionReason> reasons) {
         Long professionalId = getLoggedProfessionalId();
         matchService.professionalRejectsWithFeedback(matchId, professionalId, reasons);
         return ResponseEntity.ok("Invite rejected.");

@@ -181,8 +181,8 @@ public class ReputationService {
                 List.of(PositiveReason.RELIABLE, PositiveReason.DELIVERED_ON_TIME),
                 List.of(NegativeReason.MISSED_DEADLINES, NegativeReason.UNRELIABLE, NegativeReason.ABSENT));
         metrics.setReliability(blend(relRecent, relHist));
-
-        // Punctuality
+        
+        // Punctuality 
         double punHist = indicatorFromReviews(allReviews,
                 List.of(PositiveReason.PUNCTUAL, PositiveReason.DELIVERED_ON_TIME), List.of(NegativeReason.MISSED_DEADLINES));
         double punRecent = indicatorFromReviews(recentReviews,

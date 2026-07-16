@@ -362,7 +362,7 @@ public class MatchService {
         return matchRepository.save(match);
     }
 
-    public Match companyRejectsWithFeedback(Long matchId, Long companyId, List<String> reasons) {
+    public Match companyRejectsWithFeedback(Long matchId, Long companyId, List<CompanyRejectionReason> reasons) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
 
@@ -389,7 +389,7 @@ public class MatchService {
         return matchRepository.save(match);
     }
 
-    public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, List<String> reasons) {
+    public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, List<ProfessionalRejectionReason> reasons) {
         Match match = findById(matchId);
         validateProfessionalOwnership(match, professionalId);
 
@@ -419,17 +419,7 @@ public class MatchService {
 
     // ── Persistência de feedback de rejeição, separado por quem rejeita ────────
 
-    private void saveProfessionalRejection(Match match, List<String> reasonStrings) {
-        List<ProfessionalRejectionReason> reasons = reasonStrings.stream()
-                .map(r -> {
-                    try {
-                        return ProfessionalRejectionReason.valueOf(r.toUpperCase());
-                    } catch (IllegalArgumentException e) {
-                        return ProfessionalRejectionReason.OTHER;
-                    }
-                })
-                .toList();
-
+    private void saveProfessionalRejection(Match match, List<ProfessionalRejectionReason> reasons) {
         RejectionFeedback feedback = new RejectionFeedback();
         feedback.setMatch(match);
         feedback.setRejectedBy(AuthorType.PROFESSIONAL);
@@ -438,17 +428,7 @@ public class MatchService {
         reputationService.recalculateForCompany(match.getProject().getCompany().getId());
     }
 
-    private void saveCompanyRejection(Match match, List<String> reasonStrings) {
-        List<CompanyRejectionReason> reasons = reasonStrings.stream()
-                .map(r -> {
-                    try {
-                        return CompanyRejectionReason.valueOf(r.toUpperCase());
-                    } catch (IllegalArgumentException e) {
-                        return CompanyRejectionReason.OTHER;
-                    }
-                })
-                .toList();
-
+    private void saveCompanyRejection(Match match, List<CompanyRejectionReason> reasons) {
         RejectionFeedback feedback = new RejectionFeedback();
         feedback.setMatch(match);
         feedback.setRejectedBy(AuthorType.COMPANY);
