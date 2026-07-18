@@ -81,8 +81,8 @@ public class ReputationService {
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();
 
-        List<RejectionFeedback> allRejections = rejectionFeedbackRepository.findCompanyRejectionsAgainstProfessional(
-                professionalId, LocalDateTime.now().minusYears(50)); // efetivamente "todo o histórico"
+        List<RejectionFeedback> allRejections = rejectionFeedbackRepository.findByMatchProfessionalAndRejectedBy(
+                professionalId, AuthorType.COMPANY, LocalDateTime.now().minusYears(50));
         List<RejectionFeedback> recentRejections = allRejections.stream()
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();
@@ -111,8 +111,8 @@ public class ReputationService {
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();
 
-        List<RejectionFeedback> allRejections = rejectionFeedbackRepository.findProfessionalRejectionsAgainstCompany(
-                companyId, LocalDateTime.now().minusYears(50));
+        List<RejectionFeedback> allRejections = rejectionFeedbackRepository.findByMatchProjectCompanyAndRejectedBy(
+                companyId, AuthorType.PROFESSIONAL, LocalDateTime.now().minusYears(50));
         List<RejectionFeedback> recentRejections = allRejections.stream()
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();

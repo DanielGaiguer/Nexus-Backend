@@ -122,6 +122,11 @@ public class ProfessionalController {
         return ResponseEntity.ok(toProfileDTO(existing));
     }
 
+    @GetMapping("/skills")
+    public ResponseEntity<?> listSkills() {
+        return ResponseEntity.ok(skillService.findAll());
+    }
+
     @PutMapping("/skills")
     public ResponseEntity<String> updateSkills(@RequestBody List<Long> skillIds) {
         UserDTO logged = getLoggedUser();
