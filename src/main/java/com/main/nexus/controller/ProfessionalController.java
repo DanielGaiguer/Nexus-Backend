@@ -6,6 +6,7 @@ import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Skill;
+import com.main.nexus.service.FileStorageService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
@@ -23,7 +24,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
@@ -44,6 +47,9 @@ public class ProfessionalController {
     
     @Autowired
     private GeolocationService geolocationService;
+    
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @GetMapping("/projects")
     public ResponseEntity<?> listPreviousProjects() {
@@ -207,5 +213,44 @@ public class ProfessionalController {
 
         matchService.professionalShowsInterest(professional.getId(), projectId);
         return ResponseEntity.ok("Interest sent to company.");
+    }
+
+    // Upload de curriculo
+    @PostMapping("/resume")
+    public ResponseEntity<String> uploadResume(@RequestParam("file") MultipartFile file) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        // Remove o currículo anterior se existir
+        if (professional.getResume() != null) {
+            fileStorageService.deleteResume(professional.getResume());
+        }
+
+        String fileName = fileStorageService.storeResume(file, professional.getId());
+        professional.setResume(fileName);
+        professionalService.update(professional);
+
+        return ResponseEntity.ok("Resume uploaded successfully.");
+    }
+
+    // Download do currículo — acessível por COMPANY e PROFESSIONAL autenticados
+    @GetMapping("/{professionalId}/resume")
+    public ResponseEntity<byte[]> downloadResume(@PathVariable Long professionalId) {
+        Professional professional = professionalService.findById(professionalId);
+
+        if (professional.getResume() == null) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(404),
+                    "This professional has no resume.");
+        }
+
+        byte[] content = fileStorageService.loadResume(professional.getResume());
+
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition",
+                        "inline; filename=\"curriculo_" + professional.getName().replace(" ", "_") + ".pdf\"")
+                .body(content);
     }
 }

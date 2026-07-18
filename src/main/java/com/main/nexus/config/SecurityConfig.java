@@ -34,12 +34,15 @@ public class SecurityConfig {
                 .requestMatchers("/api/company/**").hasRole("COMPANY")
                 .requestMatchers("/api/projects/**").hasRole("COMPANY")
                 .requestMatchers("/api/professional/**").hasRole("PROFESSIONAL")
+                .requestMatchers(HttpMethod.POST, "/api/professional/resume").hasRole("PROFESSIONAL")
 
                 // Match: tanto empresa quanto profissional acessam
                 .requestMatchers("/api/matches/**").hasAnyRole("COMPANY", "PROFESSIONAL")
 
                 // Reviews: ambos podem avaliar
                 .requestMatchers("/api/reviews/**").hasAnyRole("COMPANY", "PROFESSIONAL")
+                    
+                    .requestMatchers("/api/professional/*/resume").hasAnyRole("PROFESSIONAL", "COMPANY")
 
                 .anyRequest().authenticated()
             )
