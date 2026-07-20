@@ -1,7 +1,10 @@
 package com.main.nexus.controller;
 
 import com.main.nexus.dto.AdminDashboardDTO;
+import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.UserSummaryDTO;
+import com.main.nexus.model.Project;
+import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.MatchRepository;
@@ -75,6 +78,15 @@ public class AdminController {
         ));
     }
 
+    @GetMapping("/projects")
+    public ResponseEntity<List<ProjectResponseDTO>> listAllProjects() {
+        List<ProjectResponseDTO> projects = projectRepository.findAll()
+                .stream()
+                .map(this::toResponseDTO)
+                .toList();
+        return ResponseEntity.ok(projects);
+    }
+
     @GetMapping("/companies/pending")
     public ResponseEntity<?> pendingCompanies() {
         return ResponseEntity.ok(companyService.findPending());
@@ -131,5 +143,26 @@ public class AdminController {
             userRepository.save(user);
         });
         return ResponseEntity.ok("User status updated.");
+    }
+
+    private ProjectResponseDTO toResponseDTO(Project p) {
+        return new ProjectResponseDTO(
+                p.getId(),
+                p.getTitle(),
+                p.getDescription(),
+                p.getMinimumBudget(),
+                p.getMaximumBudget(),
+                p.getDeadline(),
+                p.getWorkMode(),
+                p.getType(),
+                p.getStatus(),
+                p.getCreatedAt(),
+                p.getMaxPositions(),
+                p.getFilledPositions(),
+                p.getExperienceLevel(),
+                p.getRequiredSkills().stream().map(Skill::getName).toList(),
+                p.getCompany().getId(),
+                p.getCompany().getCompanyName()
+        );
     }
 }
