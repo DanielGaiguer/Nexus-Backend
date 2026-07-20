@@ -54,6 +54,9 @@ public class Company {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CompanyStatus status = CompanyStatus.PENDING;
+    
+    @Column(length = 500)
+    private String profilePhotoUrl;
 
     public Long getId() {
         return id;
@@ -158,4 +161,14 @@ public class Company {
     public void setStatus(CompanyStatus status) {
         this.status = status;
     }
+
+    public String getProfilePhotoUrl() {
+        return profilePhotoUrl;
+    }
+
+    public void setProfilePhotoUrl(String profilePhotoUrl) {
+        this.profilePhotoUrl = profilePhotoUrl;
+    }
+    
+    
 }

@@ -21,5 +21,6 @@ public record ProfessionalProfileDTO(
         Double longitude,
         List<String> skills,
         List<ProjectType> preferredTypes,
-        ExperienceLevel experienceLevel
+        ExperienceLevel experienceLevel,
+        String profilePhotoUrl
 ) {}

@@ -86,6 +86,9 @@ public class Professional {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private ExperienceLevel experienceLevel;
+    
+    @Column(length = 500)
+    private String profilePhotoUrl;
 
     public Long getId() {
         return id;
@@ -230,4 +233,13 @@ public class Professional {
     public void setExperienceLevel(ExperienceLevel experienceLevel) {
         this.experienceLevel = experienceLevel;
     }
+
+    public String getProfilePhotoUrl() {
+        return profilePhotoUrl;
+    }
+
+    public void setProfilePhotoUrl(String profilePhotoUrl) {
+        this.profilePhotoUrl = profilePhotoUrl;
+    }
+    
 }

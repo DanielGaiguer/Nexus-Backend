@@ -12,6 +12,7 @@ import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.SkillService;
+import com.main.nexus.service.SupabaseStorageService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -50,6 +51,9 @@ public class ProfessionalController {
     
     @Autowired
     private FileStorageService fileStorageService;
+    
+    @Autowired
+    private SupabaseStorageService supabaseStorageService;
 
     @GetMapping("/projects")
     public ResponseEntity<?> listPreviousProjects() {
@@ -188,7 +192,8 @@ public class ProfessionalController {
                 p.getLongitude(),
                 p.getSkills().stream().map(Skill::getName).toList(),
                 p.getPreferredTypes(),
-                p.getExperienceLevel()
+                p.getExperienceLevel(),
+                p.getProfilePhotoUrl()
         );
     }
     
@@ -252,5 +257,40 @@ public class ProfessionalController {
                 .header("Content-Disposition",
                         "inline; filename=\"curriculo_" + professional.getName().replace(" ", "_") + ".pdf\"")
                 .body(content);
+    }
+    
+    @PostMapping("/profile/photo")
+    public ResponseEntity<String> uploadProfilePhoto(
+            @RequestParam("file") MultipartFile file) {
+
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        // Remove a foto antiga do bucket se existir
+        supabaseStorageService.deleteProfilePhoto(professional.getProfilePhotoUrl());
+
+        String photoUrl = supabaseStorageService.uploadProfilePhoto(
+                file, "professionals", professional.getId());
+
+        professional.setProfilePhotoUrl(photoUrl);
+        professionalService.update(professional);
+
+        return ResponseEntity.ok(photoUrl);
+    }
+
+    @DeleteMapping("/profile/photo")
+    public ResponseEntity<String> deleteProfilePhoto() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        supabaseStorageService.deleteProfilePhoto(professional.getProfilePhotoUrl());
+        professional.setProfilePhotoUrl(null);
+        professionalService.update(professional);
+
+        return ResponseEntity.ok("Profile photo removed.");
     }
 }
