@@ -45,8 +45,8 @@ public class SecurityConfig {
                  //Dowload de curriculo para profissionais e empresas
                 .requestMatchers("/api/professional/*/resume").hasAnyRole("PROFESSIONAL", "COMPANY")
                     
-                 //Libera o mapa para profissional e empresa   
-                 .requestMatchers("/api/map/**").hasAnyRole("PROFESSIONAL", "COMPANY")
+                 //Libera o mapa para profissional, empresa e admin   
+                 .requestMatchers("/api/map/**").hasAnyRole("PROFESSIONAL", "COMPANY", "ADMIN")
 
                 .anyRequest().authenticated()
             )

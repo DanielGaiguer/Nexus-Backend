@@ -30,13 +30,13 @@ public class MapController {
     @Autowired
     private ProjectRepository projectRepository;
 
-    // ── Profissionais com coordenadas, filtro opcional de raio ──────────────
-
     @GetMapping("/professionals")
     public ResponseEntity<List<MapProfessionalDTO>> getProfessionals(
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,
-            @RequestParam(required = false) Double radiusKm) {
+            @RequestParam(required = false) Double radiusKm,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String uf) {
 
         List<Professional> all = professionalRepository.findAll();
 
@@ -46,11 +46,21 @@ public class MapController {
                     if (lat == null || lng == null || radiusKm == null) return true;
                     return haversineDistance(lat, lng, p.getLatitude(), p.getLongitude()) <= radiusKm;
                 })
+                .filter(p -> {
+                    if (city != null && !city.isBlank())
+                        return city.equalsIgnoreCase(p.getCity());
+                    return true;
+                })
+                .filter(p -> {
+                    if (uf != null && !uf.isBlank())
+                        return uf.equalsIgnoreCase(p.getUf());
+                    return true;
+                })
                 .map(p -> new MapProfessionalDTO(
                         p.getId(),
                         p.getName(),
                         p.getCity(),
-                        p.getState(),
+                        p.getUf(),
                         p.getLatitude(),
                         p.getLongitude(),
                         p.getReputation(),
@@ -62,13 +72,14 @@ public class MapController {
         return ResponseEntity.ok(result);
     }
 
-    // ── Empresas com coordenadas, filtro opcional de raio ──────────────────
 
     @GetMapping("/companies")
     public ResponseEntity<List<MapCompanyDTO>> getCompanies(
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,
-            @RequestParam(required = false) Double radiusKm) {
+            @RequestParam(required = false) Double radiusKm,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String uf) {
 
         List<Company> all = companyRepository.findAll();
 
@@ -78,11 +89,21 @@ public class MapController {
                     if (lat == null || lng == null || radiusKm == null) return true;
                     return haversineDistance(lat, lng, c.getLatitude(), c.getLongitude()) <= radiusKm;
                 })
+                .filter(c -> {
+                    if (city != null && !city.isBlank())
+                        return city.equalsIgnoreCase(c.getCity());
+                    return true;
+                })
+                .filter(c -> {
+                    if (uf != null && !uf.isBlank())
+                        return uf.equalsIgnoreCase(c.getUf());
+                    return true;
+                })
                 .map(c -> new MapCompanyDTO(
                         c.getId(),
                         c.getCompanyName(),
                         c.getCity(),
-                        c.getState(),
+                        c.getUf(),
                         c.getLatitude(),
                         c.getLongitude(),
                         c.getReputation(),
@@ -96,7 +117,6 @@ public class MapController {
         return ResponseEntity.ok(result);
     }
 
-    // ── Haversine — reutilizando a mesma lógica já existente no MatchService ─
 
     private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
         final double EARTH_RADIUS_KM = 6371.0;
