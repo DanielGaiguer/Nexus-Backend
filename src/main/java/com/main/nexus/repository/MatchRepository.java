@@ -20,4 +20,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     @Query("SELECT m FROM Match m WHERE m.project.id = :projectId ORDER BY m.matchScore DESC")
     List<Match> findByProjectIdOrderByMatchScoreDesc(Long projectId);
+    
+    @Query("SELECT AVG(m.matchScore) FROM Match m")
+    Double findAverageMatchScore();
 }

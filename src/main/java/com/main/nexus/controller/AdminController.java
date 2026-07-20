@@ -1,14 +1,17 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.AdminDashboardDTO;
 import com.main.nexus.dto.UserSummaryDTO;
+import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.repository.CompanyRepository;
+import com.main.nexus.repository.MatchRepository;
+import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.UserRepository;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.SkillService;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,15 +40,39 @@ public class AdminController {
 
     @Autowired
     private SkillService skillService;
+    
+    @Autowired
+    private ProfessionalRepository professionalRepository;
+    
+    @Autowired
+    private CompanyRepository companyRepository;
+    
+    @Autowired
+    private MatchRepository matchRepository;
 
     @GetMapping("/dashboard")
-    public ResponseEntity<Map<String, Object>> dashboard() {
-        Map<String, Object> data = new HashMap<>();
-        data.put("totalUsers",       userRepository.count());
-        data.put("totalProjects",    projectRepository.count());
-        data.put("totalMatches",     matchService.countConfirmedMatches());
-        data.put("pendingCompanies", companyService.findPending().size());
-        return ResponseEntity.ok(data);
+    public ResponseEntity<AdminDashboardDTO> dashboard() {
+        long totalUsers        = userRepository.count();
+        long totalProfessionals = professionalRepository.count();
+        long totalCompanies    = companyRepository.findAll().size();
+        long totalProjects     = projectRepository.count();
+        long totalOpenProjects = projectRepository.findByStatus(ProjectStatus.OPEN).size();
+        long totalMatches      = matchRepository.count();
+        long confirmedMatches  = matchService.countConfirmedMatches();
+        Double avgScore        = matchRepository.findAverageMatchScore();
+        int pendingCompanies   = companyService.findPending().size();
+
+        return ResponseEntity.ok(new AdminDashboardDTO(
+                totalUsers,
+                totalProfessionals,
+                totalCompanies,
+                totalProjects,
+                totalOpenProjects,
+                totalMatches,
+                confirmedMatches,
+                avgScore != null ? Math.round(avgScore * 10.0) / 10.0 : 0.0,
+                pendingCompanies
+        ));
     }
 
     @GetMapping("/companies/pending")
