@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -46,9 +47,49 @@ public class AuthService {
     private GeolocationService geolocationService;
 
     public void registerProfessional(RegisterProfessionalRequestDTO request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Email already in use.");
+        // ── 1. Validações de campos obrigatórios ───────────────────────────────
+        if (request.email() == null || request.email().isBlank()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Email is required.");
         }
+        if (request.password() == null || request.password().isBlank()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Password is required.");
+        }
+        if (request.name() == null || request.name().isBlank()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Name is required.");
+        }
+
+        // ── 2. Validação de unicidade ──────────────────────────────────────────
+        if (userRepository.existsByEmail(request.email())) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(409),
+                    "Email '" + request.email() + "' is already registered. " +
+                    "If you already have an account, please log in.");
+        }
+
+        // ── 3. Resolução do CEP ANTES de qualquer persistência ────────────────
+        GeolocationService.AddressData addressData = null;
+        if (request.cep() != null && !request.cep().isBlank()) {
+            try {
+                addressData = geolocationService.resolveFromCep(request.cep());
+            } catch (ResponseStatusException e) {
+                if (e.getStatusCode().value() == 404) {
+                    throw new ResponseStatusException(HttpStatusCode.valueOf(422),
+                            "CEP '" + request.cep() + "' not found. " +
+                            "Please check the ZIP code and try again.");
+                }
+                if (e.getStatusCode().value() == 400) {
+                    throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                            "CEP '" + request.cep() + "' has an invalid format. " +
+                            "Expected format: 00000-000 or 00000000.");
+                }
+                throw new ResponseStatusException(HttpStatusCode.valueOf(502),
+                        "Could not validate the ZIP code at this moment. " +
+                        "Please try again in a few seconds.");
+            }
+        }
+
 
         User user = new User();
         user.setEmail(request.email());
@@ -81,16 +122,64 @@ public class AuthService {
             "Complete seu perfil e suas skills para começar a receber oportunidades compatíveis.\n\nEquipe Nexus"
         );
     }
-
+    
+    @Transactional
     public void registerCompany(RegisterCompanyRequestDTO request) {
+        if (request.email() == null || request.email().isBlank()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Email is required.");
+        }
+        if (request.password() == null || request.password().isBlank()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Password is required.");
+        }
+        if (request.companyName() == null || request.companyName().isBlank()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Company name is required.");
+        }
+
         if (userRepository.existsByEmail(request.email())) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Email already in use.");
+            throw new ResponseStatusException(HttpStatusCode.valueOf(409),
+                    "Email '" + request.email() + "' is already registered. " +
+                    "If you already have an account, please log in.");
+        }
+
+        if (request.taxId() != null && !request.taxId().isBlank()) {
+            if (companyRepository.existsByTaxId(request.taxId())) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(409),
+                        "A company with CNPJ '" + request.taxId() + "' is already registered.");
+            }
         }
         
-        if (companyRepository.existsByTaxId(request.taxId())) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Tax ID already registered.");
+        if (request.taxId() != null && !request.taxId().isBlank()) {
+            validateTaxId(request.taxId()); // valida formato e dígitos verificadores primeiro
+            if (companyRepository.existsByTaxId(request.taxId())) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(409),
+                        "A company with CNPJ '" + request.taxId() + "' is already registered.");
+            }
         }
 
+        GeolocationService.AddressData addressData = null;
+        if (request.cep() != null && !request.cep().isBlank()) {
+            try {
+                addressData = geolocationService.resolveFromCep(request.cep());
+            } catch (ResponseStatusException e) {
+                if (e.getStatusCode().value() == 404) {
+                    throw new ResponseStatusException(HttpStatusCode.valueOf(422),
+                            "CEP '" + request.cep() + "' not found. " +
+                            "Please check the ZIP code and try again.");
+                }
+                if (e.getStatusCode().value() == 400) {
+                    throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                            "CEP '" + request.cep() + "' has an invalid format. " +
+                            "Expected format: 00000-000 or 00000000.");
+                }
+                throw new ResponseStatusException(HttpStatusCode.valueOf(502),
+                        "Could not validate the ZIP code at this moment. " +
+                        "Please try again in a few seconds.");
+            }
+        }
+        
         User user = new User();
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
@@ -168,5 +257,51 @@ public class AuthService {
         String token = tokenService.generateToken(userDTO);
 
         return new LoginResponseDTO(user.getId(), user.getEmail(), name, user.getType().name(), token);
+    }
+    
+    
+    private void validateTaxId(String taxId) {
+        if (taxId == null || taxId.isBlank()) return;
+
+        String digits = taxId.replaceAll("[^0-9]", "");
+
+        if (digits.length() != 14) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "CNPJ '" + taxId + "' has an invalid format. " +
+                    "Expected 14 digits, e.g. 12.345.678/0001-99 or 12345678000199.");
+        }
+
+        if (digits.chars().distinct().count() == 1) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "CNPJ '" + taxId + "' is invalid. Sequences of identical digits are not accepted.");
+        }
+
+        if (!isCnpjValid(digits)) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "CNPJ '" + taxId + "' is invalid. Please check the number and try again.");
+        }
+    }
+
+    private boolean isCnpjValid(String digits) {
+        int[] weights1 = {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+        int[] weights2 = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+
+        int sum = 0;
+        for (int i = 0; i < 12; i++) {
+            sum += Character.getNumericValue(digits.charAt(i)) * weights1[i];
+        }
+        int remainder = sum % 11;
+        int digit1 = remainder < 2 ? 0 : 11 - remainder;
+
+        if (digit1 != Character.getNumericValue(digits.charAt(12))) return false;
+
+        sum = 0;
+        for (int i = 0; i < 13; i++) {
+            sum += Character.getNumericValue(digits.charAt(i)) * weights2[i];
+        }
+        remainder = sum % 11;
+        int digit2 = remainder < 2 ? 0 : 11 - remainder;
+
+        return digit2 == Character.getNumericValue(digits.charAt(13));
     }
 }
