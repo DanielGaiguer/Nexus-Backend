@@ -37,7 +37,7 @@ public class Notification {
     @Column(length = 200)
     private String actionUrl;
 
-    @Column(nullable = false)
+    @Column(name = "is_read", nullable = false)
     private Boolean read = false;
 
     @Column(nullable = false)
