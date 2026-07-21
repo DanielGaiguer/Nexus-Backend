@@ -19,6 +19,12 @@ public interface RejectionFeedbackRepository extends JpaRepository<RejectionFeed
             @Param("rejectedBy") AuthorType rejectedBy,
             @Param("since") LocalDateTime since);
 
+    @Query("SELECT COUNT(r) FROM RejectionFeedback r WHERE r.match.professional.id = :professionalId " +
+           "AND r.rejectedBy = :rejectedBy")
+    long countByMatchProfessionalIdAndRejectedBy(
+            @Param("professionalId") Long professionalId,
+            @Param("rejectedBy") AuthorType rejectedBy);
+
     @Query("SELECT r FROM RejectionFeedback r WHERE r.match.project.company.id = :companyId " +
            "AND r.rejectedBy = :rejectedBy AND r.createdAt >= :since")
     List<RejectionFeedback> findByMatchProjectCompanyAndRejectedBy(

@@ -2,6 +2,7 @@ package com.main.nexus.controller;
 
 import com.main.nexus.dto.PreviousProjectRequestDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
+import com.main.nexus.dto.ProfessionalStatsDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
@@ -194,6 +195,15 @@ public class ProfessionalController {
 
         return ResponseEntity.ok(
                 matchService.getPendingInvitesForProfessional(professional.getId()));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<ProfessionalStatsDTO> getStats() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+        return ResponseEntity.ok(professionalService.getStats(professional.getId()));
     }
 
     private UserDTO getLoggedUser() {

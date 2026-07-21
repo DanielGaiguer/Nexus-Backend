@@ -17,10 +17,15 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByProjectCompanyId(Long companyId);
     
     long countByStatus(StatusMatch status);
+    long countByProfessionalId(Long professionalId);
+    long countByProfessionalIdAndStatus(Long professionalId, StatusMatch status);
 
     @Query("SELECT m FROM Match m WHERE m.project.id = :projectId ORDER BY m.matchScore DESC")
     List<Match> findByProjectIdOrderByMatchScoreDesc(Long projectId);
     
     @Query("SELECT AVG(m.matchScore) FROM Match m")
     Double findAverageMatchScore();
+
+    @Query("SELECT AVG(m.matchScore) FROM Match m WHERE m.professional.id = :professionalId")
+    Double findAverageScoreByProfessionalId(Long professionalId);
 }
