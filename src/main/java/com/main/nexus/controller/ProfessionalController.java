@@ -6,6 +6,7 @@ import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Skill;
+import com.main.nexus.service.EmailService;
 import com.main.nexus.service.FileStorageService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
@@ -54,6 +55,9 @@ public class ProfessionalController {
     
     @Autowired
     private SupabaseStorageService supabaseStorageService;
+
+    @Autowired
+    private EmailService emailService;
 
     @GetMapping("/projects")
     public ResponseEntity<?> listPreviousProjects() {
@@ -129,6 +133,29 @@ public class ProfessionalController {
         }
 
         professionalService.update(existing);
+
+        boolean hasPhoto = existing.getProfilePhotoUrl() != null && !existing.getProfilePhotoUrl().isBlank();
+        boolean hasSkills = existing.getSkills() != null && existing.getSkills().size() >= 3;
+        boolean hasCep = existing.getCep() != null && !existing.getCep().isBlank();
+        boolean hasExp = existing.getExperienceLevel() != null;
+        boolean hasSalary = existing.getMinimumSalaryExpectation() != null && existing.getMinimumSalaryExpectation() > 0;
+        boolean hasPrevPr = existing.getProjects() != null && !existing.getProjects().isEmpty();
+        boolean complete = hasPhoto && hasSkills && hasCep && hasExp && hasSalary && hasPrevPr;
+
+        if (complete && !Boolean.TRUE.equals(existing.getProfileCompletionEmailSent())) {
+            emailService.send(
+                    existing.getUser().getEmail(),
+                    "Seu perfil está completo! — Nexus",
+                    "Olá " + existing.getName() + ",\n\n" +
+                    "Parabéns! Seu perfil está completo e você agora aparece com destaque no " +
+                    "ranking das vagas compatíveis com seu perfil.\n\n" +
+                    "Acesse o Nexus para ver suas oportunidades: http://localhost:8080/pro/opportunities\n\n" +
+                    "Equipe Nexus"
+            );
+            existing.setProfileCompletionEmailSent(true);
+            professionalService.update(existing);
+        }
+
         return ResponseEntity.ok(toProfileDTO(existing));
     }
 

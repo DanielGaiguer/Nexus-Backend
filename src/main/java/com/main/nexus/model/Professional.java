@@ -90,6 +90,8 @@ public class Professional {
     @Column(length = 500)
     private String profilePhotoUrl;
 
+    private Boolean profileCompletionEmailSent = false;
+
     public Long getId() {
         return id;
     }
@@ -240,6 +242,14 @@ public class Professional {
 
     public void setProfilePhotoUrl(String profilePhotoUrl) {
         this.profilePhotoUrl = profilePhotoUrl;
+    }
+
+    public Boolean getProfileCompletionEmailSent() {
+        return profileCompletionEmailSent;
+    }
+
+    public void setProfileCompletionEmailSent(Boolean profileCompletionEmailSent) {
+        this.profileCompletionEmailSent = profileCompletionEmailSent;
     }
     
 }
