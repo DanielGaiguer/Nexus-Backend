@@ -3,6 +3,8 @@ package com.main.nexus.service;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.model.enums.StatusMatch;
+import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProjectRepository;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,12 @@ public class ProjectService {
 
     @Autowired
     private MatchService matchService;
+    
+    @Autowired
+    private NotificationService notificationService;
+
+    @Autowired
+    private MatchRepository matchRepository;
 
     public Project save(Project project) {
         Project saved = projectRepository.save(project);
@@ -60,6 +68,18 @@ public class ProjectService {
         Project project = findByIdAndCompany(id, companyId);
         project.setStatus(ProjectStatus.CLOSED);
         projectRepository.save(project);
+
+        // Notifica profissionais que tinham match WAITING ou COMPANY_INTERESTED
+        matchRepository.findByProjectId(project.getId())
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.WAITING
+                          || m.getStatus() == StatusMatch.COMPANY_INTERESTED
+                          || m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
+                .forEach(m -> notificationService.notifyProjectClosed(
+                        m.getProfessional().getUser(),
+                        project.getTitle(),
+                        project.getCompany().getCompanyName()
+                ));
     }
 
     public void delete(Long id, Long companyId) {

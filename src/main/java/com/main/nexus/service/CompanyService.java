@@ -14,6 +14,9 @@ public class CompanyService {
 
     @Autowired
     private CompanyRepository companyRepository;
+    
+    @Autowired
+    private NotificationService notificationService;
 
     public Company save(Company company) {
         return companyRepository.save(company);
@@ -55,7 +58,14 @@ public class CompanyService {
         }
 
         company.setStatus(CompanyStatus.APPROVED);
-        return companyRepository.save(company);
+        
+        Company saved = companyRepository.save(company);
+
+        // Notifica a empresa in-app
+        notificationService.notifyCompanyApproved(
+            company.getUser(), company.getCompanyName());
+
+        return saved;
     }
 
     public Company reject(Long companyId) {
@@ -66,7 +76,13 @@ public class CompanyService {
         }
 
         company.setStatus(CompanyStatus.REJECTED);
-        return companyRepository.save(company);
+        Company saved = companyRepository.save(company);
+
+        // Notifica a empresa in-app
+        notificationService.notifyCompanyRejected(
+            company.getUser(), company.getCompanyName());
+
+        return saved;
     }
     
     public boolean isApproved(Long userId) {

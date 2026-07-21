@@ -55,6 +55,9 @@ public class MatchService {
 
     @Autowired
     private MatchHistoryRepository matchHistoryRepository;
+    
+    @Autowired
+    private NotificationService notificationService;
 
     // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
@@ -290,6 +293,13 @@ public class MatchService {
                     "\"" + project.getTitle() + "\" — " + project.getCompany().getCompanyName() + "\n\n" +
                     "Acesse o Nexus para ver os detalhes e demonstrar interesse.\n\nEquipe Nexus"
                 );
+                notificationService.notifyHighScoreOpportunity(
+                    professional.getUser(),
+                    project.getTitle(),
+                    project.getCompany().getCompanyName(),
+                    score,
+                    project.getId()
+                );
             }
         }
 
@@ -343,6 +353,12 @@ public class MatchService {
         if (wasAlreadyProfessionalInterested) {
             notifyMutualMatch(saved);
         } else {
+            notificationService.notifyNewInvite(
+                match.getProfessional().getUser(),
+                match.getProject().getCompany().getCompanyName(),
+                match.getProject().getTitle(),
+                saved.getId()
+            );
             Professional professional = match.getProfessional();
             emailService.send(
                 professional.getUser().getEmail(),
@@ -371,6 +387,12 @@ public class MatchService {
         match.setStatus(StatusMatch.MATCHED);
         incrementFilledPositions(match.getProject());
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
+        notificationService.notifyMatchConfirmed(
+            match.getProfessional().getUser(),
+            match.getProject().getCompany().getCompanyName(),
+            match.getProject().getTitle(),
+            match.getId()
+        );
         return matchRepository.save(match);
     }
 
@@ -385,6 +407,11 @@ public class MatchService {
         Match saved = matchRepository.save(match);
 
         saveCompanyRejection(match, reasons);
+        notificationService.notifyInviteRejected(
+            match.getProfessional().getUser(),
+            match.getProject().getCompany().getCompanyName(),
+            match.getProject().getTitle()
+        );
         return saved;
     }
 
@@ -402,6 +429,12 @@ public class MatchService {
         match.setStatus(StatusMatch.MATCHED);
         incrementFilledPositions(match.getProject());
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
+        notificationService.notifyMatchConfirmed(
+            match.getProject().getCompany().getUser(),
+            match.getProfessional().getName(),
+            match.getProject().getTitle(),
+            match.getId()
+        );
         return matchRepository.save(match);
     }
 
@@ -416,6 +449,11 @@ public class MatchService {
         Match saved = matchRepository.save(match);
 
         saveProfessionalRejection(match, reasons);
+        notificationService.notifyInviteRejected(
+            match.getProject().getCompany().getUser(),
+            match.getProfessional().getName(),
+            match.getProject().getTitle()
+        );
         return saved;
     }
 
@@ -524,6 +562,15 @@ public class MatchService {
 
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
         Match saved = matchRepository.save(match);
+
+        if (!wasAlreadyCompanyInterested) {
+            notificationService.notifyNewInterestReceived(
+                saved.getProject().getCompany().getUser(),
+                saved.getProfessional().getName(),
+                saved.getProject().getTitle(),
+                saved.getId()
+            );
+        }
 
         if (wasAlreadyCompanyInterested) {
             notifyMutualMatch(saved);
@@ -658,6 +705,11 @@ public class MatchService {
         String professionalName = match.getProfessional().getName();
         String companyName = match.getProject().getCompany().getCompanyName();
         String projectTitle = match.getProject().getTitle();
+
+        notificationService.notifyMatchConfirmed(
+            match.getProfessional().getUser(), companyName, projectTitle, match.getId());
+        notificationService.notifyMatchConfirmed(
+            match.getProject().getCompany().getUser(), professionalName, projectTitle, match.getId());
 
         if (match.getInitiatedBy() == InitiatedBy.PROFESSIONAL) {
             emailService.send(
