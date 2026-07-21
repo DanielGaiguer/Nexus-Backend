@@ -1,6 +1,7 @@
 package com.main.nexus.service;
 
 import com.main.nexus.model.Match;
+import com.main.nexus.model.MatchHistory;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
@@ -14,6 +15,7 @@ import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.StatusMatch;
+import com.main.nexus.repository.MatchHistoryRepository;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
@@ -47,6 +49,12 @@ public class MatchService {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private MatchHistoryService matchHistoryService;
+
+    @Autowired
+    private MatchHistoryRepository matchHistoryRepository;
 
     // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
@@ -317,6 +325,7 @@ public class MatchService {
         validateCompanyOwnership(match, companyId);
 
         boolean wasAlreadyProfessionalInterested = match.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED;
+        String fromStatus = match.getStatus().name();
 
         if (wasAlreadyProfessionalInterested) {
             match.setCompanyStatus(InterestStatus.INTERESTED);
@@ -328,6 +337,7 @@ public class MatchService {
             match.setInitiatedBy(InitiatedBy.COMPANY);
         }
 
+        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
         Match saved = matchRepository.save(match);
 
         if (wasAlreadyProfessionalInterested) {
@@ -356,9 +366,11 @@ public class MatchService {
                     "This match is not awaiting a company response.");
         }
 
+        String fromStatus = match.getStatus().name();
         match.setCompanyStatus(InterestStatus.INTERESTED);
         match.setStatus(StatusMatch.MATCHED);
         incrementFilledPositions(match.getProject());
+        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
         return matchRepository.save(match);
     }
 
@@ -366,8 +378,10 @@ public class MatchService {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
 
+        String fromStatus = match.getStatus().name();
         match.setCompanyStatus(InterestStatus.REJECTED);
         match.setStatus(StatusMatch.REJECTED);
+        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
         Match saved = matchRepository.save(match);
 
         saveCompanyRejection(match, reasons);
@@ -383,9 +397,11 @@ public class MatchService {
                     "This match is not awaiting a professional response.");
         }
 
+        String fromStatus = match.getStatus().name();
         match.setProfessionalStatus(InterestStatus.INTERESTED);
         match.setStatus(StatusMatch.MATCHED);
         incrementFilledPositions(match.getProject());
+        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
         return matchRepository.save(match);
     }
 
@@ -393,8 +409,10 @@ public class MatchService {
         Match match = findById(matchId);
         validateProfessionalOwnership(match, professionalId);
 
+        String fromStatus = match.getStatus().name();
         match.setProfessionalStatus(InterestStatus.REJECTED);
         match.setStatus(StatusMatch.REJECTED);
+        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
         Match saved = matchRepository.save(match);
 
         saveProfessionalRejection(match, reasons);
@@ -493,6 +511,7 @@ public class MatchService {
                 });
 
         boolean wasAlreadyCompanyInterested = match.getStatus() == StatusMatch.COMPANY_INTERESTED;
+        String fromStatus = match.getStatus().name();
 
         if (wasAlreadyCompanyInterested) {
             match.setProfessionalStatus(InterestStatus.INTERESTED);
@@ -503,6 +522,7 @@ public class MatchService {
             match.setStatus(StatusMatch.PROFESSIONAL_INTERESTED);
         }
 
+        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
         Match saved = matchRepository.save(match);
 
         if (wasAlreadyCompanyInterested) {
@@ -521,6 +541,10 @@ public class MatchService {
                 .stream()
                 .sorted(Comparator.comparingDouble(Match::getMatchScore).reversed())
                 .toList();
+    }
+
+    public List<MatchHistory> getHistory(Long matchId) {
+        return matchHistoryRepository.findByMatchIdOrderByChangedAtAsc(matchId);
     }
 
     public List<Match> getRankingByProjectWithFilters(

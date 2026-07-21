@@ -1,6 +1,8 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.MatchHistoryDTO;
 import com.main.nexus.dto.UserDTO;
+import com.main.nexus.model.MatchHistory;
 import com.main.nexus.model.enums.CompanyRejectionReason;
 import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.service.CompanyService;
@@ -35,6 +37,19 @@ public class MatchController {
     @GetMapping("/{matchId}")
     public ResponseEntity<?> findById(@PathVariable Long matchId) {
         return ResponseEntity.ok(matchService.findById(matchId));
+    }
+
+    @GetMapping("/{matchId}/history")
+    public ResponseEntity<List<MatchHistoryDTO>> getHistory(@PathVariable Long matchId) {
+        List<MatchHistoryDTO> history = matchService.getHistory(matchId)
+                .stream()
+                .map(h -> new MatchHistoryDTO(
+                        h.getFromStatus(),
+                        h.getToStatus(),
+                        h.getChangedBy(),
+                        h.getChangedAt()))
+                .toList();
+        return ResponseEntity.ok(history);
     }
 
     // ── Empresa demonstra interesse (primeiro contato) ──────────────────────
