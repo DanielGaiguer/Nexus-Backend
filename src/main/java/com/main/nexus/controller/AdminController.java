@@ -4,10 +4,13 @@ import com.main.nexus.dto.AdminDashboardDTO;
 import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.PreviousProjectRequestDTO;
+import com.main.nexus.dto.ProfessionalDashboardDTO;
+import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.UserSummaryDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
+import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.ProjectStatus;
@@ -19,6 +22,7 @@ import com.main.nexus.repository.UserRepository;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
+import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.SkillService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +65,9 @@ public class AdminController {
 
     @Autowired
     private PreviousProjectService previousProjectService;
+
+    @Autowired
+    private ProfessionalService professionalService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardDTO> dashboard() {
@@ -159,9 +166,30 @@ public class AdminController {
         return ResponseEntity.ok(matchService.getMatchesByProfessional(id));
     }
 
+    @GetMapping("/professionals/{id}/profile")
+    public ResponseEntity<ProfessionalProfileDTO> getProfessionalProfile(@PathVariable Long id) {
+        Professional professional = professionalService.findById(id);
+        return ResponseEntity.ok(toProfessionalProfileDTO(professional));
+    }
+
     @GetMapping("/professionals/{id}/projects")
     public ResponseEntity<List<PreviousProjectRequestDTO>> getProfessionalProjects(@PathVariable Long id) {
         return ResponseEntity.ok(previousProjectService.findByProfessional(id));
+    }
+
+    @GetMapping("/professionals/{id}/dashboard")
+    public ResponseEntity<ProfessionalDashboardDTO> getProfessionalDashboard(@PathVariable Long id) {
+        Professional professional = professionalService.findById(id);
+        int totalProjects = previousProjectService.findByProfessional(id).size();
+        long totalMatches = matchService.getMatchesByProfessional(id)
+                .stream()
+                .filter(m -> m.getStatus() == com.main.nexus.model.enums.StatusMatch.MATCHED)
+                .count();
+        return ResponseEntity.ok(new ProfessionalDashboardDTO(
+                toProfessionalProfileDTO(professional),
+                totalProjects,
+                totalMatches
+        ));
     }
 
     @GetMapping("/companies/{id}/profile")
@@ -233,6 +261,28 @@ public class AdminController {
                 c.getLongitude(),
                 c.getStatus().name(),
                 c.getProfilePhotoUrl()
+        );
+    }
+
+    private ProfessionalProfileDTO toProfessionalProfileDTO(Professional p) {
+        return new ProfessionalProfileDTO(
+                p.getId(),
+                p.getName(),
+                p.getUser().getEmail(),
+                p.getPhone(),
+                p.getCity(),
+                p.getUf(),
+                p.getCep(),
+                p.getMinimumSalaryExpectation(),
+                p.getMaximumSalaryExpectation(),
+                p.getAvailable(),
+                p.getReputation(),
+                p.getLatitude(),
+                p.getLongitude(),
+                p.getSkills().stream().map(Skill::getName).toList(),
+                p.getPreferredTypes(),
+                p.getExperienceLevel(),
+                p.getProfilePhotoUrl()
         );
     }
 }

@@ -228,12 +228,6 @@ public class ProfessionalController {
         return ResponseEntity.ok(professionalService.getStats(professional.getId()));
     }
 
-    @GetMapping("/{id}/admin-profile")
-    public ResponseEntity<ProfessionalProfileDTO> getAdminProfile(@PathVariable Long id) {
-        Professional professional = professionalService.findById(id);
-        return ResponseEntity.ok(toProfileDTO(professional));
-    }
-
     @GetMapping("/profile/export")
     @ResponseBody
     public ResponseEntity<byte[]> exportPdf(
