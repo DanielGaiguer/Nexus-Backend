@@ -644,6 +644,10 @@ public class MatchService {
                 .count();
     }
 
+    public List<Match> getMatchesByCompany(Long companyId) {
+        return matchRepository.findByProjectCompanyId(companyId);
+    }
+
     // =========================================================
     // NOTIFICAÇÕES
     // =========================================================

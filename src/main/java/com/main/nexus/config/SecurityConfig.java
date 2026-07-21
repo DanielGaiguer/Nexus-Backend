@@ -32,6 +32,15 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/public/**").permitAll()
 
+                // Export de PDF: qualquer autenticado pode baixar
+                .requestMatchers("/api/professional/profile/export").authenticated()
+
+                // Stats: profissional e admin acessam
+                .requestMatchers("/api/professional/stats").hasAnyRole("PROFESSIONAL", "ADMIN")
+
+                // Admin pode ver perfil de profissional por ID
+                .requestMatchers("/api/professional/*/admin-profile").hasRole("ADMIN")
+
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/company/**").hasRole("COMPANY")
                 .requestMatchers("/api/projects/**").hasRole("COMPANY")

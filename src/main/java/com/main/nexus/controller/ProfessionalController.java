@@ -6,18 +6,24 @@ import com.main.nexus.dto.ProfessionalStatsDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
+import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.Skill;
+import com.main.nexus.repository.PreviousProjectRepository;
+import com.main.nexus.repository.ReputationMetricsRepository;
 import com.main.nexus.service.EmailService;
 import com.main.nexus.service.FileStorageService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
+import com.main.nexus.service.PdfService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.SkillService;
 import com.main.nexus.service.SupabaseStorageService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,6 +33,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -59,6 +66,15 @@ public class ProfessionalController {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private PdfService pdfService;
+
+    @Autowired
+    private ReputationMetricsRepository reputationMetricsRepository;
+
+    @Autowired
+    private PreviousProjectRepository previousProjectRepository;
 
     @GetMapping("/projects")
     public ResponseEntity<?> listPreviousProjects() {
@@ -198,12 +214,50 @@ public class ProfessionalController {
     }
 
     @GetMapping("/stats")
-    public ResponseEntity<ProfessionalStatsDTO> getStats() {
-        UserDTO logged = getLoggedUser();
-        Professional professional = professionalService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Profile not found"));
+    public ResponseEntity<ProfessionalStatsDTO> getStats(
+            @RequestParam(required = false) Long professionalId) {
+        Professional professional;
+        if (professionalId != null) {
+            professional = professionalService.findById(professionalId);
+        } else {
+            UserDTO logged = getLoggedUser();
+            professional = professionalService.findByUserId(logged.id())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatusCode.valueOf(404), "Profile not found"));
+        }
         return ResponseEntity.ok(professionalService.getStats(professional.getId()));
+    }
+
+    @GetMapping("/{id}/admin-profile")
+    public ResponseEntity<ProfessionalProfileDTO> getAdminProfile(@PathVariable Long id) {
+        Professional professional = professionalService.findById(id);
+        return ResponseEntity.ok(toProfileDTO(professional));
+    }
+
+    @GetMapping("/profile/export")
+    @ResponseBody
+    public ResponseEntity<byte[]> exportPdf(
+            @RequestParam(required = false) Long professionalId) {
+        Professional professional;
+        if (professionalId != null) {
+            professional = professionalService.findById(professionalId);
+        } else {
+            UserDTO logged = getLoggedUser();
+            professional = professionalService.findByUserId(logged.id())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatusCode.valueOf(404), "Profile not found"));
+        }
+
+        List<PreviousProject> projects = previousProjectRepository
+                .findByProfessionalId(professional.getId());
+        ReputationMetrics reputation = reputationMetricsRepository
+                .findByProfessionalId(professional.getId()).orElse(null);
+
+        byte[] pdf = pdfService.generateProfessionalProfile(professional, projects, reputation);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"perfil-nexus.pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     private UserDTO getLoggedUser() {

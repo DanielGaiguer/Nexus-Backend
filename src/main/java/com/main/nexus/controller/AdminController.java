@@ -1,8 +1,13 @@
 package com.main.nexus.controller;
 
 import com.main.nexus.dto.AdminDashboardDTO;
+import com.main.nexus.dto.CompanyDashboardDTO;
+import com.main.nexus.dto.CompanyProfileDTO;
+import com.main.nexus.dto.PreviousProjectRequestDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.UserSummaryDTO;
+import com.main.nexus.model.Company;
+import com.main.nexus.model.Match;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.ProjectStatus;
@@ -13,6 +18,7 @@ import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.UserRepository;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.SkillService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +58,9 @@ public class AdminController {
     
     @Autowired
     private MatchRepository matchRepository;
+
+    @Autowired
+    private PreviousProjectService previousProjectService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardDTO> dashboard() {
@@ -145,6 +154,48 @@ public class AdminController {
         return ResponseEntity.ok("User status updated.");
     }
 
+    @GetMapping("/professionals/{id}/matches")
+    public ResponseEntity<List<Match>> getProfessionalMatches(@PathVariable Long id) {
+        return ResponseEntity.ok(matchService.getMatchesByProfessional(id));
+    }
+
+    @GetMapping("/professionals/{id}/projects")
+    public ResponseEntity<List<PreviousProjectRequestDTO>> getProfessionalProjects(@PathVariable Long id) {
+        return ResponseEntity.ok(previousProjectService.findByProfessional(id));
+    }
+
+    @GetMapping("/companies/{id}/profile")
+    public ResponseEntity<CompanyProfileDTO> getCompanyProfile(@PathVariable Long id) {
+        Company company = companyService.findById(id);
+        return ResponseEntity.ok(toCompanyProfileDTO(company));
+    }
+
+    @GetMapping("/companies/{id}/dashboard")
+    public ResponseEntity<CompanyDashboardDTO> getCompanyDashboard(@PathVariable Long id) {
+        Company company = companyService.findById(id);
+        int totalProjects = projectRepository.findByCompanyId(id).size();
+        long totalMatches = matchService.countConfirmedMatchesByCompany(id);
+        return ResponseEntity.ok(new CompanyDashboardDTO(
+                toCompanyProfileDTO(company),
+                totalProjects,
+                totalMatches
+        ));
+    }
+
+    @GetMapping("/companies/{id}/projects")
+    public ResponseEntity<List<ProjectResponseDTO>> getCompanyProjects(@PathVariable Long id) {
+        List<ProjectResponseDTO> projects = projectRepository.findByCompanyId(id)
+                .stream()
+                .map(this::toResponseDTO)
+                .toList();
+        return ResponseEntity.ok(projects);
+    }
+
+    @GetMapping("/companies/{id}/matches")
+    public ResponseEntity<List<Match>> getCompanyMatches(@PathVariable Long id) {
+        return ResponseEntity.ok(matchService.getMatchesByCompany(id));
+    }
+
     private ProjectResponseDTO toResponseDTO(Project p) {
         return new ProjectResponseDTO(
                 p.getId(),
@@ -163,6 +214,25 @@ public class AdminController {
                 p.getRequiredSkills().stream().map(Skill::getName).toList(),
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName()
+        );
+    }
+
+    private CompanyProfileDTO toCompanyProfileDTO(Company c) {
+        return new CompanyProfileDTO(
+                c.getId(),
+                c.getCompanyName(),
+                c.getUser().getEmail(),
+                c.getTaxId(),
+                c.getPhone(),
+                c.getCity(),
+                c.getUf(),
+                c.getCep(),
+                c.getDescription(),
+                c.getReputation(),
+                c.getLatitude(),
+                c.getLongitude(),
+                c.getStatus().name(),
+                c.getProfilePhotoUrl()
         );
     }
 }
