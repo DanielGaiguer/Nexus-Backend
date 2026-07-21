@@ -18,4 +18,12 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Modifying
     @Query("UPDATE Project p SET p.filledPositions = p.filledPositions + 1 WHERE p.id = :projectId")
     void incrementFilledPositions(@Param("projectId") Long projectId);
+    
+    // Skills mais exigidas nos projetos de uma empresa
+    @Query("SELECT s.name, s.category, COUNT(p) FROM Project p " +
+           "JOIN p.requiredSkills s " +
+           "WHERE p.company.id = :companyId " +
+           "GROUP BY s.name, s.category " +
+           "ORDER BY COUNT(p) DESC")
+    List<Object[]> findMostRequiredSkillsByCompany(@Param("companyId") Long companyId);
 }

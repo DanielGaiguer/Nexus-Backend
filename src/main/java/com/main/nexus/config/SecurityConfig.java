@@ -51,6 +51,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/professional/profile/photo").hasRole("PROFESSIONAL")
                 .requestMatchers(HttpMethod.POST,   "/api/company/profile/photo").hasRole("COMPANY")
                 .requestMatchers(HttpMethod.DELETE, "/api/company/profile/photo").hasRole("COMPANY")
+                    
+                    
+                .requestMatchers("/api/analytics/company/dashboard").hasRole("COMPANY")
+                .requestMatchers("/api/analytics/company/*/dashboard").hasRole("ADMIN")
 
                 // Match: tanto empresa quanto profissional acessam
                 .requestMatchers("/api/matches/**").hasAnyRole("COMPANY", "PROFESSIONAL")
