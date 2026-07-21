@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -120,10 +121,29 @@ public class ProjectController {
     }
 
     @GetMapping("/{id}/ranking")
-    public ResponseEntity<?> getRanking(@PathVariable Long id) {
+    public ResponseEntity<?> getRanking(
+            @PathVariable Long id,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String uf,
+            @RequestParam(required = false) String experienceLevel,
+            @RequestParam(required = false) Boolean available,
+            @RequestParam(required = false) Double minSalary,
+            @RequestParam(required = false) Double maxSalary,
+            @RequestParam(required = false) String skill) {
         Company company = getLoggedCompany();
         // Garante que só o dono do projeto vê o ranking dele
         projectService.findByIdAndCompany(id, company.getId());
+        boolean hasFilters = (city != null && !city.isBlank())
+                || (uf != null && !uf.isBlank())
+                || (experienceLevel != null && !experienceLevel.isBlank())
+                || available != null
+                || minSalary != null
+                || maxSalary != null
+                || (skill != null && !skill.isBlank());
+        if (hasFilters) {
+            return ResponseEntity.ok(matchService.getRankingByProjectWithFilters(
+                    id, city, uf, experienceLevel, available, minSalary, maxSalary, skill));
+        }
         return ResponseEntity.ok(matchService.getRankingByProject(id));
     }
 

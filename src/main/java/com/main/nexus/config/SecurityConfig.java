@@ -30,6 +30,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/register/professional").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register/company").permitAll()
 
+                .requestMatchers("/api/public/**").permitAll()
+
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/company/**").hasRole("COMPANY")
                 .requestMatchers("/api/projects/**").hasRole("COMPANY")

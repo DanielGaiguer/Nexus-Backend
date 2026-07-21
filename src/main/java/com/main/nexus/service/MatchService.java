@@ -523,6 +523,68 @@ public class MatchService {
                 .toList();
     }
 
+    public List<Match> getRankingByProjectWithFilters(
+            Long projectId,
+            String city,
+            String uf,
+            String experienceLevel,
+            Boolean available,
+            Double minSalary,
+            Double maxSalary,
+            String skill) {
+
+        List<Match> ranking = getRankingByProject(projectId);
+
+        if (city != null && !city.isBlank()) {
+            ranking = ranking.stream()
+                    .filter(m -> m.getProfessional().getCity() != null
+                            && m.getProfessional().getCity().equalsIgnoreCase(city.trim()))
+                    .toList();
+        }
+        if (uf != null && !uf.isBlank()) {
+            ranking = ranking.stream()
+                    .filter(m -> m.getProfessional().getUf() != null
+                            && m.getProfessional().getUf().equalsIgnoreCase(uf.trim()))
+                    .toList();
+        }
+        if (experienceLevel != null && !experienceLevel.isBlank()) {
+            try {
+                ExperienceLevel level = ExperienceLevel.valueOf(experienceLevel.trim().toUpperCase());
+                ranking = ranking.stream()
+                        .filter(m -> m.getProfessional().getExperienceLevel() == level)
+                        .toList();
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        if (available != null) {
+            ranking = ranking.stream()
+                    .filter(m -> Boolean.valueOf(available).equals(m.getProfessional().getAvailable()))
+                    .toList();
+        }
+        if (minSalary != null) {
+            ranking = ranking.stream()
+                    .filter(m -> m.getProfessional().getMaximumSalaryExpectation() != null
+                            && m.getProfessional().getMaximumSalaryExpectation() >= minSalary)
+                    .toList();
+        }
+        if (maxSalary != null) {
+            ranking = ranking.stream()
+                    .filter(m -> m.getProfessional().getMinimumSalaryExpectation() != null
+                            && m.getProfessional().getMinimumSalaryExpectation() <= maxSalary)
+                    .toList();
+        }
+        if (skill != null && !skill.isBlank()) {
+            String skillLower = skill.trim().toLowerCase();
+            ranking = ranking.stream()
+                    .filter(m -> m.getProfessional().getSkills() != null
+                            && m.getProfessional().getSkills().stream()
+                                    .anyMatch(s -> s.getName().toLowerCase().contains(skillLower)))
+                    .toList();
+        }
+
+        return ranking;
+    }
+
     public List<Match> getMatchesByProfessional(Long professionalId) {
         return matchRepository.findByProfessionalId(professionalId);
     }
