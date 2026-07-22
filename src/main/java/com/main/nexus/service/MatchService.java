@@ -65,13 +65,13 @@ public class MatchService {
     // ou, para ONSITE/HYBRID:
     // ScoreMatch = (Skills*0.30) + (Budget*0.20) + (History*0.17) + (Reputation*0.09) + (Availability*0.09) + (Distance*0.15)
     // -------------------------------------------------------
-    public double calculateScore(Professional professional, Project project) {
+    public double getScore(Professional professional, Project project) {
 
-        double skillScore        = calculateSkillScore(professional, project);
-        double budgetScore       = calculateBudgetScore(professional, project);
-        double historyScore      = calculateHistoryScore(professional);
-        double reputationScore   = calculateReputationScore(professional);
-        double availabilityScore = calculateAvailabilityScore(professional);
+        double skillScore        = getSkillScore(professional, project);
+        double budgetScore       = getBudgetScore(professional, project);
+        double historyScore      = getHistoryScore(professional);
+        double reputationScore   = getReputationScore(professional);
+        double availabilityScore = getAvailabilityScore(professional);
 
         boolean considersDistance   = project.getWorkMode() == Modality.ONSITE
                                     || project.getWorkMode() == Modality.HYBRID;
@@ -81,8 +81,8 @@ public class MatchService {
 
         if (considersDistance && considersExperience) {
             // Cenário 4 — ONSITE/HYBRID com experiência (7 componentes)
-            double distanceScore   = calculateDistanceScore(professional, project);
-            double experienceScore = calculateExperienceScore(professional, project);
+            double distanceScore   = getDistanceScore(professional, project);
+            double experienceScore = getExperienceScore(professional, project);
 
             baseScore = (skillScore        * 0.26)
                       + (budgetScore       * 0.18)
@@ -94,7 +94,7 @@ public class MatchService {
 
         } else if (considersDistance) {
             // Cenário 3 — ONSITE/HYBRID sem experiência (6 componentes)
-            double distanceScore = calculateDistanceScore(professional, project);
+            double distanceScore = getDistanceScore(professional, project);
 
             baseScore = (skillScore        * 0.30)
                       + (budgetScore       * 0.20)
@@ -105,7 +105,7 @@ public class MatchService {
 
         } else if (considersExperience) {
             // Cenário 2 — REMOTO com experiência (6 componentes)
-            double experienceScore = calculateExperienceScore(professional, project);
+            double experienceScore = getExperienceScore(professional, project);
 
             baseScore = (skillScore        * 0.30)
                       + (budgetScore       * 0.22)
@@ -130,7 +130,7 @@ public class MatchService {
     }
 
     // Skills: quantas skills da vaga o profissional possui / total exigido * 100
-    private double calculateSkillScore(Professional professional, Project project) {
+    public double getSkillScore(Professional professional, Project project) {
         List<Skill> required = project.getRequiredSkills();
         if (required == null || required.isEmpty()) return 100.0;
 
@@ -147,7 +147,7 @@ public class MatchService {
     }
 
     // Orçamento: pretensão do profissional está dentro do range da vaga?
-    private double calculateBudgetScore(Professional professional, Project project) {
+    public double getBudgetScore(Professional professional, Project project) {
         Double profMin = professional.getMinimumSalaryExpectation();
         Double profMax = professional.getMaximumSalaryExpectation();
         Double projMax = project.getMaximumBudget();
@@ -170,7 +170,7 @@ public class MatchService {
     }
 
     // Histórico: baseado na quantidade de projetos anteriores (máx 10 projetos = 100)
-    private double calculateHistoryScore(Professional professional) {
+    public double getHistoryScore(Professional professional) {
         int count = professional.getProjects() != null
                 ? professional.getProjects().size()
                 : 0;
@@ -178,18 +178,18 @@ public class MatchService {
     }
 
     // Reputação: média de estrelas (1-5) normalizada para 0-100
-    private double calculateReputationScore(Professional professional) {
+    public double getReputationScore(Professional professional) {
         double rep = professional.getReputation() != null ? professional.getReputation() : 0.0;
         return (rep / 5.0) * 100.0;
     }
 
     // Disponibilidade: disponível = 100, indisponível = 0
-    private double calculateAvailabilityScore(Professional professional) {
+    public double getAvailabilityScore(Professional professional) {
         return Boolean.TRUE.equals(professional.getAvailable()) ? 100.0 : 0.0;
     }
 
     // Distância: calculada via Haversine entre profissional e empresa
-    private double calculateDistanceScore(Professional professional, Project project) {
+    public double getDistanceScore(Professional professional, Project project) {
         Double profLat = professional.getLatitude();
         Double profLon = professional.getLongitude();
         Double companyLat = project.getCompany().getLatitude();
@@ -229,7 +229,7 @@ public class MatchService {
         return 10.0;
     }
     
-    private double calculateExperienceScore(Professional professional, Project project) {
+    public double getExperienceScore(Professional professional, Project project) {
         ExperienceLevel profLevel = professional.getExperienceLevel();
         ExperienceLevel projLevel = project.getExperienceLevel();
 
@@ -276,7 +276,7 @@ public class MatchService {
                     .isPresent();
             if (alreadyExists) continue;
 
-            double score = calculateScore(professional, project);
+            double score = getScore(professional, project);
 
             Match match = new Match();
             match.setProject(project);
@@ -313,7 +313,7 @@ public class MatchService {
 
         for (Match match : existingMatches) {
             if (match.getStatus() == StatusMatch.WAITING) {
-                double newScore = calculateScore(match.getProfessional(), project);
+                double newScore = getScore(match.getProfessional(), project);
                 match.setMatchScore(newScore);
             }
         }
@@ -513,7 +513,7 @@ public class MatchService {
                 Match match = new Match();
                 match.setProject(project);
                 match.setProfessional(professional);
-                match.setMatchScore(calculateScore(professional, project));
+                match.setMatchScore(getScore(professional, project));
                 matchRepository.save(match);
             }
         }
@@ -543,7 +543,7 @@ public class MatchService {
                     Match newMatch = new Match();
                     newMatch.setProject(project);
                     newMatch.setProfessional(professional);
-                    newMatch.setMatchScore(calculateScore(professional, project));
+                    newMatch.setMatchScore(getScore(professional, project));
                     newMatch.setInitiatedBy(InitiatedBy.PROFESSIONAL);
                     return newMatch;
                 });

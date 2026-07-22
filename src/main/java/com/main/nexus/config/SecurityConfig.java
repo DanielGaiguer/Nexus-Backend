@@ -49,6 +49,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/professional/**").hasRole("PROFESSIONAL")
                 .requestMatchers(HttpMethod.POST, "/api/professional/resume").hasRole("PROFESSIONAL")
                     
+                .requestMatchers("/api/comparison/**").hasRole("COMPANY")
+                    
                 .requestMatchers(HttpMethod.POST,   "/api/professional/profile/photo").hasRole("PROFESSIONAL")
                 .requestMatchers(HttpMethod.DELETE, "/api/professional/profile/photo").hasRole("PROFESSIONAL")
                 .requestMatchers(HttpMethod.POST,   "/api/company/profile/photo").hasRole("COMPANY")
