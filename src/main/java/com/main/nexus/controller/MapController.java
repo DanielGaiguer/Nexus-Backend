@@ -4,12 +4,14 @@ import com.main.nexus.dto.MapCompanyDTO;
 import com.main.nexus.dto.MapProfessionalDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
+import com.main.nexus.model.Project;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -115,6 +117,39 @@ public class MapController {
                 .toList();
 
         return ResponseEntity.ok(result);
+    }
+    
+    @GetMapping("/opportunities")
+    public ResponseEntity<?> getOpportunities(
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng,
+            @RequestParam(required = false) Double radiusKm,
+            @RequestParam(required = false) String type) {
+
+        List<Project> all = projectRepository.findByStatus(ProjectStatus.OPEN);
+
+        return ResponseEntity.ok(
+            all.stream()
+                .filter(p -> type == null
+                        || p.getOpportunityType().name().equalsIgnoreCase(type))
+                .filter(p -> p.getCompany().getLatitude() != null)
+                .filter(p -> {
+                    if (lat == null || lng == null || radiusKm == null) return true;
+                    return haversineDistance(lat, lng,
+                            p.getCompany().getLatitude(),
+                            p.getCompany().getLongitude()) <= radiusKm;
+                })
+                .map(p -> Map.of(
+                        "id", p.getId(),
+                        "opportunityType", p.getOpportunityType().name(),
+                        "title", p.getTitle(),
+                        "companyName", p.getCompany().getCompanyName(),
+                        "city", p.getCompany().getCity(),
+                        "workMode", p.getWorkMode() != null ? p.getWorkMode().name() : null,
+                        "requiredSkills", p.getRequiredSkills().stream().map(Skill::getName).toList()
+                ))
+                .toList()
+        );
     }
 
 

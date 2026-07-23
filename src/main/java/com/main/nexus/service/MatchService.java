@@ -12,8 +12,10 @@ import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.InitiatedBy;
 import com.main.nexus.model.enums.InterestStatus;
 import com.main.nexus.model.enums.Modality;
+import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.model.enums.ProjectType;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchHistoryRepository;
 import com.main.nexus.repository.MatchRepository;
@@ -150,8 +152,17 @@ public class MatchService {
     public double getBudgetScore(Professional professional, Project project) {
         Double profMin = professional.getMinimumSalaryExpectation();
         Double profMax = professional.getMaximumSalaryExpectation();
-        Double projMax = project.getMaximumBudget();
-        Double projMin = project.getMinimumBudget();
+
+        Double projMax;
+        Double projMin;
+
+        if (project.getOpportunityType() == OpportunityType.JOB) {
+            projMax = project.getMonthlySalaryMax();
+            projMin = project.getMonthlySalaryMin();
+        } else {
+            projMax = project.getMaximumBudget();
+            projMin = project.getMinimumBudget();
+        }
 
         if (profMin == null || projMax == null) return 50.0;
 
@@ -323,7 +334,29 @@ public class MatchService {
     }
 
     private boolean matchesProjectType(Professional professional, Project project) {
-        return professional.getPreferredTypes().contains(project.getType());
+        if (professional.getPreferredTypes() == null || professional.getPreferredTypes().isEmpty()) {
+            return true;
+        }
+
+        if (project.getOpportunityType() == OpportunityType.PROJECT) {
+            return professional.getPreferredTypes().contains(ProjectType.FREELANCE)
+                || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
+        }
+
+        if (project.getOpportunityType() == OpportunityType.JOB) {
+            if (project.getContractType() == null) return true;
+            return switch (project.getContractType()) {
+                case CLT        -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME);
+                case PJ         -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME)
+                                || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
+                case INTERSHIP    -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME);
+                case TEMPORARY  -> professional.getPreferredTypes().contains(ProjectType.PART_TIME)
+                                || professional.getPreferredTypes().contains(ProjectType.FREELANCE);
+                case FREELANCER -> professional.getPreferredTypes().contains(ProjectType.FREELANCE);
+            };
+        }
+
+        return true;
     }
 
     // =========================================================

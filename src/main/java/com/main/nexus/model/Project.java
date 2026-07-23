@@ -1,7 +1,9 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.ContractType;
 import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.Modality;
+import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.ProjectType;
 import jakarta.persistence.Column;
@@ -77,6 +79,31 @@ public class Project {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private ExperienceLevel experienceLevel; 
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private OpportunityType opportunityType = OpportunityType.PROJECT;
+
+    // Campos exclusivos de VAGA
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ContractType contractType;
+
+    @Column(columnDefinition = "TEXT")
+    private String benefits;
+
+    @Column
+    private LocalDate startDate;
+
+    @Column
+    private Integer workloadHoursPerWeek;
+
+    @Column
+    private Double monthlySalaryMin;
+
+    @Column
+    private Double monthlySalaryMax;
+
 
     public Long getId() {
         return id;
@@ -209,5 +236,63 @@ public class Project {
     public void setExperienceLevel(ExperienceLevel experienceLevel) {
         this.experienceLevel = experienceLevel;
     }
+
+    public OpportunityType getOpportunityType() {
+        return opportunityType;
+    }
+
+    public void setOpportunityType(OpportunityType opportunityType) {
+        this.opportunityType = opportunityType;
+    }
+
+    public ContractType getContractType() {
+        return contractType;
+    }
+
+    public void setContractType(ContractType contractType) {
+        this.contractType = contractType;
+    }
+
+    public String getBenefits() {
+        return benefits;
+    }
+
+    public void setBenefits(String benefits) {
+        this.benefits = benefits;
+    }
+
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public Integer getWorkloadHoursPerWeek() {
+        return workloadHoursPerWeek;
+    }
+
+    public void setWorkloadHoursPerWeek(Integer workloadHoursPerWeek) {
+        this.workloadHoursPerWeek = workloadHoursPerWeek;
+    }
+
+    public Double getMonthlySalaryMin() {
+        return monthlySalaryMin;
+    }
+
+    public void setMonthlySalaryMin(Double monthlySalaryMin) {
+        this.monthlySalaryMin = monthlySalaryMin;
+    }
+
+    public Double getMonthlySalaryMax() {
+        return monthlySalaryMax;
+    }
+
+    public void setMonthlySalaryMax(Double monthlySalaryMax) {
+        this.monthlySalaryMax = monthlySalaryMax;
+    }
+    
+    
 
 }

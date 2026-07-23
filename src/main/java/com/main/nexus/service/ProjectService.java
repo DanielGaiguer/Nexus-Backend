@@ -2,6 +2,7 @@ package com.main.nexus.service;
 
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
@@ -28,15 +29,65 @@ public class ProjectService {
     private MatchRepository matchRepository;
 
     public Project save(Project project) {
+        validateByType(project);
         Project saved = projectRepository.save(project);
         matchService.generateRankingForProject(saved);
         return saved;
     }
-    
+
     public Project update(Project project) {
+        validateByType(project);
         Project saved = projectRepository.save(project);
         matchService.recalculateRankingForProject(saved);
         return saved;
+    }
+
+    private void validateByType(Project project) {
+        if (project.getOpportunityType() == null) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "opportunityType is required. Use PROJECT or JOB.");
+        }
+
+        if (project.getOpportunityType() == OpportunityType.PROJECT) {
+            // Campos de JOB não devem estar preenchidos
+            if (project.getContractType() != null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Field 'contractType' is not allowed for a PROJECT.");
+            }
+            if (project.getMonthlySalaryMin() != null || project.getMonthlySalaryMax() != null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Fields 'monthlySalaryMin' and 'monthlySalaryMax' are not allowed for a PROJECT.");
+            }
+            if (project.getBenefits() != null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Field 'benefits' is not allowed for a PROJECT.");
+            }
+            if (project.getWorkloadHoursPerWeek() != null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Field 'workloadHoursPerWeek' is not allowed for a PROJECT.");
+            }
+        }
+
+        if (project.getOpportunityType() == OpportunityType.JOB) {
+            // Campos de PROJECT não devem estar preenchidos
+            if (project.getMinimumBudget() != null || project.getMaximumBudget() != null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Fields 'minimumBudget' and 'maximumBudget' are not allowed for a JOB.");
+            }
+            if (project.getDeadline() != null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Field 'deadline' is not allowed for a JOB. Use 'startDate' instead.");
+            }
+            // Campos obrigatórios para JOB
+            if (project.getContractType() == null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Field 'contractType' is required for a JOB.");
+            }
+            if (project.getMonthlySalaryMin() == null || project.getMonthlySalaryMax() == null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Fields 'monthlySalaryMin' and 'monthlySalaryMax' are required for a JOB.");
+            }
+        }
     }
     
     public Project findById(Long id) {

@@ -65,19 +65,7 @@ public class ProjectController {
 
         Project project = new Project();
         project.setCompany(company);
-        project.setTitle(request.title());
-        project.setDescription(request.description());
-        project.setMinimumBudget(request.minimumBudget());
-        project.setMaximumBudget(request.maximumBudget());
-        project.setDeadline(request.deadline());
-        project.setWorkMode(request.workMode());
-        project.setType(request.type());
-        project.setMaxPositions(request.maxPositions() != null ? request.maxPositions() : 1);
-        project.setExperienceLevel(request.experienceLevel());
-
-        if (request.skillIds() != null) {
-            project.setRequiredSkills(skillService.findAllById(request.skillIds()));
-        }
+        populate(project, request);
 
         return ResponseEntity.ok(toResponseDTO(projectService.save(project)));
     }
@@ -89,28 +77,44 @@ public class ProjectController {
         Company company = getLoggedCompany();
         Project existing = projectService.findByIdAndCompany(id, company.getId());
 
-        existing.setTitle(request.title());
-        existing.setDescription(request.description());
-        existing.setMinimumBudget(request.minimumBudget());
-        existing.setMaximumBudget(request.maximumBudget());
-        existing.setDeadline(request.deadline());
-        existing.setWorkMode(request.workMode());
-        existing.setType(request.type());
-        existing.setExperienceLevel(request.experienceLevel());
+        populate(existing, request);
 
         if (request.maxPositions() != null) {
             if (request.maxPositions() < existing.getFilledPositions()) {
                 throw new ResponseStatusException(HttpStatusCode.valueOf(400),
-                        "Maximum positions cannot be less than the number of positions already filled.");
+                        "Maximum positions cannot be less than filled positions.");
             }
             existing.setMaxPositions(request.maxPositions());
         }
 
-        if (request.skillIds() != null) {
-            existing.setRequiredSkills(skillService.findAllById(request.skillIds()));
+        return ResponseEntity.ok(toResponseDTO(projectService.update(existing)));
+    }
+
+    // ── Método de populate centralizado ──────────────────────────────────────────
+
+    private void populate(Project project, ProjectRequestDTO r) {
+        project.setTitle(r.title());
+        project.setDescription(r.description());
+        project.setWorkMode(r.workMode());
+        project.setExperienceLevel(r.experienceLevel());
+        project.setOpportunityType(r.opportunityType());
+
+        if (r.skillIds() != null) {
+            project.setRequiredSkills(skillService.findAllById(r.skillIds()));
         }
 
-        return ResponseEntity.ok(toResponseDTO(projectService.update(existing)));
+        // Campos de PROJECT
+        project.setMinimumBudget(r.minimumBudget());
+        project.setMaximumBudget(r.maximumBudget());
+        project.setDeadline(r.deadline());
+
+        // Campos de JOB
+        project.setMonthlySalaryMin(r.monthlySalaryMin());
+        project.setMonthlySalaryMax(r.monthlySalaryMax());
+        project.setContractType(r.contractType());
+        project.setBenefits(r.benefits());
+        project.setStartDate(r.startDate());
+        project.setWorkloadHoursPerWeek(r.workloadHoursPerWeek());
     }
 
     @PutMapping("/{id}/close")
@@ -159,19 +163,25 @@ public class ProjectController {
                 p.getId(),
                 p.getTitle(),
                 p.getDescription(),
+                p.getWorkMode(),
+                p.getExperienceLevel(),
+                p.getStatus(),
+                p.getMaxPositions(),
+                p.getFilledPositions(),
+                p.getCreatedAt(),
+                p.getOpportunityType(),
+                p.getRequiredSkills().stream().map(Skill::getName).toList(),
+                p.getCompany().getId(),
+                p.getCompany().getCompanyName(),
                 p.getMinimumBudget(),
                 p.getMaximumBudget(),
                 p.getDeadline(),
-                p.getWorkMode(),
-                p.getType(),
-                p.getStatus(),
-                p.getCreatedAt(),
-                p.getFilledPositions(),
-                p.getMaxPositions(),
-                p.getExperienceLevel(),
-                p.getRequiredSkills().stream().map(Skill::getName).toList(),
-                p.getCompany().getId(),
-                p.getCompany().getCompanyName()
+                p.getMonthlySalaryMin(),
+                p.getMonthlySalaryMax(),
+                p.getContractType(),
+                p.getBenefits(),
+                p.getStartDate(),
+                p.getWorkloadHoursPerWeek()
         );
     }
 
