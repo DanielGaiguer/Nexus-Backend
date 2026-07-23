@@ -346,10 +346,12 @@ public class MatchService {
         if (project.getOpportunityType() == OpportunityType.JOB) {
             if (project.getContractType() == null) return true;
             return switch (project.getContractType()) {
-                case CLT        -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME);
+                case CLT        -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME) 
+                    || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
                 case PJ         -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME)
                                 || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
-                case INTERSHIP    -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME);
+                case INTERNSHIP    -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME) 
+                    || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
                 case TEMPORARY  -> professional.getPreferredTypes().contains(ProjectType.PART_TIME)
                                 || professional.getPreferredTypes().contains(ProjectType.FREELANCE);
                 case FREELANCER -> professional.getPreferredTypes().contains(ProjectType.FREELANCE);
