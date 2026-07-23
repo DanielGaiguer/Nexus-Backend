@@ -13,7 +13,7 @@ import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatusCode;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,23 +49,22 @@ public class AuthService {
     public void registerProfessional(RegisterProfessionalRequestDTO request) {
         // ── 1. Validações de campos obrigatórios ───────────────────────────────
         if (request.email() == null || request.email().isBlank()) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Email is required.");
         }
         if (request.password() == null || request.password().isBlank()) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Password is required.");
         }
         if (request.name() == null || request.name().isBlank()) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Name is required.");
         }
 
         // ── 2. Validação de unicidade ──────────────────────────────────────────
         if (userRepository.existsByEmail(request.email())) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(409),
-                    "Email '" + request.email() + "' is already registered. " +
-                    "If you already have an account, please log in.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Email already registered in the system.");
         }
 
         // ── 3. Resolução do CEP ANTES de qualquer persistência ────────────────
@@ -75,18 +74,15 @@ public class AuthService {
                 addressData = geolocationService.resolveFromCep(request.cep());
             } catch (ResponseStatusException e) {
                 if (e.getStatusCode().value() == 404) {
-                    throw new ResponseStatusException(HttpStatusCode.valueOf(422),
-                            "CEP '" + request.cep() + "' not found. " +
-                            "Please check the ZIP code and try again.");
+                    throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                            "CEP not found. Please check the ZIP code and try again.");
                 }
                 if (e.getStatusCode().value() == 400) {
-                    throw new ResponseStatusException(HttpStatusCode.valueOf(400),
-                            "CEP '" + request.cep() + "' has an invalid format. " +
-                            "Expected format: 00000-000 or 00000000.");
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "CEP has an invalid format. Expected format: 00000-000 or 00000000.");
                 }
-                throw new ResponseStatusException(HttpStatusCode.valueOf(502),
-                        "Could not validate the ZIP code at this moment. " +
-                        "Please try again in a few seconds.");
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Could not validate the ZIP code at this moment. Please try again in a few seconds.");
             }
         }
 
@@ -104,11 +100,10 @@ public class AuthService {
         professional.setCep(request.cep());
 
         if (request.cep() != null && !request.cep().isBlank()) {
-            GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
-            professional.setLatitude(address.latitude());
-            professional.setLongitude(address.longitude());
-            professional.setCity(address.city());
-            professional.setUf(address.state());
+            professional.setLatitude(addressData.latitude());
+            professional.setLongitude(addressData.longitude());
+            professional.setCity(addressData.city());
+            professional.setUf(addressData.state());
         }
 
         professional.setMinimumSalaryExpectation(request.minimumSalary());
@@ -126,36 +121,28 @@ public class AuthService {
     @Transactional
     public void registerCompany(RegisterCompanyRequestDTO request) {
         if (request.email() == null || request.email().isBlank()) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Email is required.");
         }
         if (request.password() == null || request.password().isBlank()) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Password is required.");
         }
         if (request.companyName() == null || request.companyName().isBlank()) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Company name is required.");
         }
 
         if (userRepository.existsByEmail(request.email())) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(409),
-                    "Email '" + request.email() + "' is already registered. " +
-                    "If you already have an account, please log in.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Email already registered in the system.");
         }
 
         if (request.taxId() != null && !request.taxId().isBlank()) {
+            validateTaxId(request.taxId());
             if (companyRepository.existsByTaxId(request.taxId())) {
-                throw new ResponseStatusException(HttpStatusCode.valueOf(409),
-                        "A company with CNPJ '" + request.taxId() + "' is already registered.");
-            }
-        }
-        
-        if (request.taxId() != null && !request.taxId().isBlank()) {
-            validateTaxId(request.taxId()); // valida formato e dígitos verificadores primeiro
-            if (companyRepository.existsByTaxId(request.taxId())) {
-                throw new ResponseStatusException(HttpStatusCode.valueOf(409),
-                        "A company with CNPJ '" + request.taxId() + "' is already registered.");
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "CNPJ already registered in the system.");
             }
         }
 
@@ -165,18 +152,15 @@ public class AuthService {
                 addressData = geolocationService.resolveFromCep(request.cep());
             } catch (ResponseStatusException e) {
                 if (e.getStatusCode().value() == 404) {
-                    throw new ResponseStatusException(HttpStatusCode.valueOf(422),
-                            "CEP '" + request.cep() + "' not found. " +
-                            "Please check the ZIP code and try again.");
+                    throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                            "CEP not found. Please check the ZIP code and try again.");
                 }
                 if (e.getStatusCode().value() == 400) {
-                    throw new ResponseStatusException(HttpStatusCode.valueOf(400),
-                            "CEP '" + request.cep() + "' has an invalid format. " +
-                            "Expected format: 00000-000 or 00000000.");
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "CEP has an invalid format. Expected format: 00000-000 or 00000000.");
                 }
-                throw new ResponseStatusException(HttpStatusCode.valueOf(502),
-                        "Could not validate the ZIP code at this moment. " +
-                        "Please try again in a few seconds.");
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Could not validate the ZIP code at this moment. Please try again in a few seconds.");
             }
         }
         
@@ -194,11 +178,10 @@ public class AuthService {
         company.setCep(request.cep());
 
         if (request.cep() != null && !request.cep().isBlank()) {
-            GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
-            company.setLatitude(address.latitude());
-            company.setLongitude(address.longitude());
-            company.setCity(address.city());
-            company.setUf(address.state());
+            company.setLatitude(addressData.latitude());
+            company.setLongitude(addressData.longitude());
+            company.setCity(addressData.city());
+            company.setUf(addressData.state());
         }
 
         company.setDescription(request.description());
@@ -215,29 +198,37 @@ public class AuthService {
 
     public LoginResponseDTO login(LoginRequestDTO request) {
         if (request.email().isBlank() || request.password().isBlank()) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400), "Email and password are required.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Email and password are required.");
         }
 
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(401), "Invalid email or password."));
+                        HttpStatus.UNAUTHORIZED, "Invalid email or password."));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(401), "Invalid email or password.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Invalid email or password.");
         }
 
         if (!user.getActive()) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(403), "Account is disabled.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Account is inactive.");
         }
 
         if (user.getType() == UserType.COMPANY) {
             Company company = companyService.findByUserId(user.getId())
                     .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatusCode.valueOf(500), "Company profile missing for this user."));
+                            HttpStatus.INTERNAL_SERVER_ERROR,
+                            "Company profile missing for this user."));
 
-            if (company.getStatus() != CompanyStatus.APPROVED) {
-                throw new ResponseStatusException(HttpStatusCode.valueOf(403),
-                        "Company account is pending admin approval.");
+            if (company.getStatus() == CompanyStatus.PENDING) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Company registration is pending admin approval.");
+            }
+            if (company.getStatus() == CompanyStatus.REJECTED) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Company registration was rejected.");
             }
         }
 
@@ -266,19 +257,18 @@ public class AuthService {
         String digits = taxId.replaceAll("[^0-9]", "");
 
         if (digits.length() != 14) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
-                    "CNPJ '" + taxId + "' has an invalid format. " +
-                    "Expected 14 digits, e.g. 12.345.678/0001-99 or 12345678000199.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "CNPJ has an invalid format. Expected 14 digits, e.g. 12.345.678/0001-99 or 12345678000199.");
         }
 
         if (digits.chars().distinct().count() == 1) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
-                    "CNPJ '" + taxId + "' is invalid. Sequences of identical digits are not accepted.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "CNPJ is invalid. Sequences of identical digits are not accepted.");
         }
 
         if (!isCnpjValid(digits)) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
-                    "CNPJ '" + taxId + "' is invalid. Please check the number and try again.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "CNPJ is invalid. Please check the number and try again.");
         }
     }
 

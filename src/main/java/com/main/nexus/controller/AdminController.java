@@ -71,9 +71,9 @@ public class AdminController {
 
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardDTO> dashboard() {
-        long totalUsers        = userRepository.count();
         long totalProfessionals = professionalRepository.count();
         long totalCompanies    = companyRepository.findAll().size();
+        long totalUsers        =  totalCompanies + totalProfessionals;
         long totalProjects     = projectRepository.count();
         long totalOpenProjects = projectRepository.findByStatus(ProjectStatus.OPEN).size();
         long totalMatches      = matchRepository.count();
