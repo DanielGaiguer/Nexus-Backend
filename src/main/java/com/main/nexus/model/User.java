@@ -40,6 +40,9 @@ public class User {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(unique = true, length = 64)
+    private String linkedinId;
+
     public Long getId() {
         return id;
     }
@@ -86,5 +89,13 @@ public class User {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getLinkedinId() {
+        return linkedinId;
+    }
+
+    public void setLinkedinId(String linkedinId) {
+        this.linkedinId = linkedinId;
     }
 }

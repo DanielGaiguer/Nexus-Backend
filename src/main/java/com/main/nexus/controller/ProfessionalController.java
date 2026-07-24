@@ -153,6 +153,7 @@ public class ProfessionalController {
         existing.setExpectedSalaryPJ(request.expectedSalaryPJ());
         existing.setFreelanceMinExpectation(request.freelanceMinExpectation());
         existing.setFreelanceMaxExpectation(request.freelanceMaxExpectation());
+        existing.setLinkedinUrl(request.linkedinUrl());
 
         if (request.cep() != null && !request.cep().isBlank()) {
             GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
@@ -293,7 +294,8 @@ public class ProfessionalController {
                 p.getFreelanceMinExpectation(),
                 p.getFreelanceMaxExpectation(),
                 missing.isEmpty(),
-                missing
+                missing,
+                p.getLinkedinUrl()
         );
     }
 

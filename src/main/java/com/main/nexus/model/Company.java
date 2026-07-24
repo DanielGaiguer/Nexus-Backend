@@ -58,6 +58,9 @@ public class Company {
     @Column(length = 500)
     private String profilePhotoUrl;
 
+    @Column(length = 255)
+    private String linkedinUrl;
+
     public Long getId() {
         return id;
     }
@@ -169,6 +172,12 @@ public class Company {
     public void setProfilePhotoUrl(String profilePhotoUrl) {
         this.profilePhotoUrl = profilePhotoUrl;
     }
-    
-    
+
+    public String getLinkedinUrl() {
+        return linkedinUrl;
+    }
+
+    public void setLinkedinUrl(String linkedinUrl) {
+        this.linkedinUrl = linkedinUrl;
+    }
 }

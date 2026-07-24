@@ -67,6 +67,7 @@ public class CompanyController {
         existing.setPhone(request.phone());
         existing.setCep(request.cep());
         existing.setDescription(request.description());
+        existing.setLinkedinUrl(request.linkedinUrl());
 
         if (request.cep() != null && !request.cep().isBlank()) {
             GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
@@ -149,7 +150,8 @@ public class CompanyController {
                 c.getLatitude(),
                 c.getLongitude(),
                 c.getStatus().name(),
-                c.getProfilePhotoUrl()
+                c.getProfilePhotoUrl(),
+                c.getLinkedinUrl()
         );
     }
 }

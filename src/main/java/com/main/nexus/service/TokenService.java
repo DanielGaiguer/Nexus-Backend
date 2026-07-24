@@ -66,4 +66,47 @@ public class TokenService {
             return false;
         }
     }
+
+    // ── Ticket temporário de cadastro via LinkedIn ──────────────────────────
+    // Carrega a identidade já verificada pelo LinkedIn (sub/email/name) entre
+    // o callback do OAuth e o formulário de finalização do cadastro de
+    // empresa (o LinkedIn não fornece razão social, então a empresa precisa
+    // de um passo extra para informá-la). Curta duração, propósito fixo.
+
+    private static final String LINKEDIN_TICKET_PURPOSE = "linkedin_register";
+
+    public record LinkedInTicket(String sub, String email, String name, String picture) {}
+
+    public String generateLinkedInTicket(String sub, String email, String name, String picture) {
+        return Jwts.builder()
+                .subject(sub)
+                .claim("sub", sub)
+                .claim("email", email)
+                .claim("name", name)
+                .claim("picture", picture)
+                .claim("purpose", LINKEDIN_TICKET_PURPOSE)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 900_000))
+                .signWith(this.getKeySign())
+                .compact();
+    }
+
+    public LinkedInTicket extractLinkedInTicket(String ticket) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getKeySign())
+                .build()
+                .parseSignedClaims(ticket)
+                .getPayload();
+
+        if (!LINKEDIN_TICKET_PURPOSE.equals(claims.get("purpose", String.class))) {
+            throw new JwtException("Invalid ticket purpose.");
+        }
+
+        return new LinkedInTicket(
+                claims.get("sub", String.class),
+                claims.get("email", String.class),
+                claims.get("name", String.class),
+                claims.get("picture", String.class)
+        );
+    }
 }

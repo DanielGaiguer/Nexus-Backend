@@ -15,5 +15,6 @@ public record CompanyProfileDTO(
         Double latitude,
         Double longitude,
         String status,
-        String profilePhotoUrl
+        String profilePhotoUrl,
+        String linkedinUrl
 ) {}

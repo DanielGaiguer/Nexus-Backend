@@ -111,6 +111,9 @@ public class Professional {
 
     private Boolean profileCompletionEmailSent = false;
 
+    @Column(length = 255)
+    private String linkedinUrl;
+
     public Long getId() {
         return id;
     }
@@ -296,5 +299,12 @@ public class Professional {
     public void setProfileCompletionEmailSent(Boolean profileCompletionEmailSent) {
         this.profileCompletionEmailSent = profileCompletionEmailSent;
     }
-    
+
+    public String getLinkedinUrl() {
+        return linkedinUrl;
+    }
+
+    public void setLinkedinUrl(String linkedinUrl) {
+        this.linkedinUrl = linkedinUrl;
+    }
 }

@@ -2,14 +2,19 @@ package com.main.nexus.controller;
 
 import com.main.nexus.dto.LoginRequestDTO;
 import com.main.nexus.dto.LoginResponseDTO;
+import com.main.nexus.dto.RegisterCompanyLinkedInRequestDTO;
 import com.main.nexus.dto.RegisterCompanyRequestDTO;
 import com.main.nexus.dto.RegisterProfessionalRequestDTO;
 import com.main.nexus.service.AuthService;
+import java.net.URI;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -39,4 +44,40 @@ public class AuthController {
         LoginResponseDTO response = authService.login(request);
         return ResponseEntity.ok(response);
     }
-} 
+
+    // ── Sign In with LinkedIn (OpenID Connect) ──────────────────────────────
+
+    @GetMapping("/linkedin/login")
+    public ResponseEntity<Void> linkedInLogin() {
+        return redirect(authService.getLinkedInLoginUrl());
+    }
+
+    @GetMapping("/linkedin/register")
+    public ResponseEntity<Void> linkedInRegister(@RequestParam String role) {
+        return redirect(authService.getLinkedInRegisterUrl(role));
+    }
+
+    @PostMapping("/register/company/linkedin")
+    public ResponseEntity<String> registerCompanyViaLinkedIn(
+            @RequestBody RegisterCompanyLinkedInRequestDTO request) {
+        authService.registerCompanyViaLinkedIn(request);
+        return ResponseEntity.ok("Company registration submitted. Awaiting admin approval.");
+    }
+
+    @GetMapping("/linkedin/link")
+    public ResponseEntity<Void> linkedInLink(@RequestParam String token) {
+        return redirect(authService.getLinkedInLinkUrl(token));
+    }
+
+    @GetMapping("/linkedin/callback")
+    public ResponseEntity<Void> linkedInCallback(
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error) {
+        return redirect(authService.handleLinkedInCallback(code, state, error));
+    }
+
+    private ResponseEntity<Void> redirect(String url) {
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
+    }
+}

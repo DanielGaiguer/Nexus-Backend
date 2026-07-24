@@ -2,6 +2,7 @@ package com.main.nexus.service;
 
 import com.main.nexus.dto.LoginRequestDTO;
 import com.main.nexus.dto.LoginResponseDTO;
+import com.main.nexus.dto.RegisterCompanyLinkedInRequestDTO;
 import com.main.nexus.dto.RegisterCompanyRequestDTO;
 import com.main.nexus.dto.RegisterProfessionalRequestDTO;
 import com.main.nexus.dto.UserDTO;
@@ -12,8 +13,13 @@ import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.UserRepository;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,6 +58,12 @@ public class AuthService {
     
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private LinkedInService linkedInService;
+
+    @Value("${nexus.frontend.base-url}")
+    private String frontendBaseUrl;
 
     public void registerProfessional(RegisterProfessionalRequestDTO request) {
         // ── 1. Validações de campos obrigatórios ───────────────────────────────
@@ -256,7 +268,16 @@ public class AuthService {
             }
         }
 
-        String name = switch (user.getType()) {
+        String name = resolveName(user);
+
+        UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), user.getType().name());
+        String token = tokenService.generateToken(userDTO);
+
+        return new LoginResponseDTO(user.getId(), user.getEmail(), name, user.getType().name(), token);
+    }
+
+    private String resolveName(User user) {
+        return switch (user.getType()) {
             case PROFESSIONAL -> professionalService
                     .findByUserId(user.getId())
                     .map(Professional::getName)
@@ -267,14 +288,310 @@ public class AuthService {
                     .orElse(user.getEmail());
             case ADMIN -> "Admin";
         };
-
-        UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), user.getType().name());
-        String token = tokenService.generateToken(userDTO);
-
-        return new LoginResponseDTO(user.getId(), user.getEmail(), name, user.getType().name(), token);
     }
-    
-    
+
+    // ── Sign In with LinkedIn (OpenID Connect) ──────────────────────────────
+    // Observação: o /v2/userinfo do LinkedIn não retorna a URL pública do
+    // perfil, só sub/name/email/picture. Por isso este fluxo autentica e
+    // vincula a conta (via "sub"), mas a linkedinUrl exibida no perfil
+    // continua sendo informada manualmente pelo usuário.
+
+    public String getLinkedInLoginUrl() {
+        return linkedInService.buildAuthorizationUrl("login");
+    }
+
+    public String getLinkedInRegisterUrl(String role) {
+        String normalizedRole = "COMPANY".equalsIgnoreCase(role) ? "COMPANY" : "PROFESSIONAL";
+        return linkedInService.buildAuthorizationUrl("register:" + normalizedRole);
+    }
+
+    public String getLinkedInLinkUrl(String currentUserToken) {
+        if (!tokenService.validToken(currentUserToken)) {
+            return frontendBaseUrl + "/auth/login?linkedinError=session_expired";
+        }
+        return linkedInService.buildAuthorizationUrl("link:" + currentUserToken);
+    }
+
+    public String handleLinkedInCallback(String code, String state, String error) {
+        if (error != null || code == null || state == null) {
+            return frontendBaseUrl + "/auth/login?linkedinError=denied";
+        }
+
+        try {
+            if (state.startsWith("link:")) {
+                return handleLinkedInLink(code, state.substring("link:".length()));
+            }
+            if (state.startsWith("register:")) {
+                return handleLinkedInRegister(code, state.substring("register:".length()));
+            }
+            return handleLinkedInLogin(code);
+        } catch (ResponseStatusException e) {
+            return frontendBaseUrl + "/auth/login?linkedinError=failed";
+        }
+    }
+
+    private String handleLinkedInLogin(String code) {
+        LinkedInService.LinkedInUserInfo info = linkedInService.exchangeCodeForUserInfo(code);
+
+        User user = findUserByLinkedInInfo(info).orElse(null);
+        if (user == null) {
+            return frontendBaseUrl + "/auth/login?linkedinError=no_account";
+        }
+
+        return loginExistingLinkedInUser(user, info);
+    }
+
+    private Optional<User> findUserByLinkedInInfo(LinkedInService.LinkedInUserInfo info) {
+        return userRepository.findByLinkedinId(info.sub())
+                .or(() -> info.email() != null
+                        ? userRepository.findByEmail(info.email())
+                        : Optional.empty());
+    }
+
+    private String loginExistingLinkedInUser(User user, LinkedInService.LinkedInUserInfo info) {
+        if (!user.getActive()) {
+            return frontendBaseUrl + "/auth/login?linkedinError=inactive";
+        }
+
+        if (user.getType() == UserType.COMPANY) {
+            Company company = companyService.findByUserId(user.getId()).orElse(null);
+            if (company != null && company.getStatus() == CompanyStatus.PENDING) {
+                return frontendBaseUrl + "/auth/login?linkedinError=pending_approval";
+            }
+            if (company != null && company.getStatus() == CompanyStatus.REJECTED) {
+                return frontendBaseUrl + "/auth/login?linkedinError=rejected";
+            }
+        }
+
+        // Auto-vincula na primeira vez que o e-mail bater (login social por e-mail)
+        if (user.getLinkedinId() == null) {
+            user.setLinkedinId(info.sub());
+            userRepository.save(user);
+        }
+
+        backfillProfilePhoto(user, info.picture());
+
+        String name = resolveName(user);
+        UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), user.getType().name());
+        String jwt = tokenService.generateToken(userDTO);
+
+        return frontendBaseUrl + "/auth/linkedin/complete"
+                + "?token=" + urlEncode(jwt)
+                + "&userId=" + user.getId()
+                + "&email=" + urlEncode(user.getEmail())
+                + "&name=" + urlEncode(name)
+                + "&role=" + user.getType().name();
+    }
+
+    // Usa a foto do LinkedIn como foto de perfil apenas se o usuário ainda
+    // não tiver uma — nunca sobrescreve uma foto que a pessoa já escolheu.
+    private void backfillProfilePhoto(User user, String pictureUrl) {
+        if (pictureUrl == null || pictureUrl.isBlank()) {
+            return;
+        }
+        if (user.getType() == UserType.PROFESSIONAL) {
+            professionalService.findByUserId(user.getId()).ifPresent(p -> {
+                if (p.getProfilePhotoUrl() == null || p.getProfilePhotoUrl().isBlank()) {
+                    p.setProfilePhotoUrl(pictureUrl);
+                    professionalService.update(p);
+                }
+            });
+        } else if (user.getType() == UserType.COMPANY) {
+            companyService.findByUserId(user.getId()).ifPresent(c -> {
+                if (c.getProfilePhotoUrl() == null || c.getProfilePhotoUrl().isBlank()) {
+                    c.setProfilePhotoUrl(pictureUrl);
+                    companyService.update(c);
+                }
+            });
+        }
+    }
+
+    // ── Cadastro via LinkedIn ────────────────────────────────────────────────
+    // Profissional: o LinkedIn fornece nome + e-mail, os dois únicos campos
+    // obrigatórios — a conta é criada de imediato (senha aleatória; o login
+    // seguinte sempre será via LinkedIn). Empresa: o LinkedIn não fornece
+    // razão social, então em vez de criar a conta aqui, emitimos um ticket
+    // assinado e mandamos o navegador para um formulário curto de finalização.
+
+    private String handleLinkedInRegister(String code, String role) {
+        LinkedInService.LinkedInUserInfo info = linkedInService.exchangeCodeForUserInfo(code);
+
+        if (info.email() == null || info.email().isBlank()) {
+            return frontendBaseUrl + "/auth/login?linkedinError=no_email";
+        }
+
+        // Já existe conta com esse LinkedIn/e-mail? Não duplica — apenas loga.
+        User existing = findUserByLinkedInInfo(info).orElse(null);
+        if (existing != null) {
+            return loginExistingLinkedInUser(existing, info);
+        }
+
+        if ("COMPANY".equals(role)) {
+            String ticket = tokenService.generateLinkedInTicket(
+                    info.sub(), info.email(), info.name(), info.picture());
+            return frontendBaseUrl + "/auth/register/company/linkedin"
+                    + "?ticket=" + urlEncode(ticket)
+                    + "&email=" + urlEncode(info.email())
+                    + "&name=" + urlEncode(info.name() != null ? info.name() : "");
+        }
+
+        return registerProfessionalViaLinkedIn(info);
+    }
+
+    private String registerProfessionalViaLinkedIn(LinkedInService.LinkedInUserInfo info) {
+        String name = (info.name() != null && !info.name().isBlank()) ? info.name() : info.email();
+
+        User user = new User();
+        user.setEmail(info.email());
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        user.setType(UserType.PROFESSIONAL);
+        user.setLinkedinId(info.sub());
+        User savedUser = userRepository.save(user);
+
+        Professional professional = new Professional();
+        professional.setUser(savedUser);
+        professional.setName(name);
+        if (info.picture() != null && !info.picture().isBlank()) {
+            professional.setProfilePhotoUrl(info.picture());
+        }
+        professionalService.save(professional);
+
+        List<String> missing = profileCompletionService.getMissingFields(professional);
+        String emailBody = "Olá " + name + ",\n\nSua conta foi criada com sucesso via LinkedIn!\n\n"
+                + "Para começar a receber oportunidades compatíveis, complete seu perfil preenchendo: "
+                + String.join(", ", missing) + ".\n\nAcesse o Nexus e finalize seu cadastro.\n\nEquipe Nexus";
+        emailService.send(savedUser.getEmail(), "Bem-vindo ao Nexus!", emailBody);
+        if (!missing.isEmpty()) {
+            notificationService.notifyIncompleteProfile(savedUser, missing);
+        }
+
+        UserDTO userDTO = new UserDTO(savedUser.getId(), savedUser.getEmail(), UserType.PROFESSIONAL.name());
+        String jwt = tokenService.generateToken(userDTO);
+
+        return frontendBaseUrl + "/auth/linkedin/complete"
+                + "?token=" + urlEncode(jwt)
+                + "&userId=" + savedUser.getId()
+                + "&email=" + urlEncode(savedUser.getEmail())
+                + "&name=" + urlEncode(name)
+                + "&role=" + UserType.PROFESSIONAL.name();
+    }
+
+    @Transactional
+    public void registerCompanyViaLinkedIn(RegisterCompanyLinkedInRequestDTO request) {
+        TokenService.LinkedInTicket ticket;
+        try {
+            ticket = tokenService.extractLinkedInTicket(request.ticket());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "LinkedIn session expired. Please connect with LinkedIn again.");
+        }
+
+        if (request.companyName() == null || request.companyName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Company name is required.");
+        }
+
+        if (userRepository.existsByEmail(ticket.email())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Email already registered in the system.");
+        }
+        if (userRepository.findByLinkedinId(ticket.sub()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This LinkedIn account is already linked to another user.");
+        }
+
+        if (request.taxId() != null && !request.taxId().isBlank()) {
+            validateTaxId(request.taxId());
+            if (companyRepository.existsByTaxId(request.taxId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "CNPJ already registered in the system.");
+            }
+        }
+
+        GeolocationService.AddressData addressData = null;
+        if (request.cep() != null && !request.cep().isBlank()) {
+            try {
+                addressData = geolocationService.resolveFromCep(request.cep());
+            } catch (ResponseStatusException e) {
+                if (e.getStatusCode().value() == 404) {
+                    throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                            "CEP not found. Please check the ZIP code and try again.");
+                }
+                if (e.getStatusCode().value() == 400) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "CEP has an invalid format. Expected format: 00000-000 or 00000000.");
+                }
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Could not validate the ZIP code at this moment. Please try again in a few seconds.");
+            }
+        }
+
+        User user = new User();
+        user.setEmail(ticket.email());
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        user.setType(UserType.COMPANY);
+        user.setLinkedinId(ticket.sub());
+        User savedUser = userRepository.save(user);
+
+        Company company = new Company();
+        company.setUser(savedUser);
+        company.setCompanyName(request.companyName());
+        company.setTaxId(request.taxId());
+        company.setPhone(request.phone());
+        company.setCep(request.cep());
+
+        if (addressData != null) {
+            company.setLatitude(addressData.latitude());
+            company.setLongitude(addressData.longitude());
+            company.setCity(addressData.city());
+            company.setUf(addressData.state());
+        }
+
+        company.setDescription(request.description());
+        company.setStatus(CompanyStatus.PENDING);
+        if (ticket.picture() != null && !ticket.picture().isBlank()) {
+            company.setProfilePhotoUrl(ticket.picture());
+        }
+        companyService.save(company);
+
+        emailService.send(
+            savedUser.getEmail(),
+            "Cadastro recebido — Nexus",
+            "Olá " + request.companyName() + ",\n\nSeu cadastro foi recebido e está em análise pelo administrador. "
+            + "Você receberá um e-mail assim que sua conta for aprovada.\n\nEquipe Nexus"
+        );
+    }
+
+    private String handleLinkedInLink(String code, String existingJwt) {
+        if (!tokenService.validToken(existingJwt)) {
+            return frontendBaseUrl + "/auth/login?linkedinError=session_expired";
+        }
+
+        UserDTO claims = tokenService.extractClaims(existingJwt);
+        User user = userRepository.findById(claims.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User not found."));
+
+        LinkedInService.LinkedInUserInfo info = linkedInService.exchangeCodeForUserInfo(code);
+        String profilePath = user.getType() == UserType.COMPANY ? "/company/profile" : "/pro/profile";
+
+        Optional<User> owner = userRepository.findByLinkedinId(info.sub());
+        if (owner.isPresent() && !owner.get().getId().equals(user.getId())) {
+            return frontendBaseUrl + profilePath + "?linkedinError=already_linked";
+        }
+
+        user.setLinkedinId(info.sub());
+        userRepository.save(user);
+        backfillProfilePhoto(user, info.picture());
+
+        return frontendBaseUrl + profilePath + "?linkedinLinked=true";
+    }
+
+    private String urlEncode(String value) {
+        return value == null ? "" : URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+
     private void validateTaxId(String taxId) {
         if (taxId == null || taxId.isBlank()) return;
 

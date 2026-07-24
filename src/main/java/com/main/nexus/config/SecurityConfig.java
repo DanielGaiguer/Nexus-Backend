@@ -30,6 +30,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register/professional").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register/company").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/auth/linkedin/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/register/company/linkedin").permitAll()
 
                 .requestMatchers("/api/public/**").permitAll()
 

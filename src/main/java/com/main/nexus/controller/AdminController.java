@@ -288,7 +288,8 @@ public class AdminController {
                 c.getLatitude(),
                 c.getLongitude(),
                 c.getStatus().name(),
-                c.getProfilePhotoUrl()
+                c.getProfilePhotoUrl(),
+                c.getLinkedinUrl()
         );
     }
 
@@ -316,7 +317,8 @@ public class AdminController {
                 p.getFreelanceMinExpectation(),
                 p.getFreelanceMaxExpectation(),
                 missing.isEmpty(),
-                missing
+                missing,
+                p.getLinkedinUrl()
         );
     }
 }

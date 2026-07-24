@@ -31,5 +31,7 @@ public record ProfessionalProfileDTO(
 
         // Status de completude
         boolean profileComplete,
-        List<String> missingFields
+        List<String> missingFields,
+
+        String linkedinUrl
 ) {}
