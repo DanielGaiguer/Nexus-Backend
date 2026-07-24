@@ -2,6 +2,7 @@ package com.main.nexus.controller;
 
 import com.main.nexus.dto.ProjectRequestDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
+import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Project;
@@ -61,7 +62,7 @@ public class ProjectController {
                         .toList());
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id}")   
     public ResponseEntity<ProjectResponseDTO> findById(@PathVariable Long id) {
         Company company = getLoggedCompany();
         Project project = projectService.findByIdAndCompany(id, company.getId());
@@ -200,7 +201,13 @@ public class ProjectController {
                 p.getFilledPositions(),
                 p.getCreatedAt(),
                 p.getOpportunityType(),
-                p.getRequiredSkills().stream().map(Skill::getName).toList(),
+                p.getRequiredSkills().stream()
+                    .map(skill -> new SkillResponseDTO(
+                            skill.getId(),
+                            skill.getName(),
+                            skill.getCategory()
+                    ))
+                    .toList(),
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName(),
 

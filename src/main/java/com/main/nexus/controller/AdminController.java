@@ -7,6 +7,7 @@ import com.main.nexus.dto.PreviousProjectRequestDTO;
 import com.main.nexus.dto.ProfessionalDashboardDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
+import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserSummaryDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
@@ -240,7 +241,13 @@ public class AdminController {
                 p.getFilledPositions(),
                 p.getCreatedAt(),
                 p.getOpportunityType(),
-                p.getRequiredSkills().stream().map(Skill::getName).toList(),
+               p.getRequiredSkills().stream()
+                    .map(skill -> new SkillResponseDTO(
+                            skill.getId(),
+                            skill.getName(),
+                            skill.getCategory()
+                    ))
+                    .toList(),
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName(),
 

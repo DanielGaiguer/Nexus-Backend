@@ -20,7 +20,7 @@ public record ProjectResponseDTO(
         Integer filledPositions,
         LocalDateTime createdAt,
         OpportunityType opportunityType,
-        List<String> requiredSkills,
+        List<SkillResponseDTO> requiredSkills,
         Long companyId,
         String companyName,
         
