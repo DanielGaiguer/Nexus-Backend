@@ -243,9 +243,20 @@ public class AdminController {
                 p.getRequiredSkills().stream().map(Skill::getName).toList(),
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName(),
+
+                // Localização efetiva — da vaga ou da empresa como fallback
+                p.getCep() != null ? p.getCep() : p.getCompany().getCep(),
+                p.getEffectiveLatitude(),
+                p.getEffectiveLongitude(),
+                p.getEffectiveCity(),
+                p.getEffectiveUf(),
+
+                // PROJECT
                 p.getMinimumBudget(),
                 p.getMaximumBudget(),
                 p.getDeadline(),
+
+                // JOB
                 p.getMonthlySalaryMin(),
                 p.getMonthlySalaryMax(),
                 p.getContractType(),

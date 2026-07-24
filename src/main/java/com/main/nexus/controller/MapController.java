@@ -132,19 +132,22 @@ public class MapController {
             all.stream()
                 .filter(p -> type == null
                         || p.getOpportunityType().name().equalsIgnoreCase(type))
-                .filter(p -> p.getCompany().getLatitude() != null)
+                .filter(p -> p.getEffectiveLatitude() != null && p.getEffectiveLongitude() != null)
                 .filter(p -> {
                     if (lat == null || lng == null || radiusKm == null) return true;
                     return haversineDistance(lat, lng,
-                            p.getCompany().getLatitude(),
-                            p.getCompany().getLongitude()) <= radiusKm;
+                            p.getEffectiveLatitude(),
+                            p.getEffectiveLongitude()) <= radiusKm;
                 })
                 .map(p -> Map.of(
                         "id", p.getId(),
                         "opportunityType", p.getOpportunityType().name(),
                         "title", p.getTitle(),
                         "companyName", p.getCompany().getCompanyName(),
-                        "city", p.getCompany().getCity(),
+                        "city", p.getEffectiveCity() != null ? p.getEffectiveCity() : "",
+                        "uf", p.getEffectiveUf() != null ? p.getEffectiveUf() : "",
+                        "latitude", p.getEffectiveLatitude(),
+                        "longitude", p.getEffectiveLongitude(),
                         "workMode", p.getWorkMode() != null ? p.getWorkMode().name() : null,
                         "requiredSkills", p.getRequiredSkills().stream().map(Skill::getName).toList()
                 ))

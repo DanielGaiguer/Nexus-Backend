@@ -7,6 +7,7 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.Skill;
 import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SkillService;
@@ -41,6 +42,14 @@ public class ProjectController {
 
     @Autowired
     private SkillService skillService;
+    
+    @Autowired
+    private GeolocationService geolocationService;
+
+    @GetMapping("/skills")
+    public ResponseEntity<?> listSkills() {
+        return ResponseEntity.ok(skillService.findAll());
+    }
 
     @GetMapping
     public ResponseEntity<List<ProjectResponseDTO>> listMyProjects() {
@@ -101,6 +110,27 @@ public class ProjectController {
 
         if (r.skillIds() != null) {
             project.setRequiredSkills(skillService.findAllById(r.skillIds()));
+        }
+        
+        if (r.cep() != null && !r.cep().isBlank()) {
+            try {
+                GeolocationService.AddressData address = geolocationService.resolveFromCep(r.cep());
+                project.setCep(r.cep());
+                project.setLatitude(address.latitude());
+                project.setLongitude(address.longitude());
+                project.setCity(address.city());
+                project.setUf(address.state());
+            } catch (Exception e) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(422),
+                        "CEP '" + r.cep() + "' is invalid or could not be resolved.");
+            }
+        } else {
+            // Limpa a localização própria se o CEP foi removido (voltará a usar o da empresa)
+            project.setCep(null);
+            project.setLatitude(null);
+            project.setLongitude(null);
+            project.setCity(null);
+            project.setUf(null);
         }
 
         // Campos de PROJECT
@@ -173,9 +203,20 @@ public class ProjectController {
                 p.getRequiredSkills().stream().map(Skill::getName).toList(),
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName(),
+
+                // Localização efetiva — da vaga ou da empresa como fallback
+                p.getCep() != null ? p.getCep() : p.getCompany().getCep(),
+                p.getEffectiveLatitude(),
+                p.getEffectiveLongitude(),
+                p.getEffectiveCity(),
+                p.getEffectiveUf(),
+
+                // PROJECT
                 p.getMinimumBudget(),
                 p.getMaximumBudget(),
                 p.getDeadline(),
+
+                // JOB
                 p.getMonthlySalaryMin(),
                 p.getMonthlySalaryMax(),
                 p.getContractType(),

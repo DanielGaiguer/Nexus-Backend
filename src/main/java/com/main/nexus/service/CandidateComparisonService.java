@@ -118,7 +118,7 @@ public class CandidateComparisonService {
                 .orElse(null);
 
         ScoreBreakdownDTO breakdown = buildScoreBreakdown(professional, project, match);
-        Double expectedSalary = matchService.getExpectedSalary(professional, project);
+        Double expectedSalary = matchService.calculateExpectedSalary(professional, project);
 
         return new CandidateComparisonItemDTO(
                 match.getId(),
@@ -149,20 +149,20 @@ public class CandidateComparisonService {
     private ScoreBreakdownDTO buildScoreBreakdown(
             Professional professional, Project project, Match match) {
 
-        double skillScore        = matchService.getSkillScore(professional, project);
-        double budgetScore       = matchService.getBudgetScore(professional, project);
-        double historyScore      = matchService.getHistoryScore(professional);
-        double reputationScore   = matchService.getReputationScore(professional);
-        double availabilityScore = matchService.getAvailabilityScore(professional);
+        double skillScore        = matchService.calculateSkillScore(professional, project);
+        double budgetScore       = matchService.calculateBudgetScore(professional, project);
+        double historyScore      = matchService.calculateHistoryScore(professional);
+        double reputationScore   = matchService.calculateReputationScore(professional);
+        double availabilityScore = matchService.calculateAvailabilityScore(professional);
 
         boolean considersDistance   = project.getWorkMode() == Modality.ONSITE
                                     || project.getWorkMode() == Modality.HYBRID;
         boolean considersExperience = project.getExperienceLevel() != null;
 
         Double distanceScore   = considersDistance
-                ? matchService.getDistanceScore(professional, project) : null;
+                ? matchService.calculateDistanceScore(professional, project) : null;
         Double experienceScore = considersExperience
-                ? matchService.getExperienceScore(professional, project) : null;
+                ? matchService.calculateExperienceScore(professional, project) : null;
 
         double baseScore = computeBaseScore(
                 skillScore, budgetScore, historyScore, reputationScore,

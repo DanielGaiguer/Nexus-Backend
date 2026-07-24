@@ -23,6 +23,12 @@ public record ProjectResponseDTO(
         List<String> requiredSkills,
         Long companyId,
         String companyName,
+        
+        String cep,
+        Double latitude,
+        Double longitude,
+        String city,
+        String uf,
 
         // PROJECT
         Double minimumBudget,

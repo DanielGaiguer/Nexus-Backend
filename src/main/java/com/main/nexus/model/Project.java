@@ -53,6 +53,21 @@ public class Project {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ProjectStatus status = ProjectStatus.OPEN;
+    
+    @Column(length = 9)
+    private String cep;
+
+    @Column
+    private Double latitude;
+
+    @Column
+    private Double longitude;
+
+    @Column(length = 100)
+    private String city;
+
+    @Column(length = 2)
+    private String uf;
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -272,6 +287,62 @@ public class Project {
         this.monthlySalaryMin = monthlySalaryMin;
     }
 
+    public String getCep() {
+        return cep;
+    }
+
+    public void setCep(String cep) {
+        this.cep = cep;
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getUf() {
+        return uf;
+    }
+
+    public void setUf(String uf) {
+        this.uf = uf;
+    }
+    
+    public Double getEffectiveLatitude() {
+        return latitude != null ? latitude : company.getLatitude();
+    }
+
+    public Double getEffectiveLongitude() {
+        return longitude != null ? longitude : company.getLongitude();
+    }
+
+    public String getEffectiveCity() {
+        return city != null ? city : company.getCity();
+    }
+
+    public String getEffectiveUf() {
+        return uf != null ? uf : company.getUf();
+    }
+
     public Double getMonthlySalaryMax() {
         return monthlySalaryMax;
     }
@@ -279,7 +350,4 @@ public class Project {
     public void setMonthlySalaryMax(Double monthlySalaryMax) {
         this.monthlySalaryMax = monthlySalaryMax;
     }
-    
-    
-
 }

@@ -16,6 +16,7 @@ public record ProjectRequestDTO(
         Integer maxPositions,
         OpportunityType opportunityType,
         List<Long> skillIds,
+        String cep,
 
         // Campos exclusivos de PROJECT
         Double minimumBudget,

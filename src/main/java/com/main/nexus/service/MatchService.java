@@ -72,11 +72,11 @@ public class MatchService {
     // -------------------------------------------------------
     public double getScore(Professional professional, Project project) {
 
-        double skillScore        = getSkillScore(professional, project);
-        double budgetScore       = getBudgetScore(professional, project);
-        double historyScore      = getHistoryScore(professional);
-        double reputationScore   = getReputationScore(professional);
-        double availabilityScore = getAvailabilityScore(professional);
+        double skillScore        = calculateSkillScore(professional, project);
+        double budgetScore       = calculateBudgetScore(professional, project);
+        double historyScore      = calculateHistoryScore(professional);
+        double reputationScore   = calculateReputationScore(professional);
+        double availabilityScore = calculateAvailabilityScore(professional);
 
         boolean considersDistance   = project.getWorkMode() == Modality.ONSITE
                                     || project.getWorkMode() == Modality.HYBRID;
@@ -86,8 +86,8 @@ public class MatchService {
 
         if (considersDistance && considersExperience) {
             // Cenário 4 — ONSITE/HYBRID com experiência (7 componentes)
-            double distanceScore   = getDistanceScore(professional, project);
-            double experienceScore = getExperienceScore(professional, project);
+            double distanceScore   = calculateDistanceScore(professional, project);
+            double experienceScore = calculateExperienceScore(professional, project);
 
             baseScore = (skillScore        * 0.26)
                       + (budgetScore       * 0.18)
@@ -99,7 +99,7 @@ public class MatchService {
 
         } else if (considersDistance) {
             // Cenário 3 — ONSITE/HYBRID sem experiência (6 componentes)
-            double distanceScore = getDistanceScore(professional, project);
+            double distanceScore = calculateDistanceScore(professional, project);
 
             baseScore = (skillScore        * 0.30)
                       + (budgetScore       * 0.20)
@@ -110,7 +110,7 @@ public class MatchService {
 
         } else if (considersExperience) {
             // Cenário 2 — REMOTO com experiência (6 componentes)
-            double experienceScore = getExperienceScore(professional, project);
+            double experienceScore = calculateExperienceScore(professional, project);
 
             baseScore = (skillScore        * 0.30)
                       + (budgetScore       * 0.22)
@@ -135,7 +135,7 @@ public class MatchService {
     }
 
     // Skills: quantas skills da vaga o profissional possui / total exigido * 100
-    public double getSkillScore(Professional professional, Project project) {
+    public double calculateSkillScore(Professional professional, Project project) {
         List<Skill> required = project.getRequiredSkills();
         if (required == null || required.isEmpty()) return 100.0;
 
@@ -154,23 +154,23 @@ public class MatchService {
     // Orçamento: para vagas CLT/PJ, compara a pretensão única do profissional contra o
     // range salarial da vaga via tabela de penalidade por % de diferença. Para vagas
     // freelance/temporárias e para PROJECT, mantém a lógica de faixa (min/max) existente.
-    public double getBudgetScore(Professional professional, Project project) {
+    public double calculateBudgetScore(Professional professional, Project project) {
         if (project.getOpportunityType() == OpportunityType.JOB && project.getContractType() != null) {
             return switch (project.getContractType()) {
-                case CLT, INTERNSHIP -> getSalaryScore(
+                case CLT, INTERNSHIP -> calculateSalaryScore(
                         professional.getExpectedSalaryCLT(),
                         project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
-                case PJ -> getSalaryScore(
+                case PJ -> calculateSalaryScore(
                         professional.getExpectedSalaryPJ(),
                         project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
-                case TEMPORARY, FREELANCER -> getRangeScore(
+                case TEMPORARY, FREELANCER -> calculateRangeScore(
                         professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation(),
                         project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
             };
         }
 
         // PROJECT — usa a pretensão freelance (faixa min/max)
-        return getRangeScore(
+        return calculateRangeScore(
                 professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation(),
                 project.getMinimumBudget(), project.getMaximumBudget());
     }
@@ -178,7 +178,7 @@ public class MatchService {
     // Compara um valor único de pretensão salarial (CLT/PJ) contra o range ofertado pela vaga.
     // Se a pretensão cai dentro do range, diferença = 0%. Se estiver fora, calcula a diferença
     // percentual até a borda mais próxima do range e aplica a tabela de penalidade.
-    private double getSalaryScore(Double expected, Double offeredMin, Double offeredMax) {
+    private double calculateSalaryScore(Double expected, Double offeredMin, Double offeredMax) {
         if (expected == null || offeredMin == null || offeredMax == null) return 50.0;
 
         double diffPercent;
@@ -207,7 +207,7 @@ public class MatchService {
     }
 
     // Lógica de faixa (min/max) original — usada para freelance/temporário e para PROJECT
-    private double getRangeScore(Double profMin, Double profMax, Double projMin, Double projMax) {
+    private double calculateRangeScore(Double profMin, Double profMax, Double projMin, Double projMax) {
         if (profMin == null || projMax == null) return 50.0;
 
         double profExpectation = (profMax != null) ? (profMin + profMax) / 2.0 : profMin;
@@ -226,7 +226,7 @@ public class MatchService {
 
     // Pretensão salarial única e relevante para o regime da vaga/projeto — usada fora do
     // cálculo de score (filtros de ranking, comparação de candidatos)
-    public Double getExpectedSalary(Professional professional, Project project) {
+    public Double calculateExpectedSalary(Professional professional, Project project) {
         if (project.getOpportunityType() == OpportunityType.JOB && project.getContractType() != null) {
             return switch (project.getContractType()) {
                 case CLT, INTERNSHIP -> professional.getExpectedSalaryCLT();
@@ -245,7 +245,7 @@ public class MatchService {
     }
 
     // Histórico: baseado na quantidade de projetos anteriores (máx 10 projetos = 100)
-    public double getHistoryScore(Professional professional) {
+    public double calculateHistoryScore(Professional professional) {
         int count = professional.getProjects() != null
                 ? professional.getProjects().size()
                 : 0;
@@ -253,28 +253,32 @@ public class MatchService {
     }
 
     // Reputação: média de estrelas (1-5) normalizada para 0-100
-    public double getReputationScore(Professional professional) {
+    public double calculateReputationScore(Professional professional) {
         double rep = professional.getReputation() != null ? professional.getReputation() : 0.0;
         return (rep / 5.0) * 100.0;
     }
 
     // Disponibilidade: disponível = 100, indisponível = 0
-    public double getAvailabilityScore(Professional professional) {
+    public double calculateAvailabilityScore(Professional professional) {
         return Boolean.TRUE.equals(professional.getAvailable()) ? 100.0 : 0.0;
     }
 
     // Distância: calculada via Haversine entre profissional e empresa
-    public double getDistanceScore(Professional professional, Project project) {
+    public double calculateDistanceScore(Professional professional, Project project) {
         Double profLat = professional.getLatitude();
         Double profLon = professional.getLongitude();
-        Double companyLat = project.getCompany().getLatitude();
-        Double companyLon = project.getCompany().getLongitude();
 
-        if (profLat == null || profLon == null || companyLat == null || companyLon == null) {
+        // Usa a localização efetiva da vaga:
+        // se o projeto tem CEP próprio, usa as coordenadas dele
+        // senão, cai no CEP da empresa como fallback
+        Double projectLat = project.getEffectiveLatitude();
+        Double projectLon = project.getEffectiveLongitude();
+
+        if (profLat == null || profLon == null || projectLat == null || projectLon == null) {
             return 50.0;
         }
 
-        double distanceKm = haversineDistance(profLat, profLon, companyLat, companyLon);
+        double distanceKm = haversineDistance(profLat, profLon, projectLat, projectLon);
         return scoreFromDistance(distanceKm);
     }
 
@@ -304,7 +308,7 @@ public class MatchService {
         return 10.0;
     }
     
-    public double getExperienceScore(Professional professional, Project project) {
+    public double calculateExperienceScore(Professional professional, Project project) {
         ExperienceLevel profLevel = professional.getExperienceLevel();
         ExperienceLevel projLevel = project.getExperienceLevel();
 
@@ -737,7 +741,7 @@ public class MatchService {
         if (minSalary != null) {
             ranking = ranking.stream()
                     .filter(m -> {
-                        Double expected = getExpectedSalary(m.getProfessional(), m.getProject());
+                        Double expected = calculateExpectedSalary(m.getProfessional(), m.getProject());
                         return expected != null && expected >= minSalary;
                     })
                     .toList();
@@ -745,7 +749,7 @@ public class MatchService {
         if (maxSalary != null) {
             ranking = ranking.stream()
                     .filter(m -> {
-                        Double expected = getExpectedSalary(m.getProfessional(), m.getProject());
+                        Double expected = calculateExpectedSalary(m.getProfessional(), m.getProject());
                         return expected != null && expected <= maxSalary;
                     })
                     .toList();
