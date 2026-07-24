@@ -4,7 +4,7 @@ public record MapProfessionalDTO(
         Long id,
         String name,
         String city,
-        String state,
+        String uf,
         Double latitude,
         Double longitude,
         Double reputation,
