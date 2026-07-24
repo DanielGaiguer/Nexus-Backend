@@ -269,7 +269,8 @@ public class AdminController {
                 p.getContractType(),
                 p.getBenefits(),
                 p.getStartDate(),
-                p.getWorkloadHoursPerWeek()
+                p.getWorkloadHoursPerWeek(),
+                null
         );
     }
 

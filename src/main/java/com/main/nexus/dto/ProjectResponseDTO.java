@@ -41,5 +41,8 @@ public record ProjectResponseDTO(
         ContractType contractType,
         String benefits,
         LocalDate startDate,
-        Integer workloadHoursPerWeek
+        Integer workloadHoursPerWeek,
+
+        // Nested company (only populated on public detail endpoint)
+        PublicCompanyDTO company
 ) {}

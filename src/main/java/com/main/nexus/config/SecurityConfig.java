@@ -62,6 +62,8 @@ public class SecurityConfig {
                     
                 .requestMatchers("/api/analytics/company/dashboard").hasRole("COMPANY")
                 .requestMatchers("/api/analytics/company/*/dashboard").hasRole("ADMIN")
+                .requestMatchers("/api/analytics/professional/dashboard").hasRole("PROFESSIONAL")
+                .requestMatchers("/api/analytics/professional/*/dashboard").hasRole("ADMIN")
 
                 // Match: tanto empresa quanto profissional acessam
                 .requestMatchers("/api/matches/**").hasAnyRole("COMPANY", "PROFESSIONAL")

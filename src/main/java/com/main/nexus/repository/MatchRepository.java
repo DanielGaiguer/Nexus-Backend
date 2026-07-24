@@ -62,4 +62,27 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     // Matches de um projeto específico com score e status
     @Query("SELECT m FROM Match m WHERE m.project.id = :projectId ORDER BY m.matchScore DESC")
     List<Match> findByProjectIdOrderByScore(@Param("projectId") Long projectId);
+
+    // Matches por mês de um profissional — retorna [year, month, status, count]
+    @Query("SELECT YEAR(m.createdAt), MONTH(m.createdAt), m.status, COUNT(m) " +
+           "FROM Match m " +
+           "WHERE m.professional.id = :professionalId " +
+           "AND m.createdAt >= :since " +
+           "GROUP BY YEAR(m.createdAt), MONTH(m.createdAt), m.status " +
+           "ORDER BY YEAR(m.createdAt) ASC, MONTH(m.createdAt) ASC")
+    List<Object[]> findMonthlyMatchStatsByProfessional(
+            @Param("professionalId") Long professionalId,
+            @Param("since") java.time.LocalDateTime since);
+
+    // Scores de todos os matches de um profissional — para calcular distribuição
+    @Query("SELECT m.matchScore FROM Match m WHERE m.professional.id = :professionalId")
+    List<Double> findAllScoresByProfessional(@Param("professionalId") Long professionalId);
+
+    // Skills mais presentes nos projetos em que o profissional deu match
+    @Query("SELECT s.name, s.category, COUNT(DISTINCT m.project) " +
+           "FROM Match m JOIN m.project.requiredSkills s " +
+           "WHERE m.professional.id = :professionalId " +
+           "GROUP BY s.name, s.category " +
+           "ORDER BY COUNT(DISTINCT m.project) DESC")
+    List<Object[]> findMostRequiredSkillsByProfessional(@Param("professionalId") Long professionalId);
 }
