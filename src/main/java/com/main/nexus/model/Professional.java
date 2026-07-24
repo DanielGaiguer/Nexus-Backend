@@ -1,6 +1,7 @@
 package com.main.nexus.model;
 
 import com.main.nexus.model.enums.ExperienceLevel;
+import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProjectType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
@@ -49,9 +50,6 @@ public class Professional {
     @Column(length = 9)
     private String cep;
 
-    private Double minimumSalaryExpectation;
-    private Double maximumSalaryExpectation;
-
     @Column(nullable = false)
     private Boolean available = true;
 
@@ -89,6 +87,27 @@ public class Professional {
     
     @Column(length = 500)
     private String profilePhotoUrl;
+    
+    @Column
+    private Double expectedSalaryCLT;
+
+    @Column
+    private Double expectedSalaryPJ;
+
+    @Column
+    private Double freelanceMinExpectation;
+
+    @Column
+    private Double freelanceMaxExpectation;
+
+    @ElementCollection(targetClass = OpportunityType.class)
+    @Enumerated(EnumType.STRING)
+    @CollectionTable(
+        name = "tb_professional_opportunity_types",
+        joinColumns = @JoinColumn(name = "professional_id")
+    )
+    @Column(name = "opportunity_type", length = 20)
+    private List<OpportunityType> preferredOpportunityTypes = new ArrayList<>();
 
     private Boolean profileCompletionEmailSent = false;
 
@@ -146,22 +165,6 @@ public class Professional {
 
     public void setCep(String cep) {
         this.cep = cep;
-    }
-    
-    public Double getMinimumSalaryExpectation() {
-        return minimumSalaryExpectation;
-    }
-
-    public void setMinimumSalaryExpectation(Double minimumSalaryExpectation) {
-        this.minimumSalaryExpectation = minimumSalaryExpectation;
-    }
-
-    public Double getMaximumSalaryExpectation() {
-        return maximumSalaryExpectation;
-    }
-
-    public void setMaximumSalaryExpectation(Double maximumSalaryExpectation) {
-        this.maximumSalaryExpectation = maximumSalaryExpectation;
     }
 
     public Boolean getAvailable() {
@@ -243,6 +246,48 @@ public class Professional {
     public void setProfilePhotoUrl(String profilePhotoUrl) {
         this.profilePhotoUrl = profilePhotoUrl;
     }
+
+    public Double getExpectedSalaryCLT() {
+        return expectedSalaryCLT;
+    }
+
+    public void setExpectedSalaryCLT(Double expectedSalaryCLT) {
+        this.expectedSalaryCLT = expectedSalaryCLT;
+    }
+
+    public Double getExpectedSalaryPJ() {
+        return expectedSalaryPJ;
+    }
+
+    public void setExpectedSalaryPJ(Double expectedSalaryPJ) {
+        this.expectedSalaryPJ = expectedSalaryPJ;
+    }
+
+    public Double getFreelanceMinExpectation() {
+        return freelanceMinExpectation;
+    }
+
+    public void setFreelanceMinExpectation(Double freelanceMinExpectation) {
+        this.freelanceMinExpectation = freelanceMinExpectation;
+    }
+
+    public Double getFreelanceMaxExpectation() {
+        return freelanceMaxExpectation;
+    }
+
+    public void setFreelanceMaxExpectation(Double freelanceMaxExpectation) {
+        this.freelanceMaxExpectation = freelanceMaxExpectation;
+    }
+
+    public List<OpportunityType> getPreferredOpportunityTypes() {
+        return preferredOpportunityTypes;
+    }
+
+    public void setPreferredOpportunityTypes(List<OpportunityType> preferredOpportunityTypes) {
+        this.preferredOpportunityTypes = preferredOpportunityTypes;
+    }
+    
+    
 
     public Boolean getProfileCompletionEmailSent() {
         return profileCompletionEmailSent;

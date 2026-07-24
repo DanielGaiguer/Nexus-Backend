@@ -23,6 +23,7 @@ import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.ProfessionalService;
+import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.SkillService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +69,9 @@ public class AdminController {
 
     @Autowired
     private ProfessionalService professionalService;
+
+    @Autowired
+    private ProfileCompletionService profileCompletionService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardDTO> dashboard() {
@@ -271,6 +275,7 @@ public class AdminController {
     }
 
     private ProfessionalProfileDTO toProfessionalProfileDTO(Professional p) {
+        List<String> missing = profileCompletionService.getMissingFields(p);
         return new ProfessionalProfileDTO(
                 p.getId(),
                 p.getName(),
@@ -279,8 +284,6 @@ public class AdminController {
                 p.getCity(),
                 p.getUf(),
                 p.getCep(),
-                p.getMinimumSalaryExpectation(),
-                p.getMaximumSalaryExpectation(),
                 p.getAvailable(),
                 p.getReputation(),
                 p.getLatitude(),
@@ -288,7 +291,14 @@ public class AdminController {
                 p.getSkills().stream().map(Skill::getName).toList(),
                 p.getPreferredTypes(),
                 p.getExperienceLevel(),
-                p.getProfilePhotoUrl()
+                p.getProfilePhotoUrl(),
+                p.getPreferredOpportunityTypes(),
+                p.getExpectedSalaryCLT(),
+                p.getExpectedSalaryPJ(),
+                p.getFreelanceMinExpectation(),
+                p.getFreelanceMaxExpectation(),
+                missing.isEmpty(),
+                missing
         );
     }
 }

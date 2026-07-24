@@ -101,17 +101,35 @@ public class PdfService {
 
             // ── Salary ──
             addSectionTitle(doc, fontBold, "Pretensão salarial");
-            Double minSalary = professional.getMinimumSalaryExpectation();
-            Double maxSalary = professional.getMaximumSalaryExpectation();
-            if (minSalary != null && maxSalary != null) {
-                String salary = String.format("R$ %.2f — R$ %.2f", minSalary, maxSalary);
-                doc.add(new Paragraph(salary)
-                        .setFont(fontRegular).setFontSize(10)
-                        .setMarginBottom(14));
-            } else if (minSalary != null) {
-                doc.add(new Paragraph("A partir de R$ " + String.format("%.2f", minSalary))
-                        .setFont(fontRegular).setFontSize(10)
-                        .setMarginBottom(14));
+            Double cltSalary = professional.getExpectedSalaryCLT();
+            Double pjSalary = professional.getExpectedSalaryPJ();
+            Double freelanceMin = professional.getFreelanceMinExpectation();
+            Double freelanceMax = professional.getFreelanceMaxExpectation();
+
+            boolean hasAnySalaryInfo = cltSalary != null || pjSalary != null
+                    || freelanceMin != null || freelanceMax != null;
+
+            if (hasAnySalaryInfo) {
+                Paragraph salaryParagraph = new Paragraph().setMarginBottom(14);
+                boolean first = true;
+                if (cltSalary != null) {
+                    salaryParagraph.add(new Text((first ? "" : "\n") + "CLT: R$ " + String.format("%.2f", cltSalary))
+                            .setFont(fontRegular).setFontSize(10));
+                    first = false;
+                }
+                if (pjSalary != null) {
+                    salaryParagraph.add(new Text((first ? "" : "\n") + "PJ: R$ " + String.format("%.2f", pjSalary))
+                            .setFont(fontRegular).setFontSize(10));
+                    first = false;
+                }
+                if (freelanceMin != null || freelanceMax != null) {
+                    String range = freelanceMin != null && freelanceMax != null
+                            ? String.format("R$ %.2f — R$ %.2f", freelanceMin, freelanceMax)
+                            : "R$ " + String.format("%.2f", freelanceMin != null ? freelanceMin : freelanceMax);
+                    salaryParagraph.add(new Text((first ? "" : "\n") + "Por projeto: " + range)
+                            .setFont(fontRegular).setFontSize(10));
+                }
+                doc.add(salaryParagraph);
             } else {
                 addEmptyField(doc, fontRegular);
             }

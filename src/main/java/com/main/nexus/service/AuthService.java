@@ -12,6 +12,7 @@ import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.UserRepository;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -45,6 +46,12 @@ public class AuthService {
 
     @Autowired
     private GeolocationService geolocationService;
+
+    @Autowired
+    private ProfileCompletionService profileCompletionService;
+    
+    @Autowired
+    private NotificationService notificationService;
 
     public void registerProfessional(RegisterProfessionalRequestDTO request) {
         // ── 1. Validações de campos obrigatórios ───────────────────────────────
@@ -97,7 +104,11 @@ public class AuthService {
         professional.setUser(savedUser);
         professional.setName(request.name());
         professional.setPhone(request.phone());
-        professional.setCep(request.cep());
+        professional.setPreferredOpportunityTypes(request.preferredOpportunityTypes());
+        professional.setExpectedSalaryCLT(request.expectedSalaryCLT());
+        professional.setExpectedSalaryPJ(request.expectedSalaryPJ());
+        professional.setFreelanceMinExpectation(request.freelanceMinExpectation());
+        professional.setFreelanceMaxExpectation(request.freelanceMaxExpectation());
 
         if (request.cep() != null && !request.cep().isBlank()) {
             professional.setLatitude(addressData.latitude());
@@ -105,17 +116,30 @@ public class AuthService {
             professional.setCity(addressData.city());
             professional.setUf(addressData.state());
         }
-
-        professional.setMinimumSalaryExpectation(request.minimumSalary());
-        professional.setMaximumSalaryExpectation(request.maximumSalary());
+        
         professionalService.save(professional);
         
-        emailService.send(
-            savedUser.getEmail(),
-            "Bem-vindo ao Nexus!",
-            "Olá " + request.name() + ",\n\nSua conta foi criada com sucesso. " +
-            "Complete seu perfil e suas skills para começar a receber oportunidades compatíveis.\n\nEquipe Nexus"
-        );
+        List<String> missing = profileCompletionService.getMissingFields(professional);
+        boolean incomplete = !missing.isEmpty();
+        
+        String emailBody;
+         if (incomplete) {
+             String fieldList = String.join(", ", missing);
+             emailBody = "Olá " + request.name() + ",\n\nSua conta foi criada com sucesso!\n\n" +
+                     "Para começar a receber oportunidades compatíveis, complete seu perfil preenchendo: " +
+                     fieldList + ".\n\n" +
+                     "Acesse o Nexus e finalize seu cadastro.\n\nEquipe Nexus";
+         } else {
+             emailBody = "Olá " + request.name() + ",\n\nSua conta foi criada com sucesso e seu perfil está completo! " +
+                     "Você já pode começar a receber oportunidades compatíveis com seu perfil.\n\nEquipe Nexus";
+         }
+
+         emailService.send(savedUser.getEmail(), "Bem-vindo ao Nexus!", emailBody);
+
+         // Notificação in-app de perfil incompleto
+         if (incomplete) {
+             notificationService.notifyIncompleteProfile(savedUser, missing);
+         }
     }
     
     @Transactional

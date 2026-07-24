@@ -141,6 +141,18 @@ public class NotificationService {
             "/opportunities"
         );
     }
+    
+    @Async
+    public void notifyIncompleteProfile(User user, List<String> missingFields) {
+        String fieldList = String.join(", ", missingFields);
+        notify(
+            user,
+            NotificationType.COMPLETE_YOUR_PROFILE,
+            "Complete seu perfil para aparecer nas recomendações",
+            "Seu perfil ainda está incompleto. Para aparecer nos rankings e receber oportunidades compatíveis, preencha: " + fieldList + ".",
+            "/profile"
+        );
+    }
 
     // =========================================================
     // CONSULTAS — consumidas pelo controller

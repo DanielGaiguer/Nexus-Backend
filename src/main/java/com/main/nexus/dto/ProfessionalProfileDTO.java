@@ -1,8 +1,8 @@
-
 package com.main.nexus.dto;
 
-import com.main.nexus.model.enums.ProjectType;
 import com.main.nexus.model.enums.ExperienceLevel;
+import com.main.nexus.model.enums.OpportunityType;
+import com.main.nexus.model.enums.ProjectType;
 import java.util.List;
 
 public record ProfessionalProfileDTO(
@@ -10,11 +10,9 @@ public record ProfessionalProfileDTO(
         String name,
         String email,
         String phone,
-        String city, 
-        String uf,
+        String city,
+        String state,
         String cep,
-        Double minimumSalary,
-        Double maximumSalary,
         Boolean available,
         Double reputation,
         Double latitude,
@@ -22,5 +20,16 @@ public record ProfessionalProfileDTO(
         List<String> skills,
         List<ProjectType> preferredTypes,
         ExperienceLevel experienceLevel,
-        String profilePhotoUrl
+        String profilePhotoUrl,
+
+        // Novos campos de regime
+        List<OpportunityType> preferredOpportunityTypes,
+        Double expectedSalaryCLT,
+        Double expectedSalaryPJ,
+        Double freelanceMinExpectation,
+        Double freelanceMaxExpectation,
+
+        // Status de completude
+        boolean profileComplete,
+        List<String> missingFields
 ) {}

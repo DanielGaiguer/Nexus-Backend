@@ -8,15 +8,18 @@ import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.Skill;
+import com.main.nexus.model.enums.NotificationType;
 import com.main.nexus.repository.PreviousProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
 import com.main.nexus.service.EmailService;
 import com.main.nexus.service.FileStorageService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.NotificationService;
 import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.PdfService;
 import com.main.nexus.service.ProfessionalService;
+import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.SkillService;
 import com.main.nexus.service.SupabaseStorageService;
 import java.util.List;
@@ -75,6 +78,12 @@ public class ProfessionalController {
 
     @Autowired
     private PreviousProjectRepository previousProjectRepository;
+    
+    @Autowired
+    private ProfileCompletionService profileCompletionService;
+    
+    @Autowired
+    private NotificationService notificationService;
 
     @GetMapping("/projects")
     public ResponseEntity<?> listPreviousProjects() {
@@ -126,51 +135,51 @@ public class ProfessionalController {
     @PutMapping("/profile")
     public ResponseEntity<ProfessionalProfileDTO> updateProfile(
             @RequestBody ProfessionalProfileDTO request) {
+
         UserDTO logged = getLoggedUser();
         Professional existing = professionalService.findByUserId(logged.id())
-                .orElseThrow(() -> new RuntimeException("Profile not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        boolean wasIncomplete = !profileCompletionService.isProfileComplete(existing);
 
         existing.setName(request.name());
         existing.setPhone(request.phone());
-        existing.setCep(request.cep());
-        existing.setMinimumSalaryExpectation(request.minimumSalary());
-        existing.setMaximumSalaryExpectation(request.maximumSalary());
         existing.setAvailable(request.available());
-        existing.setLatitude(request.latitude());
-        existing.setLongitude(request.longitude());
         existing.setPreferredTypes(request.preferredTypes());
         existing.setExperienceLevel(request.experienceLevel());
-        
+        existing.setPreferredOpportunityTypes(request.preferredOpportunityTypes());
+        existing.setExpectedSalaryCLT(request.expectedSalaryCLT());
+        existing.setExpectedSalaryPJ(request.expectedSalaryPJ());
+        existing.setFreelanceMinExpectation(request.freelanceMinExpectation());
+        existing.setFreelanceMaxExpectation(request.freelanceMaxExpectation());
+
         if (request.cep() != null && !request.cep().isBlank()) {
-            GeolocationService.AddressData coords = geolocationService.resolveFromCep(request.cep());
-            existing.setLatitude(coords.latitude());
-            existing.setLongitude(coords.longitude());
-            existing.setCity(coords.city());
-            existing.setUf(coords.state());
+            GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
+            existing.setLatitude(address.latitude());
+            existing.setLongitude(address.longitude());
+            existing.setCity(address.city());
+            existing.setUf(address.state());
         }
 
         professionalService.update(existing);
 
-        boolean hasPhoto = existing.getProfilePhotoUrl() != null && !existing.getProfilePhotoUrl().isBlank();
-        boolean hasSkills = existing.getSkills() != null && existing.getSkills().size() >= 3;
-        boolean hasCep = existing.getCep() != null && !existing.getCep().isBlank();
-        boolean hasExp = existing.getExperienceLevel() != null;
-        boolean hasSalary = existing.getMinimumSalaryExpectation() != null && existing.getMinimumSalaryExpectation() > 0;
-        boolean hasPrevPr = existing.getProjects() != null && !existing.getProjects().isEmpty();
-        boolean complete = hasPhoto && hasSkills && hasCep && hasExp && hasSalary && hasPrevPr;
-
-        if (complete && !Boolean.TRUE.equals(existing.getProfileCompletionEmailSent())) {
-            emailService.send(
-                    existing.getUser().getEmail(),
-                    "Seu perfil está completo! — Nexus",
-                    "Olá " + existing.getName() + ",\n\n" +
-                    "Parabéns! Seu perfil está completo e você agora aparece com destaque no " +
-                    "ranking das vagas compatíveis com seu perfil.\n\n" +
-                    "Acesse o Nexus para ver suas oportunidades: http://localhost:8080/pro/opportunities\n\n" +
-                    "Equipe Nexus"
+        // Se o perfil estava incompleto e agora está completo, notifica
+        boolean nowComplete = profileCompletionService.isProfileComplete(existing);
+        if (wasIncomplete && nowComplete) {
+            notificationService.notify(
+                existing.getUser(),
+                    NotificationType.COMPLETE_YOUR_PROFILE,
+                "Perfil completo!",
+                "Parabéns! Seu perfil está completo e você agora aparece nos rankings de oportunidades compatíveis.",
+                "/profile"
             );
-            existing.setProfileCompletionEmailSent(true);
-            professionalService.update(existing);
+        }
+
+        // Se ainda incompleto, lembra o que falta
+        if (!nowComplete) {
+            List<String> missing = profileCompletionService.getMissingFields(existing);
+            notificationService.notifyIncompleteProfile(existing.getUser(), missing);
         }
 
         return ResponseEntity.ok(toProfileDTO(existing));
@@ -259,8 +268,9 @@ public class ProfessionalController {
                 .getAuthentication()
                 .getPrincipal();
     }
-
+    
     private ProfessionalProfileDTO toProfileDTO(Professional p) {
+        List<String> missing = profileCompletionService.getMissingFields(p);
         return new ProfessionalProfileDTO(
                 p.getId(),
                 p.getName(),
@@ -268,9 +278,7 @@ public class ProfessionalController {
                 p.getPhone(),
                 p.getCity(),
                 p.getUf(),
-                p.getCep(),
-                p.getMinimumSalaryExpectation(),
-                p.getMaximumSalaryExpectation(),
+                null,
                 p.getAvailable(),
                 p.getReputation(),
                 p.getLatitude(),
@@ -278,10 +286,17 @@ public class ProfessionalController {
                 p.getSkills().stream().map(Skill::getName).toList(),
                 p.getPreferredTypes(),
                 p.getExperienceLevel(),
-                p.getProfilePhotoUrl()
+                p.getProfilePhotoUrl(),
+                p.getPreferredOpportunityTypes(),
+                p.getExpectedSalaryCLT(),
+                p.getExpectedSalaryPJ(),
+                p.getFreelanceMinExpectation(),
+                p.getFreelanceMaxExpectation(),
+                missing.isEmpty(),
+                missing
         );
     }
-    
+
     // Lista oportunidades compatíveis — "projetos vistos por mim"
     @GetMapping("/opportunities")
     public ResponseEntity<?> getOpportunities() {

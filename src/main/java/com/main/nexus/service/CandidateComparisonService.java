@@ -118,6 +118,7 @@ public class CandidateComparisonService {
                 .orElse(null);
 
         ScoreBreakdownDTO breakdown = buildScoreBreakdown(professional, project, match);
+        Double expectedSalary = matchService.getExpectedSalary(professional, project);
 
         return new CandidateComparisonItemDTO(
                 match.getId(),
@@ -131,8 +132,8 @@ public class CandidateComparisonService {
                 metrics != null ? metrics.getConfidenceScore() != null
                         ? metrics.getConfidenceScore() * 100 : 0.0 : 0.0,
                 metrics != null ? metrics.getTotalReviews() : 0,
-                professional.getMinimumSalaryExpectation(),
-                professional.getMaximumSalaryExpectation(),
+                expectedSalary,
+                expectedSalary,
                 professionalSkillNames,
                 matchingSkills,
                 missingSkills,

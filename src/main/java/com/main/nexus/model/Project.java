@@ -5,7 +5,6 @@ import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProjectStatus;
-import com.main.nexus.model.enums.ProjectType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -58,10 +57,6 @@ public class Project {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
     
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private ProjectType type;
-
     @ManyToMany
     @JoinTable(
         name = "tb_job_skill",
@@ -199,14 +194,6 @@ public class Project {
 
     public void setModality(Modality modality) {
         this.modality = modality;
-    }
-
-    public ProjectType getType() {
-        return type;
-    }
-
-    public void setType(ProjectType type) {
-        this.type = type;
     }
 
     public Integer getMaxPositions() {

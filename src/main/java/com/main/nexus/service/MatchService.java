@@ -61,6 +61,9 @@ public class MatchService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private ProfileCompletionService profileCompletionService;
+
     // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
     // ScoreMatch = (Skills*0.35) + (Budget*0.25) + (History*0.20) + (Reputation*0.10) + (Availability*0.10)
@@ -148,22 +151,63 @@ public class MatchService {
         return ((double) matched / required.size()) * 100.0;
     }
 
-    // Orçamento: pretensão do profissional está dentro do range da vaga?
+    // Orçamento: para vagas CLT/PJ, compara a pretensão única do profissional contra o
+    // range salarial da vaga via tabela de penalidade por % de diferença. Para vagas
+    // freelance/temporárias e para PROJECT, mantém a lógica de faixa (min/max) existente.
     public double getBudgetScore(Professional professional, Project project) {
-        Double profMin = professional.getMinimumSalaryExpectation();
-        Double profMax = professional.getMaximumSalaryExpectation();
-
-        Double projMax;
-        Double projMin;
-
-        if (project.getOpportunityType() == OpportunityType.JOB) {
-            projMax = project.getMonthlySalaryMax();
-            projMin = project.getMonthlySalaryMin();
-        } else {
-            projMax = project.getMaximumBudget();
-            projMin = project.getMinimumBudget();
+        if (project.getOpportunityType() == OpportunityType.JOB && project.getContractType() != null) {
+            return switch (project.getContractType()) {
+                case CLT, INTERNSHIP -> getSalaryScore(
+                        professional.getExpectedSalaryCLT(),
+                        project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
+                case PJ -> getSalaryScore(
+                        professional.getExpectedSalaryPJ(),
+                        project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
+                case TEMPORARY, FREELANCER -> getRangeScore(
+                        professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation(),
+                        project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
+            };
         }
 
+        // PROJECT — usa a pretensão freelance (faixa min/max)
+        return getRangeScore(
+                professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation(),
+                project.getMinimumBudget(), project.getMaximumBudget());
+    }
+
+    // Compara um valor único de pretensão salarial (CLT/PJ) contra o range ofertado pela vaga.
+    // Se a pretensão cai dentro do range, diferença = 0%. Se estiver fora, calcula a diferença
+    // percentual até a borda mais próxima do range e aplica a tabela de penalidade.
+    private double getSalaryScore(Double expected, Double offeredMin, Double offeredMax) {
+        if (expected == null || offeredMin == null || offeredMax == null) return 50.0;
+
+        double diffPercent;
+        if (expected >= offeredMin && expected <= offeredMax) {
+            diffPercent = 0.0;
+        } else if (expected < offeredMin) {
+            diffPercent = ((offeredMin - expected) / offeredMin) * 100.0;
+        } else {
+            diffPercent = ((expected - offeredMax) / offeredMax) * 100.0;
+        }
+
+        return 100.0 - salaryPenaltyPercent(diffPercent);
+    }
+
+    // Tabela de abatimento no score conforme a diferença percentual entre esperado e ofertado
+    private double salaryPenaltyPercent(double diffPercent) {
+        if (diffPercent <= 15.0)  return 0.0;
+        if (diffPercent <= 20.0)  return 5.0;
+        if (diffPercent <= 30.0)  return 10.0;
+        if (diffPercent <= 40.0)  return 15.0;
+        if (diffPercent <= 50.0)  return 20.0;
+        if (diffPercent <= 60.0)  return 25.0;
+        if (diffPercent <= 75.0)  return 30.0;
+        if (diffPercent <= 100.0) return 40.0;
+        return 50.0;
+    }
+
+    // Lógica de faixa (min/max) original — usada para freelance/temporário e para PROJECT
+    private double getRangeScore(Double profMin, Double profMax, Double projMin, Double projMax) {
         if (profMin == null || projMax == null) return 50.0;
 
         double profExpectation = (profMax != null) ? (profMin + profMax) / 2.0 : profMin;
@@ -178,6 +222,26 @@ public class MatchService {
 
         double excesso = (profExpectation - projMax) / projMax;
         return Math.max(0, 100.0 - (excesso * 100));
+    }
+
+    // Pretensão salarial única e relevante para o regime da vaga/projeto — usada fora do
+    // cálculo de score (filtros de ranking, comparação de candidatos)
+    public Double getExpectedSalary(Professional professional, Project project) {
+        if (project.getOpportunityType() == OpportunityType.JOB && project.getContractType() != null) {
+            return switch (project.getContractType()) {
+                case CLT, INTERNSHIP -> professional.getExpectedSalaryCLT();
+                case PJ -> professional.getExpectedSalaryPJ();
+                case TEMPORARY, FREELANCER -> averageOf(
+                        professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation());
+            };
+        }
+        return averageOf(professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation());
+    }
+
+    private Double averageOf(Double min, Double max) {
+        if (min == null) return max;
+        if (max == null) return min;
+        return (min + max) / 2.0;
     }
 
     // Histórico: baseado na quantidade de projetos anteriores (máx 10 projetos = 100)
@@ -280,6 +344,9 @@ public class MatchService {
         List<Match> matches = new ArrayList<>();
 
         for (Professional professional : allProfessionals) {
+            
+            if (!profileCompletionService.canParticipateInRanking(professional)) continue;
+            
             if (!matchesProjectType(professional, project)) continue;
 
             boolean alreadyExists = matchRepository
@@ -669,14 +736,18 @@ public class MatchService {
         }
         if (minSalary != null) {
             ranking = ranking.stream()
-                    .filter(m -> m.getProfessional().getMaximumSalaryExpectation() != null
-                            && m.getProfessional().getMaximumSalaryExpectation() >= minSalary)
+                    .filter(m -> {
+                        Double expected = getExpectedSalary(m.getProfessional(), m.getProject());
+                        return expected != null && expected >= minSalary;
+                    })
                     .toList();
         }
         if (maxSalary != null) {
             ranking = ranking.stream()
-                    .filter(m -> m.getProfessional().getMinimumSalaryExpectation() != null
-                            && m.getProfessional().getMinimumSalaryExpectation() <= maxSalary)
+                    .filter(m -> {
+                        Double expected = getExpectedSalary(m.getProfessional(), m.getProject());
+                        return expected != null && expected <= maxSalary;
+                    })
                     .toList();
         }
         if (skill != null && !skill.isBlank()) {

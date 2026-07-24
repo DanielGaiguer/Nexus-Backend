@@ -9,5 +9,6 @@ public enum NotificationType {
     COMPANY_APPROVED,        // empresa foi aprovada pelo admin
     COMPANY_REJECTED,        // empresa foi rejeitada pelo admin
     PROJECT_CLOSED,          // um projeto foi encerrado
-    NEW_INTEREST_RECEIVED    // profissional demonstrou interesse na empresa
+    NEW_INTEREST_RECEIVED,   // profissional demonstrou interesse na empresa
+    COMPLETE_YOUR_PROFILE
 }
