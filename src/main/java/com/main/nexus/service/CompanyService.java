@@ -18,6 +18,9 @@ public class CompanyService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private EmailService emailService;
+
     public Company save(Company company) {
         return companyRepository.save(company);
     }
@@ -65,6 +68,13 @@ public class CompanyService {
         notificationService.notifyCompanyApproved(
             company.getUser(), company.getCompanyName());
 
+        emailService.send(
+            company.getUser().getEmail(),
+            "Cadastro aprovado! — Nexus",
+            "Olá " + company.getCompanyName() + ",\n\nSeu cadastro foi aprovado pelo administrador. " +
+            "Você já pode publicar vagas e encontrar profissionais no Nexus.\n\nEquipe Nexus"
+        );
+
         return saved;
     }
 
@@ -81,6 +91,13 @@ public class CompanyService {
         // Notifica a empresa in-app
         notificationService.notifyCompanyRejected(
             company.getUser(), company.getCompanyName());
+
+        emailService.send(
+            company.getUser().getEmail(),
+            "Cadastro não aprovado — Nexus",
+            "Olá " + company.getCompanyName() + ",\n\nSeu cadastro não foi aprovado pelo administrador. " +
+            "Entre em contato com o suporte para mais informações.\n\nEquipe Nexus"
+        );
 
         return saved;
     }
