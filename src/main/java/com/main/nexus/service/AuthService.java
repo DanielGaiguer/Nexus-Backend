@@ -232,6 +232,11 @@ public class AuthService {
         );
 
         notifyAdminsOfNewCompany(savedCompany);
+
+        List<String> missing = profileCompletionService.getMissingFields(savedCompany);
+        if (!missing.isEmpty()) {
+            notificationService.notifyIncompleteCompanyProfile(savedUser, missing);
+        }
     }
 
     public LoginResponseDTO login(LoginRequestDTO request) {
@@ -564,6 +569,11 @@ public class AuthService {
         );
 
         notifyAdminsOfNewCompany(savedCompany);
+
+        List<String> missing = profileCompletionService.getMissingFields(savedCompany);
+        if (!missing.isEmpty()) {
+            notificationService.notifyIncompleteCompanyProfile(savedUser, missing);
+        }
     }
 
     // ── Notifica administradores sobre novo cadastro de empresa pendente ────

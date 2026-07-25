@@ -173,7 +173,7 @@ public class ProfessionalController {
                     NotificationType.COMPLETE_YOUR_PROFILE,
                 "Perfil completo!",
                 "Parabéns! Seu perfil está completo e você agora aparece nos rankings de oportunidades compatíveis.",
-                "/profile"
+                "/pro/profile"
             );
         }
 

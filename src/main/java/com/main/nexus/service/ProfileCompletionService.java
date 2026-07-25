@@ -1,5 +1,6 @@
 package com.main.nexus.service;
 
+import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.enums.OpportunityType;
 import java.util.ArrayList;
@@ -86,5 +87,35 @@ public class ProfileCompletionService {
             }
         }
         return true;
+    }
+
+    // ── Empresas ──────────────────────────────────────────────────────────────
+    // CEP (latitude/longitude preenchidos = CEP foi resolvido)
+    // CNPJ, telefone e descrição — companyName e email já são obrigatórios no cadastro
+
+    public boolean isProfileComplete(Company company) {
+        return getMissingFields(company).isEmpty();
+    }
+
+    public List<String> getMissingFields(Company company) {
+        List<String> missing = new ArrayList<>();
+
+        if (company.getLatitude() == null || company.getLongitude() == null) {
+            missing.add("CEP / Localização");
+        }
+
+        if (company.getTaxId() == null || company.getTaxId().isBlank()) {
+            missing.add("CNPJ");
+        }
+
+        if (company.getPhone() == null || company.getPhone().isBlank()) {
+            missing.add("Telefone");
+        }
+
+        if (company.getDescription() == null || company.getDescription().isBlank()) {
+            missing.add("Descrição da empresa");
+        }
+
+        return missing;
     }
 }

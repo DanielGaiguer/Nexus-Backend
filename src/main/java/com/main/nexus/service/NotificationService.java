@@ -117,7 +117,7 @@ public class NotificationService {
             NotificationType.NEW_COMPANY_REGISTRATION,
             "Nova empresa aguardando aprovação",
             "A empresa \"" + companyName + "\" se cadastrou e está aguardando sua análise.",
-            "/admin/companies/" + companyId
+            "/admin/company/" + companyId
         );
     }
 
@@ -160,7 +160,19 @@ public class NotificationService {
             NotificationType.COMPLETE_YOUR_PROFILE,
             "Complete seu perfil para aparecer nas recomendações",
             "Seu perfil ainda está incompleto. Para aparecer nos rankings e receber oportunidades compatíveis, preencha: " + fieldList + ".",
-            "/profile"
+            "/pro/profile"
+        );
+    }
+
+    @Async
+    public void notifyIncompleteCompanyProfile(User user, List<String> missingFields) {
+        String fieldList = String.join(", ", missingFields);
+        notify(
+            user,
+            NotificationType.COMPLETE_YOUR_PROFILE,
+            "Complete o perfil da empresa para melhorar seus matches",
+            "O perfil da sua empresa ainda está incompleto. Para melhorar a qualidade dos matches com profissionais, preencha: " + fieldList + ".",
+            "/company/profile"
         );
     }
 

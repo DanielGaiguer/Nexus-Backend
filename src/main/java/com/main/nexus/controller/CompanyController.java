@@ -4,11 +4,15 @@ import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
+import com.main.nexus.model.enums.NotificationType;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.NotificationService;
+import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SupabaseStorageService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -39,9 +43,15 @@ public class CompanyController {
 
     @Autowired
     private GeolocationService geolocationService;
-    
+
     @Autowired
     private SupabaseStorageService supabaseStorageService;
+
+    @Autowired
+    private ProfileCompletionService profileCompletionService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @GetMapping("/profile")
     public ResponseEntity<CompanyProfileDTO> getProfile() {
@@ -58,10 +68,12 @@ public class CompanyController {
         UserDTO logged = getLoggedUser();
         Company existing = companyService.findByUserId(logged.id())
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
-        
+
         if (!existing.getTaxId().equals(request.taxId()) && companyService.existsByTaxId(request.taxId())) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Tax ID already in use.");
         }
+
+        boolean wasIncomplete = !profileCompletionService.isProfileComplete(existing);
 
         existing.setCompanyName(request.companyName());
         existing.setPhone(request.phone());
@@ -78,6 +90,25 @@ public class CompanyController {
         }
 
         companyService.update(existing);
+
+        // Se o perfil estava incompleto e agora está completo, notifica
+        boolean nowComplete = profileCompletionService.isProfileComplete(existing);
+        if (wasIncomplete && nowComplete) {
+            notificationService.notify(
+                existing.getUser(),
+                NotificationType.COMPLETE_YOUR_PROFILE,
+                "Perfil completo!",
+                "Parabéns! O perfil da sua empresa está completo, o que melhora a qualidade dos matches com profissionais.",
+                "/company/profile"
+            );
+        }
+
+        // Se ainda incompleto, lembra o que falta
+        if (!nowComplete) {
+            List<String> missing = profileCompletionService.getMissingFields(existing);
+            notificationService.notifyIncompleteCompanyProfile(existing.getUser(), missing);
+        }
+
         return ResponseEntity.ok(toProfileDTO(existing));
     }
 
