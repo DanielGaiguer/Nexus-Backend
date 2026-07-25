@@ -493,13 +493,9 @@ public class MatchService {
         match.setStatus(StatusMatch.MATCHED);
         incrementFilledPositions(match.getProject());
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
-        notificationService.notifyMatchConfirmed(
-            match.getProfessional().getUser(),
-            match.getProject().getCompany().getCompanyName(),
-            match.getProject().getTitle(),
-            match.getId()
-        );
-        return matchRepository.save(match);
+        Match saved = matchRepository.save(match);
+        notifyMutualMatch(saved);
+        return saved;
     }
 
     public Match companyRejectsWithFeedback(Long matchId, Long companyId, List<CompanyRejectionReason> reasons) {
@@ -535,13 +531,9 @@ public class MatchService {
         match.setStatus(StatusMatch.MATCHED);
         incrementFilledPositions(match.getProject());
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
-        notificationService.notifyMatchConfirmed(
-            match.getProject().getCompany().getUser(),
-            match.getProfessional().getName(),
-            match.getProject().getTitle(),
-            match.getId()
-        );
-        return matchRepository.save(match);
+        Match saved = matchRepository.save(match);
+        notifyMutualMatch(saved);
+        return saved;
     }
 
     public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, List<ProfessionalRejectionReason> reasons) {
@@ -821,23 +813,21 @@ public class MatchService {
         notificationService.notifyMatchConfirmed(
             match.getProject().getCompany().getUser(), professionalName, projectTitle, match.getId());
 
-        if (match.getInitiatedBy() == InitiatedBy.PROFESSIONAL) {
-            emailService.send(
-                professionalEmail,
-                "Seu interesse foi correspondido! — Nexus",
-                "Olá " + professionalName + ",\n\n" +
-                companyName + " também demonstrou interesse em você para o projeto \"" + projectTitle + "\".\n\n" +
-                "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
-            );
-        } else if (match.getInitiatedBy() == InitiatedBy.COMPANY) {
-            emailService.send(
-                companyEmail,
-                "Seu interesse foi correspondido! — Nexus",
-                "Olá " + companyName + ",\n\n" +
-                professionalName + " também demonstrou interesse no projeto \"" + projectTitle + "\".\n\n" +
-                "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
-            );
-        }
+        emailService.send(
+            professionalEmail,
+            "Match confirmado! — Nexus",
+            "Olá " + professionalName + ",\n\n" +
+            companyName + " também demonstrou interesse em você para o projeto \"" + projectTitle + "\".\n\n" +
+            "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
+        );
+
+        emailService.send(
+            companyEmail,
+            "Match confirmado! — Nexus",
+            "Olá " + companyName + ",\n\n" +
+            professionalName + " também demonstrou interesse no projeto \"" + projectTitle + "\".\n\n" +
+            "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
+        );
     }
     
     private void incrementFilledPositions(Project project) {

@@ -111,6 +111,16 @@ public class NotificationService {
         );
     }
 
+    public void notifyNewCompanyRegistration(User adminUser, String companyName, Long companyId) {
+        notify(
+            adminUser,
+            NotificationType.NEW_COMPANY_REGISTRATION,
+            "Nova empresa aguardando aprovação",
+            "A empresa \"" + companyName + "\" se cadastrou e está aguardando sua análise.",
+            "/admin/companies/" + companyId
+        );
+    }
+
     public void notifyCompanyApproved(User companyUser, String companyName) {
         notify(
             companyUser,

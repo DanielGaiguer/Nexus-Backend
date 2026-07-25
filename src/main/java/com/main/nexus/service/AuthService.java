@@ -222,14 +222,16 @@ public class AuthService {
 
         company.setDescription(request.description());
         company.setStatus(CompanyStatus.PENDING);
-        companyService.save(company);
-        
+        Company savedCompany = companyService.save(company);
+
         emailService.send(
             savedUser.getEmail(),
             "Cadastro recebido — Nexus",
             "Olá " + request.companyName() + ",\n\nSeu cadastro foi recebido e está em análise pelo administrador. " +
             "Você receberá um e-mail assim que sua conta for aprovada.\n\nEquipe Nexus"
         );
+
+        notifyAdminsOfNewCompany(savedCompany);
     }
 
     public LoginResponseDTO login(LoginRequestDTO request) {
@@ -552,7 +554,7 @@ public class AuthService {
         if (ticket.picture() != null && !ticket.picture().isBlank()) {
             company.setProfilePhotoUrl(ticket.picture());
         }
-        companyService.save(company);
+        Company savedCompany = companyService.save(company);
 
         emailService.send(
             savedUser.getEmail(),
@@ -560,6 +562,25 @@ public class AuthService {
             "Olá " + request.companyName() + ",\n\nSeu cadastro foi recebido e está em análise pelo administrador. "
             + "Você receberá um e-mail assim que sua conta for aprovada.\n\nEquipe Nexus"
         );
+
+        notifyAdminsOfNewCompany(savedCompany);
+    }
+
+    // ── Notifica administradores sobre novo cadastro de empresa pendente ────
+    private void notifyAdminsOfNewCompany(Company company) {
+        List<User> admins = userRepository.findByType(UserType.ADMIN);
+
+        for (User admin : admins) {
+            notificationService.notifyNewCompanyRegistration(
+                admin, company.getCompanyName(), company.getId());
+
+            emailService.send(
+                admin.getEmail(),
+                "Nova empresa aguardando aprovação — Nexus",
+                "Olá,\n\nA empresa \"" + company.getCompanyName() + "\" acabou de se cadastrar no Nexus e está " +
+                "aguardando aprovação.\n\nAcesse o painel administrativo para analisar o cadastro.\n\nEquipe Nexus"
+            );
+        }
     }
 
     private String handleLinkedInLink(String code, String existingJwt) {
