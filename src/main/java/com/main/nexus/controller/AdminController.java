@@ -3,9 +3,11 @@ package com.main.nexus.controller;
 import com.main.nexus.dto.AdminDashboardDTO;
 import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
+import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.PreviousProjectRequestDTO;
 import com.main.nexus.dto.ProfessionalDashboardDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
+import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserSummaryDTO;
@@ -167,8 +169,12 @@ public class AdminController {
     }
 
     @GetMapping("/professionals/{id}/matches")
-    public ResponseEntity<List<Match>> getProfessionalMatches(@PathVariable Long id) {
-        return ResponseEntity.ok(matchService.getMatchesByProfessional(id));
+    public ResponseEntity<List<MatchResponseDTO>> getProfessionalMatches(@PathVariable Long id) {
+        List<MatchResponseDTO> matches = matchService.getMatchesByProfessional(id)
+                .stream()
+                .map(this::toMatchResponseDTO)
+                .toList();
+        return ResponseEntity.ok(matches);
     }
 
     @GetMapping("/professionals/{id}/profile")
@@ -225,8 +231,31 @@ public class AdminController {
     }
 
     @GetMapping("/companies/{id}/matches")
-    public ResponseEntity<List<Match>> getCompanyMatches(@PathVariable Long id) {
-        return ResponseEntity.ok(matchService.getMatchesByCompany(id));
+    public ResponseEntity<List<MatchResponseDTO>> getCompanyMatches(@PathVariable Long id) {
+        List<MatchResponseDTO> matches = matchService.getMatchesByCompany(id)
+                .stream()
+                .map(this::toMatchResponseDTO)
+                .toList();
+        return ResponseEntity.ok(matches);
+    }
+
+    private MatchResponseDTO toMatchResponseDTO(Match m) {
+        Professional professional = m.getProfessional();
+        return new MatchResponseDTO(
+                m.getId(),
+                m.getMatchScore(),
+                m.getCompanyStatus(),
+                m.getProfessionalStatus(),
+                m.getStatus(),
+                m.getCreatedAt(),
+                toResponseDTO(m.getProject()),
+                new ProfessionalSummaryDTO(
+                        professional.getId(),
+                        professional.getName(),
+                        professional.getPhone(),
+                        professional.getReputation()
+                )
+        );
     }
 
     private ProjectResponseDTO toResponseDTO(Project p) {
