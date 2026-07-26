@@ -1,10 +1,14 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.MatchResponseDTO;
+import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectRequestDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
+import com.main.nexus.model.Match;
+import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.Skill;
 import com.main.nexus.service.CompanyService;
@@ -156,7 +160,7 @@ public class ProjectController {
     }
 
     @GetMapping("/{id}/ranking")
-    public ResponseEntity<?> getRanking(
+    public ResponseEntity<List<MatchResponseDTO>> getRanking(
             @PathVariable Long id,
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String uf,
@@ -175,11 +179,13 @@ public class ProjectController {
                 || minSalary != null
                 || maxSalary != null
                 || (skill != null && !skill.isBlank());
-        if (hasFilters) {
-            return ResponseEntity.ok(matchService.getRankingByProjectWithFilters(
-                    id, city, uf, experienceLevel, available, minSalary, maxSalary, skill));
-        }
-        return ResponseEntity.ok(matchService.getRankingByProject(id));
+
+        List<Match> matches = hasFilters
+                ? matchService.getRankingByProjectWithFilters(
+                        id, city, uf, experienceLevel, available, minSalary, maxSalary, skill)
+                : matchService.getRankingByProject(id);
+
+        return ResponseEntity.ok(matches.stream().map(this::toMatchResponseDTO).toList());
     }
 
     @DeleteMapping("/{id}")
@@ -231,6 +237,25 @@ public class ProjectController {
                 p.getStartDate(),
                 p.getWorkloadHoursPerWeek(),
                 null
+        );
+    }
+
+    private MatchResponseDTO toMatchResponseDTO(Match m) {
+        Professional professional = m.getProfessional();
+        return new MatchResponseDTO(
+                m.getId(),
+                m.getMatchScore(),
+                m.getCompanyStatus(),
+                m.getProfessionalStatus(),
+                m.getStatus(),
+                m.getCreatedAt(),
+                toResponseDTO(m.getProject()),
+                new ProfessionalSummaryDTO(
+                        professional.getId(),
+                        professional.getName(),
+                        professional.getPhone(),
+                        professional.getReputation()
+                )
         );
     }
 

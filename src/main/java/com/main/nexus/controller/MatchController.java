@@ -1,8 +1,17 @@
 package com.main.nexus.controller;
 
 import com.main.nexus.dto.MatchHistoryDTO;
+import com.main.nexus.dto.MatchResponseDTO;
+import com.main.nexus.dto.ProfessionalSummaryDTO;
+import com.main.nexus.dto.ProjectResponseDTO;
+import com.main.nexus.dto.PublicCompanyDTO;
+import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
+import com.main.nexus.model.Company;
+import com.main.nexus.model.Match;
 import com.main.nexus.model.MatchHistory;
+import com.main.nexus.model.Professional;
+import com.main.nexus.model.Project;
 import com.main.nexus.model.enums.CompanyRejectionReason;
 import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.service.CompanyService;
@@ -35,8 +44,8 @@ public class MatchController {
     private CompanyService companyService;
 
     @GetMapping("/{matchId}")
-    public ResponseEntity<?> findById(@PathVariable Long matchId) {
-        return ResponseEntity.ok(matchService.findById(matchId));
+    public ResponseEntity<MatchResponseDTO> findById(@PathVariable Long matchId) {
+        return ResponseEntity.ok(toMatchResponseDTO(matchService.findById(matchId)));
     }
 
     @GetMapping("/{matchId}/history")
@@ -95,6 +104,79 @@ public class MatchController {
         Long professionalId = getLoggedProfessionalId();
         matchService.professionalRejectsWithFeedback(matchId, professionalId, reasons);
         return ResponseEntity.ok("Invite rejected.");
+    }
+
+    // ── Conversão para DTO ───────────────────────────────────────────────────
+
+    private MatchResponseDTO toMatchResponseDTO(Match m) {
+        Professional professional = m.getProfessional();
+        return new MatchResponseDTO(
+                m.getId(),
+                m.getMatchScore(),
+                m.getCompanyStatus(),
+                m.getProfessionalStatus(),
+                m.getStatus(),
+                m.getCreatedAt(),
+                toProjectResponseDTO(m.getProject()),
+                new ProfessionalSummaryDTO(
+                        professional.getId(),
+                        professional.getName(),
+                        professional.getPhone(),
+                        professional.getReputation()
+                )
+        );
+    }
+
+    private ProjectResponseDTO toProjectResponseDTO(Project p) {
+        Company c = p.getCompany();
+        PublicCompanyDTO companyDTO = new PublicCompanyDTO(
+                c.getId(),
+                c.getCompanyName(),
+                c.getDescription(),
+                c.getCity(),
+                c.getUf(),
+                c.getReputation(),
+                c.getProfilePhotoUrl()
+        );
+        return new ProjectResponseDTO(
+                p.getId(),
+                p.getTitle(),
+                p.getDescription(),
+                p.getWorkMode(),
+                p.getExperienceLevel(),
+                p.getStatus(),
+                p.getMaxPositions(),
+                p.getFilledPositions(),
+                p.getCreatedAt(),
+                p.getOpportunityType(),
+                p.getRequiredSkills().stream()
+                        .map(skill -> new SkillResponseDTO(
+                                skill.getId(),
+                                skill.getName(),
+                                skill.getCategory()
+                        ))
+                        .toList(),
+                c.getId(),
+                c.getCompanyName(),
+
+                p.getCep() != null ? p.getCep() : c.getCep(),
+                p.getEffectiveLatitude(),
+                p.getEffectiveLongitude(),
+                p.getEffectiveCity(),
+                p.getEffectiveUf(),
+
+                p.getMinimumBudget(),
+                p.getMaximumBudget(),
+                p.getDeadline(),
+
+                p.getMonthlySalaryMin(),
+                p.getMonthlySalaryMax(),
+                p.getContractType(),
+                p.getBenefits(),
+                p.getStartDate(),
+                p.getWorkloadHoursPerWeek(),
+                companyDTO
+        );
     }
 
     // ── Utilitários de identidade ────────────────────────────────────────────

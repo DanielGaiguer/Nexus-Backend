@@ -1,5 +1,6 @@
 package com.main.nexus.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.main.nexus.model.enums.ContractType;
 import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.Modality;
@@ -13,7 +14,7 @@ public record ProjectResponseDTO(
         Long id,
         String title,
         String description,
-        Modality workMode,
+        @JsonProperty("modality") Modality workMode,
         ExperienceLevel experienceLevel,
         ProjectStatus status,
         Integer maxPositions,

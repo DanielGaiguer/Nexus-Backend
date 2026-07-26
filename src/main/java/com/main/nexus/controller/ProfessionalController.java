@@ -1,11 +1,19 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.PreviousProjectRequestDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.ProfessionalStatsDTO;
+import com.main.nexus.dto.ProfessionalSummaryDTO;
+import com.main.nexus.dto.ProjectResponseDTO;
+import com.main.nexus.dto.PublicCompanyDTO;
+import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
+import com.main.nexus.model.Company;
+import com.main.nexus.model.Match;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
+import com.main.nexus.model.Project;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.NotificationType;
@@ -205,22 +213,24 @@ public class ProfessionalController {
     }
 
     @GetMapping("/matches")
-    public ResponseEntity<?> getMatches() {
+    public ResponseEntity<List<MatchResponseDTO>> getMatches() {
         UserDTO logged = getLoggedUser();
         Professional professional = professionalService.findByUserId(logged.id())
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
 
-        return ResponseEntity.ok(matchService.getMatchesByProfessional(professional.getId()));
+        return ResponseEntity.ok(matchService.getMatchesByProfessional(professional.getId())
+                .stream().map(this::toMatchResponseDTO).toList());
     }
 
     @GetMapping("/matches/invites")
-    public ResponseEntity<?> getPendingInvites() {
+    public ResponseEntity<List<MatchResponseDTO>> getPendingInvites() {
         UserDTO logged = getLoggedUser();
         Professional professional = professionalService.findByUserId(logged.id())
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
 
         return ResponseEntity.ok(
-                matchService.getPendingInvitesForProfessional(professional.getId()));
+                matchService.getPendingInvitesForProfessional(professional.getId())
+                        .stream().map(this::toMatchResponseDTO).toList());
     }
 
     @GetMapping("/stats")
@@ -269,7 +279,78 @@ public class ProfessionalController {
                 .getAuthentication()
                 .getPrincipal();
     }
-    
+
+    private MatchResponseDTO toMatchResponseDTO(Match m) {
+        Professional professional = m.getProfessional();
+        return new MatchResponseDTO(
+                m.getId(),
+                m.getMatchScore(),
+                m.getCompanyStatus(),
+                m.getProfessionalStatus(),
+                m.getStatus(),
+                m.getCreatedAt(),
+                toProjectResponseDTO(m.getProject()),
+                new ProfessionalSummaryDTO(
+                        professional.getId(),
+                        professional.getName(),
+                        professional.getPhone(),
+                        professional.getReputation()
+                )
+        );
+    }
+
+    private ProjectResponseDTO toProjectResponseDTO(Project p) {
+        Company c = p.getCompany();
+        PublicCompanyDTO companyDTO = new PublicCompanyDTO(
+                c.getId(),
+                c.getCompanyName(),
+                c.getDescription(),
+                c.getCity(),
+                c.getUf(),
+                c.getReputation(),
+                c.getProfilePhotoUrl()
+        );
+        return new ProjectResponseDTO(
+                p.getId(),
+                p.getTitle(),
+                p.getDescription(),
+                p.getWorkMode(),
+                p.getExperienceLevel(),
+                p.getStatus(),
+                p.getMaxPositions(),
+                p.getFilledPositions(),
+                p.getCreatedAt(),
+                p.getOpportunityType(),
+                p.getRequiredSkills().stream()
+                        .map(skill -> new SkillResponseDTO(
+                                skill.getId(),
+                                skill.getName(),
+                                skill.getCategory()
+                        ))
+                        .toList(),
+                c.getId(),
+                c.getCompanyName(),
+
+                p.getCep() != null ? p.getCep() : c.getCep(),
+                p.getEffectiveLatitude(),
+                p.getEffectiveLongitude(),
+                p.getEffectiveCity(),
+                p.getEffectiveUf(),
+
+                p.getMinimumBudget(),
+                p.getMaximumBudget(),
+                p.getDeadline(),
+
+                p.getMonthlySalaryMin(),
+                p.getMonthlySalaryMax(),
+                p.getContractType(),
+                p.getBenefits(),
+                p.getStartDate(),
+                p.getWorkloadHoursPerWeek(),
+                companyDTO
+        );
+    }
+
     private ProfessionalProfileDTO toProfileDTO(Professional p) {
         List<String> missing = profileCompletionService.getMissingFields(p);
         return new ProfessionalProfileDTO(
@@ -301,13 +382,14 @@ public class ProfessionalController {
 
     // Lista oportunidades compatíveis — "projetos vistos por mim"
     @GetMapping("/opportunities")
-    public ResponseEntity<?> getOpportunities() {
+    public ResponseEntity<List<MatchResponseDTO>> getOpportunities() {
         UserDTO logged = getLoggedUser();
         Professional professional = professionalService.findByUserId(logged.id())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Profile not found"));
 
-        return ResponseEntity.ok(matchService.getOpportunitiesForProfessional(professional.getId()));
+        return ResponseEntity.ok(matchService.getOpportunitiesForProfessional(professional.getId())
+                .stream().map(this::toMatchResponseDTO).toList());
     }
 
     // Profissional demonstra interesse em um projeto
