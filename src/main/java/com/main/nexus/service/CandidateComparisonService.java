@@ -9,7 +9,7 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.Skill;
-import com.main.nexus.model.enums.Modality;
+import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
@@ -35,6 +35,7 @@ public class CandidateComparisonService {
     @Autowired
     private MatchService matchService;
 
+    private static final int MIN_CANDIDATES = 2;
     private static final int MAX_CANDIDATES = 5;
 
     public CandidateComparisonResponseDTO compare(
@@ -43,6 +44,11 @@ public class CandidateComparisonService {
         if (request.matchIds() == null || request.matchIds().isEmpty()) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "At least one match ID is required.");
+        }
+
+        if (request.matchIds().size() < MIN_CANDIDATES) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "At least " + MIN_CANDIDATES + " candidates are required to compare.");
         }
 
         if (request.matchIds().size() > MAX_CANDIDATES) {
@@ -86,8 +92,11 @@ public class CandidateComparisonService {
                 requiredSkillNames,
                 project.getWorkMode() != null ? project.getWorkMode().name() : null,
                 project.getExperienceLevel() != null ? project.getExperienceLevel().name() : null,
+                project.getOpportunityType() != null ? project.getOpportunityType().name() : null,
                 project.getMinimumBudget(),
                 project.getMaximumBudget(),
+                project.getMonthlySalaryMin(),
+                project.getMonthlySalaryMax(),
                 candidates
         );
     }
@@ -117,8 +126,8 @@ public class CandidateComparisonService {
                 .findByProfessionalId(professional.getId())
                 .orElse(null);
 
-        ScoreBreakdownDTO breakdown = buildScoreBreakdown(professional, project, match);
-        Double expectedSalary = matchService.calculateExpectedSalary(professional, project);
+        ScoreBreakdownDTO breakdown = matchService.getScoreBreakdown(professional, project, match);
+        SalaryRange salaryRange = resolveSalaryRange(professional, project);
 
         return new CandidateComparisonItemDTO(
                 match.getId(),
@@ -132,8 +141,8 @@ public class CandidateComparisonService {
                 metrics != null ? metrics.getConfidenceScore() != null
                         ? metrics.getConfidenceScore() * 100 : 0.0 : 0.0,
                 metrics != null ? metrics.getTotalReviews() : 0,
-                expectedSalary,
-                expectedSalary,
+                salaryRange.min(),
+                salaryRange.max(),
                 professionalSkillNames,
                 matchingSkills,
                 missingSkills,
@@ -144,71 +153,25 @@ public class CandidateComparisonService {
         );
     }
 
-    // ── Reconstrói o breakdown de score componente a componente ──────────────
+    // ── Faixa de pretensão salarial relevante para o regime da vaga/projeto ──
+    // CLT/PJ são valores únicos (min = max); freelance/temporário e PROJECT
+    // usam a faixa min/max informada pelo profissional.
 
-    private ScoreBreakdownDTO buildScoreBreakdown(
-            Professional professional, Project project, Match match) {
+    private record SalaryRange(Double min, Double max) {}
 
-        double skillScore        = matchService.calculateSkillScore(professional, project);
-        double budgetScore       = matchService.calculateBudgetScore(professional, project);
-        double historyScore      = matchService.calculateHistoryScore(professional);
-        double reputationScore   = matchService.calculateReputationScore(professional);
-        double availabilityScore = matchService.calculateAvailabilityScore(professional);
-
-        boolean considersDistance   = project.getWorkMode() == Modality.ONSITE
-                                    || project.getWorkMode() == Modality.HYBRID;
-        boolean considersExperience = project.getExperienceLevel() != null;
-
-        Double distanceScore   = considersDistance
-                ? matchService.calculateDistanceScore(professional, project) : null;
-        Double experienceScore = considersExperience
-                ? matchService.calculateExperienceScore(professional, project) : null;
-
-        double baseScore = computeBaseScore(
-                skillScore, budgetScore, historyScore, reputationScore,
-                availabilityScore, distanceScore, experienceScore,
-                considersDistance, considersExperience);
-
-        double reputationAdjustment = match.getMatchScore() - baseScore;
-
-        return new ScoreBreakdownDTO(
-                round(skillScore),
-                round(budgetScore),
-                round(historyScore),
-                round(reputationScore),
-                round(availabilityScore),
-                distanceScore   != null ? round(distanceScore)   : null,
-                experienceScore != null ? round(experienceScore) : null,
-                round(reputationAdjustment),
-                round(match.getMatchScore())
-        );
-    }
-
-    private double computeBaseScore(
-            double skill, double budget, double history,
-            double reputation, double availability,
-            Double distance, Double experience,
-            boolean considersDistance, boolean considersExperience) {
-
-        if (considersDistance && considersExperience) {
-            return (skill * 0.26) + (budget * 0.18) + (history * 0.15)
-                 + (reputation * 0.08) + (availability * 0.08)
-                 + (distance   * 0.13) + (experience  * 0.12);
-        } else if (considersDistance) {
-            return (skill * 0.30) + (budget * 0.20) + (history * 0.17)
-                 + (reputation * 0.09) + (availability * 0.09)
-                 + (distance * 0.15);
-        } else if (considersExperience) {
-            return (skill * 0.30) + (budget * 0.22) + (history * 0.18)
-                 + (reputation * 0.09) + (availability * 0.09)
-                 + (experience * 0.12);
-        } else {
-            return (skill * 0.35) + (budget * 0.25) + (history * 0.20)
-                 + (reputation * 0.10) + (availability * 0.10);
+    private SalaryRange resolveSalaryRange(Professional professional, Project project) {
+        if (project.getOpportunityType() == OpportunityType.JOB && project.getContractType() != null) {
+            return switch (project.getContractType()) {
+                case CLT, INTERNSHIP -> new SalaryRange(
+                        professional.getExpectedSalaryCLT(), professional.getExpectedSalaryCLT());
+                case PJ -> new SalaryRange(
+                        professional.getExpectedSalaryPJ(), professional.getExpectedSalaryPJ());
+                case TEMPORARY, FREELANCER -> new SalaryRange(
+                        professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation());
+            };
         }
+        return new SalaryRange(
+                professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation());
     }
 
-    private double round(double value) {
-        return Math.round(value * 10.0) / 10.0;
-    }
 }

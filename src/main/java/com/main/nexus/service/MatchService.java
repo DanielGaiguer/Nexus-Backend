@@ -1,5 +1,6 @@
 package com.main.nexus.service;
 
+import com.main.nexus.dto.ScoreBreakdownDTO;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.MatchHistory;
 import com.main.nexus.model.Professional;
@@ -132,6 +133,81 @@ public class MatchService {
         double companyAdjustment = reputationService.getScoreAdjustment(project.getCompany().getId(), AuthorType.COMPANY);
 
         return baseScore * (1 + professionalAdjustment + companyAdjustment);
+    }
+
+    // ── Reconstrói o score componente a componente para exibição na UI ────────
+    // (ranking e comparação de candidatos usam o mesmo cálculo). O "finalScore"
+    // reaproveita match.getMatchScore() — o valor armazenado, o mesmo exibido em
+    // toda outra tela do sistema — para nunca divergir do que a empresa já viu
+    // em outro lugar. Os componentes individuais são recalculados "ao vivo",
+    // já que nunca são persistidos.
+
+    public ScoreBreakdownDTO getScoreBreakdown(Professional professional, Project project, Match match) {
+
+        double skillScore        = calculateSkillScore(professional, project);
+        double budgetScore       = calculateBudgetScore(professional, project);
+        double historyScore      = calculateHistoryScore(professional);
+        double reputationScore   = calculateReputationScore(professional);
+        double availabilityScore = calculateAvailabilityScore(professional);
+
+        boolean considersDistance   = project.getWorkMode() == Modality.ONSITE
+                                    || project.getWorkMode() == Modality.HYBRID;
+        boolean considersExperience = project.getExperienceLevel() != null;
+
+        Double distanceScore   = considersDistance
+                ? calculateDistanceScore(professional, project) : null;
+        Double experienceScore = considersExperience
+                ? calculateExperienceScore(professional, project) : null;
+
+        double baseScore = computeBaseScoreForBreakdown(
+                skillScore, budgetScore, historyScore, reputationScore,
+                availabilityScore, distanceScore, experienceScore,
+                considersDistance, considersExperience);
+
+        double reputationAdjustment = match.getMatchScore() - baseScore;
+
+        return new ScoreBreakdownDTO(
+                roundToOneDecimal(skillScore),
+                roundToOneDecimal(budgetScore),
+                roundToOneDecimal(historyScore),
+                roundToOneDecimal(reputationScore),
+                roundToOneDecimal(availabilityScore),
+                distanceScore   != null ? roundToOneDecimal(distanceScore)   : null,
+                experienceScore != null ? roundToOneDecimal(experienceScore) : null,
+                roundToOneDecimal(reputationAdjustment),
+                roundToOneDecimal(match.getMatchScore())
+        );
+    }
+
+    // Mesma fórmula de ponderação usada em getScore(), mas sem o multiplicador
+    // de reputação — aqui isolamos o "base score" para poder mostrar o quanto
+    // desse multiplicador contribuiu (reputationAdjustment) separadamente.
+    private double computeBaseScoreForBreakdown(
+            double skill, double budget, double history,
+            double reputation, double availability,
+            Double distance, Double experience,
+            boolean considersDistance, boolean considersExperience) {
+
+        if (considersDistance && considersExperience) {
+            return (skill * 0.26) + (budget * 0.18) + (history * 0.15)
+                 + (reputation * 0.08) + (availability * 0.08)
+                 + (distance   * 0.13) + (experience  * 0.12);
+        } else if (considersDistance) {
+            return (skill * 0.30) + (budget * 0.20) + (history * 0.17)
+                 + (reputation * 0.09) + (availability * 0.09)
+                 + (distance * 0.15);
+        } else if (considersExperience) {
+            return (skill * 0.30) + (budget * 0.22) + (history * 0.18)
+                 + (reputation * 0.09) + (availability * 0.09)
+                 + (experience * 0.12);
+        } else {
+            return (skill * 0.35) + (budget * 0.25) + (history * 0.20)
+                 + (reputation * 0.10) + (availability * 0.10);
+        }
+    }
+
+    private double roundToOneDecimal(double value) {
+        return Math.round(value * 10.0) / 10.0;
     }
 
     // Skills: quantas skills da vaga o profissional possui / total exigido * 100

@@ -295,7 +295,8 @@ public class ProfessionalController {
                         professional.getName(),
                         professional.getPhone(),
                         professional.getReputation()
-                )
+                ),
+                matchService.getScoreBreakdown(professional, m.getProject(), m)
         );
     }
 

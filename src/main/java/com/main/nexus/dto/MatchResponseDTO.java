@@ -12,5 +12,6 @@ public record MatchResponseDTO(
         StatusMatch status,
         LocalDateTime createdAt,
         ProjectResponseDTO project,
-        ProfessionalSummaryDTO professional
+        ProfessionalSummaryDTO professional,
+        ScoreBreakdownDTO scoreBreakdown
 ) {}

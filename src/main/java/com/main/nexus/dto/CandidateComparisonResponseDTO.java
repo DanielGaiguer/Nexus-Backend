@@ -9,7 +9,10 @@ public record CandidateComparisonResponseDTO(
         List<String> requiredSkills,
         String workMode,
         String experienceLevelRequired,
+        String opportunityType,
         Double minimumBudget,
         Double maximumBudget,
+        Double monthlySalaryMin,
+        Double monthlySalaryMax,
         List<CandidateComparisonItemDTO> candidates
 ) {}

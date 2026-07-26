@@ -254,7 +254,8 @@ public class AdminController {
                         professional.getName(),
                         professional.getPhone(),
                         professional.getReputation()
-                )
+                ),
+                null
         );
     }
 
