@@ -56,10 +56,15 @@ public class CompanyAnalyticsService {
     // ── 1. Resumo geral de matches ────────────────────────────────────────────
 
     private MatchSummaryDTO buildMatchSummary(Long companyId) {
-        long total     = matchRepository.countByCompanyId(companyId);
+        // WAITING é apenas o candidato pontuado automaticamente pelo ranking —
+        // nunca virou um convite/interesse real, então não deve contar como
+        // "match" nem inflar os pendentes (ver MatchService.generateRankingForProject).
+        long companyInterested      = matchRepository.countByCompanyIdAndStatus(companyId, StatusMatch.COMPANY_INTERESTED);
+        long professionalInterested = matchRepository.countByCompanyIdAndStatus(companyId, StatusMatch.PROFESSIONAL_INTERESTED);
         long confirmed = matchRepository.countByCompanyIdAndStatus(companyId, StatusMatch.MATCHED);
         long rejected  = matchRepository.countByCompanyIdAndStatus(companyId, StatusMatch.REJECTED);
-        long pending   = total - confirmed - rejected;
+        long pending   = companyInterested + professionalInterested;
+        long total     = pending + confirmed + rejected;
 
         double acceptanceRate = total > 0
                 ? Math.round((double) confirmed / total * 1000.0) / 10.0
@@ -153,7 +158,11 @@ public class CompanyAnalyticsService {
         List<ProjectAcceptanceRateDTO> result = new ArrayList<>();
 
         for (Project project : projects) {
-            List<Match> matches = matchRepository.findByProjectIdOrderByScore(project.getId());
+            // Exclui candidatos WAITING (nunca contatados) — mesma razão do buildMatchSummary()
+            List<Match> matches = matchRepository.findByProjectIdOrderByScore(project.getId())
+                    .stream()
+                    .filter(m -> m.getStatus() != StatusMatch.WAITING)
+                    .toList();
 
             if (matches.isEmpty()) continue;
 

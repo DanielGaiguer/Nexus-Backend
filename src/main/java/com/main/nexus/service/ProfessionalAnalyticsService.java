@@ -50,10 +50,15 @@ public class ProfessionalAnalyticsService {
     // ── 1. Resumo geral de matches ────────────────────────────────────────────
 
     private MatchSummaryDTO buildMatchSummary(Long professionalId) {
-        long total     = matchRepository.countByProfessionalId(professionalId);
+        // WAITING é apenas o candidato pontuado automaticamente pelo ranking/oportunidades —
+        // nunca virou um convite/interesse real, então não deve contar como "match"
+        // nem inflar os pendentes (ver MatchService.getOpportunitiesForProfessional).
+        long companyInterested      = matchRepository.countByProfessionalIdAndStatus(professionalId, StatusMatch.COMPANY_INTERESTED);
+        long professionalInterested = matchRepository.countByProfessionalIdAndStatus(professionalId, StatusMatch.PROFESSIONAL_INTERESTED);
         long confirmed = matchRepository.countByProfessionalIdAndStatus(professionalId, StatusMatch.MATCHED);
         long rejected  = matchRepository.countByProfessionalIdAndStatus(professionalId, StatusMatch.REJECTED);
-        long pending   = total - confirmed - rejected;
+        long pending   = companyInterested + professionalInterested;
+        long total     = pending + confirmed + rejected;
 
         double acceptanceRate = total > 0
                 ? Math.round((double) confirmed / total * 1000.0) / 10.0
@@ -144,7 +149,10 @@ public class ProfessionalAnalyticsService {
     // gerado vários matches com o profissional em projetos diferentes.
 
     private List<CompanyAcceptanceRateDTO> buildAcceptanceRatePerCompany(Long professionalId) {
-        List<Match> matches = matchRepository.findByProfessionalId(professionalId);
+        // Exclui candidatos WAITING (nunca contatados) — mesma razão do buildMatchSummary()
+        List<Match> matches = matchRepository.findByProfessionalId(professionalId).stream()
+                .filter(m -> m.getStatus() != StatusMatch.WAITING)
+                .toList();
 
         Map<Long, List<Match>> byCompany = new LinkedHashMap<>();
         Map<Long, String> companyNames = new LinkedHashMap<>();
