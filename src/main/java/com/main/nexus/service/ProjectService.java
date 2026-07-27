@@ -133,6 +133,30 @@ public class ProjectService {
                 ));
     }
 
+    // ── Reativa um projeto encerrado — opcionalmente ajustando o nº de posições,
+    // já que a vaga costuma ter sido encerrada por estar totalmente preenchida ──
+    public Project reopenProject(Long id, Long companyId, Integer newMaxPositions) {
+        Project project = findByIdAndCompany(id, companyId);
+
+        if (project.getStatus() != ProjectStatus.CLOSED) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Only closed projects can be reactivated.");
+        }
+
+        if (newMaxPositions != null) {
+            if (newMaxPositions < project.getFilledPositions()) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Maximum positions cannot be less than filled positions.");
+            }
+            project.setMaxPositions(newMaxPositions);
+        }
+
+        project.setStatus(ProjectStatus.OPEN);
+        Project saved = projectRepository.save(project);
+        matchService.recalculateRankingForProject(saved);
+        return saved;
+    }
+
     public void delete(Long id, Long companyId) {
         Project project = findByIdAndCompany(id, companyId);
         projectRepository.delete(project);

@@ -35,6 +35,10 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/public/**").permitAll()
 
+                // Reputação agregada não contém dados sensíveis — pode ser exibida
+                // nas páginas públicas de perfil sem exigir autenticação
+                .requestMatchers(HttpMethod.GET, "/api/reputation/**").permitAll()
+
                 // Export de PDF: qualquer autenticado pode baixar
                 .requestMatchers("/api/professional/profile/export").authenticated()
                     
@@ -46,13 +50,24 @@ public class SecurityConfig {
                 // Admin pode ver perfil de profissional por ID
                 .requestMatchers("/api/professional/*/admin-profile").hasRole("ADMIN")
 
+                // Regras específicas de /api/professional e /api/company precisam vir
+                // ANTES das regras amplas hasRole abaixo — do contrário a regra ampla
+                // (que também casa com esses paths) sempre vence primeiro e a específica
+                // nunca é avaliada (era o caso do download de currículo por empresas).
+                .requestMatchers("/api/professional/*/resume").hasAnyRole("PROFESSIONAL", "COMPANY")
+                .requestMatchers("/api/professional/*/contact").hasRole("COMPANY")
+                .requestMatchers("/api/company/*/contact").hasRole("PROFESSIONAL")
+
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/company/**").hasRole("COMPANY")
                 .requestMatchers("/api/projects/**").hasRole("COMPANY")
                 .requestMatchers("/api/professional/**").hasRole("PROFESSIONAL")
                 .requestMatchers(HttpMethod.POST, "/api/professional/resume").hasRole("PROFESSIONAL")
-                    
+
                 .requestMatchers("/api/comparison/**").hasRole("COMPANY")
+
+                .requestMatchers(HttpMethod.GET, "/api/score/preview").hasRole("COMPANY")
+                .requestMatchers(HttpMethod.GET, "/api/score/preview/self").hasRole("PROFESSIONAL")
                     
                 .requestMatchers(HttpMethod.POST,   "/api/professional/profile/photo").hasRole("PROFESSIONAL")
                 .requestMatchers(HttpMethod.DELETE, "/api/professional/profile/photo").hasRole("PROFESSIONAL")
@@ -71,10 +86,7 @@ public class SecurityConfig {
                 // Reviews: ambos podem avaliar
                 .requestMatchers("/api/reviews/**").hasAnyRole("COMPANY", "PROFESSIONAL")
                 
-                 //Dowload de curriculo para profissionais e empresas
-                .requestMatchers("/api/professional/*/resume").hasAnyRole("PROFESSIONAL", "COMPANY")
-                    
-                 //Libera o mapa para profissional, empresa e admin   
+                 //Libera o mapa para profissional, empresa e admin
                  .requestMatchers("/api/map/**").hasAnyRole("PROFESSIONAL", "COMPANY", "ADMIN")
 
                 .anyRequest().authenticated()

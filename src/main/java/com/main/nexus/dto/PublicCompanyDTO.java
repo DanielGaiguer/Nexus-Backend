@@ -7,5 +7,8 @@ public record PublicCompanyDTO(
         String city,
         String uf,
         Double reputation,
-        String profilePhotoUrl
+        String profilePhotoUrl,
+        ReputationExplanationDTO reputationDetails,
+        String taxId,
+        String status
 ) {}

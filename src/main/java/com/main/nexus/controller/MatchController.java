@@ -88,6 +88,13 @@ public class MatchController {
         return ResponseEntity.ok("Invite rejected.");
     }
 
+    @PostMapping("/{matchId}/company-cancel")
+    public ResponseEntity<String> companyCancels(@PathVariable Long matchId) {
+        Long companyId = getLoggedCompanyId();
+        matchService.companyCancelsMatch(matchId, companyId);
+        return ResponseEntity.ok("Match cancelled.");
+    }
+
     // ── Profissional responde a um interesse da empresa ─────────────────────
 
     @PostMapping("/{matchId}/professional-accept")
@@ -137,7 +144,10 @@ public class MatchController {
                 c.getCity(),
                 c.getUf(),
                 c.getReputation(),
-                c.getProfilePhotoUrl()
+                c.getProfilePhotoUrl(),
+                null,
+                c.getTaxId(),
+                c.getStatus().name()
         );
         return new ProjectResponseDTO(
                 p.getId(),

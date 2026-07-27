@@ -12,5 +12,10 @@ public record PublicProfessionalDTO(
         Boolean available,
         List<String> skills,
         List<PublicProjectDTO> previousProjects,
-        Double overallScore
+        Double overallScore,
+        ReputationExplanationDTO reputationDetails,
+        String profilePhotoUrl,
+        Double minimumSalary,
+        Double maximumSalary,
+        List<String> preferredTypes
 ) {}

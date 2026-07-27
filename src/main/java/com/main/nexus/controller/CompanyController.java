@@ -2,13 +2,16 @@ package com.main.nexus.controller;
 
 import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
+import com.main.nexus.dto.ContactInfoDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
+import com.main.nexus.model.Professional;
 import com.main.nexus.model.enums.NotificationType;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.NotificationService;
+import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SupabaseStorageService;
@@ -19,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,6 +41,9 @@ public class CompanyController {
 
     @Autowired
     private ProjectService projectService;
+
+    @Autowired
+    private ProfessionalService professionalService;
 
     @Autowired
     private MatchService matchService;
@@ -131,7 +138,26 @@ public class CompanyController {
                 .getAuthentication()
                 .getPrincipal();
     }
-    
+
+    // Contato (telefone/e-mail) — só liberado para profissional com match confirmado
+    @GetMapping("/{companyId}/contact")
+    public ResponseEntity<ContactInfoDTO> getContact(@PathVariable Long companyId) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Professional profile not found"));
+
+        Company company = companyService.findById(companyId);
+
+        if (!matchService.hasConfirmedMatchBetween(companyId, professional.getId())) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "Contact info is only available after a confirmed match.");
+        }
+
+        return ResponseEntity.ok(new ContactInfoDTO(
+                company.getPhone(), company.getUser().getEmail()));
+    }
+
     @PostMapping("/profile/photo")
     public ResponseEntity<String> uploadProfilePhoto(
             @RequestParam("file") MultipartFile file) {

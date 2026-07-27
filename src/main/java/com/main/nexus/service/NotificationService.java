@@ -75,6 +75,28 @@ public class NotificationService {
         );
     }
 
+    public void notifyMatchCancelled(User user,
+                                     String otherPartyName, String projectTitle) {
+        notify(
+            user,
+            NotificationType.MATCH_CANCELLED,
+            "Match cancelado",
+            otherPartyName + " cancelou o match confirmado no projeto \"" + projectTitle + "\".",
+            "/matches"
+        );
+    }
+
+    public void notifyInviteCancelled(User user,
+                                      String companyName, String projectTitle) {
+        notify(
+            user,
+            NotificationType.INVITE_REJECTED,
+            "Convite cancelado",
+            companyName + " cancelou o convite enviado para o projeto \"" + projectTitle + "\".",
+            "/matches"
+        );
+    }
+
     public void notifyInviteRejected(User user,
                                      String otherPartyName, String projectTitle) {
         notify(
@@ -108,6 +130,19 @@ public class NotificationService {
             String.format("O projeto \"%s\" da empresa %s tem %.0f%% de compatibilidade com o seu perfil.",
                     projectTitle, companyName, score),
             "/opportunities/" + projectId
+        );
+    }
+
+    public void notifyHighScoreCandidate(User companyUser,
+                                         String professionalName, String projectTitle,
+                                         double score, Long projectId) {
+        notify(
+            companyUser,
+            NotificationType.HIGH_SCORE_CANDIDATE,
+            "Novo candidato muito compatível!",
+            String.format("%s tem %.0f%% de compatibilidade com o seu projeto \"%s\".",
+                    professionalName, score, projectTitle),
+            "/company/projects/" + projectId + "/ranking"
         );
     }
 

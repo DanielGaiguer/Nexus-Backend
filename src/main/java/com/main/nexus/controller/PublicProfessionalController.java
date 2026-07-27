@@ -4,12 +4,16 @@ import com.main.nexus.dto.PublicCompanyDTO;
 import com.main.nexus.dto.PublicProfessionalDTO;
 import com.main.nexus.dto.PublicProjectDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
+import com.main.nexus.dto.ReputationExplanationDTO;
 import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.ReputationMetrics;
+import com.main.nexus.model.enums.CompanyStatus;
+import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
@@ -35,6 +39,9 @@ public class PublicProfessionalController {
     @Autowired
     private ProjectRepository projectRepository;
 
+    @Autowired
+    private CompanyRepository companyRepository;
+
     @GetMapping("/professional/{id}")
     public ResponseEntity<PublicProfessionalDTO> getProfessional(@PathVariable Long id) {
         Optional<Professional> optional = professionalRepository.findById(id);
@@ -58,9 +65,12 @@ public class PublicProfessionalController {
                         .toList()
                 : List.of();
 
-        Double overallScore = reputationMetricsRepository.findByProfessionalId(id)
-                .map(ReputationMetrics::getReputationScore)
-                .orElse(null);
+        ReputationMetrics metrics = reputationMetricsRepository.findByProfessionalId(id).orElse(null);
+        Double overallScore = metrics != null ? metrics.getReputationScore() : null;
+
+        List<String> preferredTypeNames = p.getPreferredTypes() != null
+                ? p.getPreferredTypes().stream().map(Enum::name).toList()
+                : List.of();
 
         PublicProfessionalDTO dto = new PublicProfessionalDTO(
                 p.getId(),
@@ -72,10 +82,30 @@ public class PublicProfessionalController {
                 p.getAvailable(),
                 skillNames,
                 previousProjects,
-                overallScore
+                overallScore,
+                metrics != null ? toReputationDTO(metrics) : null,
+                p.getProfilePhotoUrl(),
+                p.getFreelanceMinExpectation(),
+                p.getFreelanceMaxExpectation(),
+                preferredTypeNames
         );
 
         return ResponseEntity.ok(dto);
+    }
+
+    private ReputationExplanationDTO toReputationDTO(ReputationMetrics m) {
+        return new ReputationExplanationDTO(
+                m.getReputationScore(),
+                m.getConfidenceScore() != null ? m.getConfidenceScore() * 100 : 0.0,
+                m.getTotalReviews(),
+                m.getTechnicalCompetence(),
+                m.getCommunication(),
+                m.getReliability(),
+                m.getPunctuality(),
+                m.getProfessionalism(),
+                m.getSatisfactionAverage(),
+                m.getRecommendationRate()
+        );
     }
 
     @GetMapping("/opportunity/{id}")
@@ -100,7 +130,10 @@ public class PublicProfessionalController {
                 c.getCity(),
                 c.getUf(),
                 c.getReputation(),
-                c.getProfilePhotoUrl()
+                c.getProfilePhotoUrl(),
+                null,
+                c.getTaxId(),
+                c.getStatus().name()
         );
 
         ProjectResponseDTO dto = new ProjectResponseDTO(
@@ -145,5 +178,91 @@ public class PublicProfessionalController {
         );
 
         return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/company/{id}")
+    public ResponseEntity<PublicCompanyDTO> getCompany(@PathVariable Long id) {
+        Optional<Company> optional = companyRepository.findById(id);
+        if (optional.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Company c = optional.get();
+        if (c.getStatus() != CompanyStatus.APPROVED) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ReputationMetrics metrics = reputationMetricsRepository.findByCompanyId(id).orElse(null);
+
+        PublicCompanyDTO dto = new PublicCompanyDTO(
+                c.getId(),
+                c.getCompanyName(),
+                c.getDescription(),
+                c.getCity(),
+                c.getUf(),
+                c.getReputation(),
+                c.getProfilePhotoUrl(),
+                metrics != null ? toReputationDTO(metrics) : null,
+                c.getTaxId(),
+                c.getStatus().name()
+        );
+
+        return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/company/{id}/projects")
+    public ResponseEntity<List<ProjectResponseDTO>> getCompanyOpenProjects(@PathVariable Long id) {
+        Optional<Company> optional = companyRepository.findById(id);
+        if (optional.isEmpty() || optional.get().getStatus() != CompanyStatus.APPROVED) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Company c = optional.get();
+
+        List<ProjectResponseDTO> openProjects = projectRepository.findByCompanyId(id).stream()
+                .filter(project -> project.getStatus() == ProjectStatus.OPEN)
+                .map(project -> new ProjectResponseDTO(
+                        project.getId(),
+                        project.getTitle(),
+                        project.getDescription(),
+                        project.getWorkMode(),
+                        project.getExperienceLevel(),
+                        project.getStatus(),
+                        project.getMaxPositions(),
+                        project.getFilledPositions(),
+                        project.getCreatedAt(),
+                        project.getOpportunityType(),
+                        project.getRequiredSkills().stream()
+                                .map(skill -> new SkillResponseDTO(
+                                        skill.getId(),
+                                        skill.getName(),
+                                        skill.getCategory()
+                                ))
+                                .toList(),
+                        c.getId(),
+                        c.getCompanyName(),
+
+                        project.getCep() != null ? project.getCep() : c.getCep(),
+                        project.getEffectiveLatitude(),
+                        project.getEffectiveLongitude(),
+                        project.getEffectiveCity(),
+                        project.getEffectiveUf(),
+
+                        project.getMinimumBudget(),
+                        project.getMaximumBudget(),
+                        project.getDeadline(),
+
+                        project.getMonthlySalaryMin(),
+                        project.getMonthlySalaryMax(),
+                        project.getContractType(),
+                        project.getBenefits(),
+                        project.getStartDate(),
+                        project.getWorkloadHoursPerWeek(),
+
+                        null
+                ))
+                .toList();
+
+        return ResponseEntity.ok(openProjects);
     }
 }

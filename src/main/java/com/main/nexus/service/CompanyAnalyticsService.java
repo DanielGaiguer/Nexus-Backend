@@ -175,6 +175,7 @@ public class CompanyAnalyticsService {
             result.add(new ProjectAcceptanceRateDTO(
                     project.getId(),
                     project.getTitle(),
+                    project.getOpportunityType(),
                     matches.size(),
                     confirmed,
                     rejected,

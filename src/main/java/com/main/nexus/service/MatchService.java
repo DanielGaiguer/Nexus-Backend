@@ -458,6 +458,22 @@ public class MatchService {
                     score,
                     project.getId()
                 );
+
+                emailService.send(
+                    project.getCompany().getUser().getEmail(),
+                    "Novo candidato muito compatível com seu projeto!",
+                    "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
+                    professional.getName() + " tem " + String.format("%.0f", score) + "% de compatibilidade com o seu projeto:\n\n" +
+                    "\"" + project.getTitle() + "\"\n\n" +
+                    "Acesse o Nexus para ver o ranking e demonstrar interesse.\n\nEquipe Nexus"
+                );
+                notificationService.notifyHighScoreCandidate(
+                    project.getCompany().getUser(),
+                    professional.getName(),
+                    project.getTitle(),
+                    score,
+                    project.getId()
+                );
             }
         }
 
@@ -590,6 +606,53 @@ public class MatchService {
             match.getProject().getCompany().getCompanyName(),
             match.getProject().getTitle()
         );
+        return saved;
+    }
+
+    public Match companyCancelsMatch(Long matchId, Long companyId) {
+        Match match = findById(matchId);
+        validateCompanyOwnership(match, companyId);
+
+        boolean wasMatched = match.getStatus() == StatusMatch.MATCHED;
+        boolean wasPendingInvite = match.getStatus() == StatusMatch.COMPANY_INTERESTED;
+
+        if (!wasMatched && !wasPendingInvite) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "This match cannot be cancelled.");
+        }
+
+        String fromStatus = match.getStatus().name();
+        match.setCompanyStatus(InterestStatus.REJECTED);
+        match.setStatus(StatusMatch.REJECTED);
+        if (wasMatched) {
+            decrementFilledPositions(match.getProject());
+        }
+        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
+        Match saved = matchRepository.save(match);
+
+        String companyName = match.getProject().getCompany().getCompanyName();
+        String projectTitle = match.getProject().getTitle();
+
+        if (wasMatched) {
+            notificationService.notifyMatchCancelled(
+                match.getProfessional().getUser(), companyName, projectTitle);
+            emailService.send(
+                match.getProfessional().getUser().getEmail(),
+                "Match cancelado — Nexus",
+                "Olá " + match.getProfessional().getName() + ",\n\n" +
+                companyName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+            );
+        } else {
+            notificationService.notifyInviteCancelled(
+                match.getProfessional().getUser(), companyName, projectTitle);
+            emailService.send(
+                match.getProfessional().getUser().getEmail(),
+                "Convite cancelado — Nexus",
+                "Olá " + match.getProfessional().getName() + ",\n\n" +
+                companyName + " cancelou o convite enviado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+            );
+        }
+
         return saved;
     }
 
@@ -862,6 +925,15 @@ public class MatchService {
                 .toList();
     }
 
+    // ── Verifica se empresa e profissional têm um match confirmado entre si ──
+    // Usado para liberar dados de contato (telefone/e-mail) só depois do match.
+    public boolean hasConfirmedMatchBetween(Long companyId, Long professionalId) {
+        return matchRepository.findByProfessionalId(professionalId)
+                .stream()
+                .anyMatch(m -> m.getStatus() == StatusMatch.MATCHED
+                        && m.getProject().getCompany().getId().equals(companyId));
+    }
+
     public long countConfirmedMatchesByCompany(Long companyId) {
         return matchRepository.findByProjectCompanyId(companyId)
                 .stream()
@@ -908,5 +980,9 @@ public class MatchService {
     
     private void incrementFilledPositions(Project project) {
         projectRepository.incrementFilledPositions(project.getId());
+    }
+
+    private void decrementFilledPositions(Project project) {
+        projectRepository.decrementFilledPositions(project.getId());
     }
 }

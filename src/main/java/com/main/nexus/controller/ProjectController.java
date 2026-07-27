@@ -159,6 +159,15 @@ public class ProjectController {
         return ResponseEntity.ok("Project closed.");
     }
 
+    @PutMapping("/{id}/reopen")
+    public ResponseEntity<ProjectResponseDTO> reopenProject(
+            @PathVariable Long id,
+            @RequestParam(required = false) Integer maxPositions) {
+        Company company = getLoggedCompany();
+        Project project = projectService.reopenProject(id, company.getId(), maxPositions);
+        return ResponseEntity.ok(toResponseDTO(project));
+    }
+
     @GetMapping("/{id}/ranking")
     public ResponseEntity<List<MatchResponseDTO>> getRanking(
             @PathVariable Long id,
