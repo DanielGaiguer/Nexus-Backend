@@ -54,7 +54,18 @@ public class Match {
     @Column(length = 20)
     private InitiatedBy initiatedBy;
 
-    public InitiatedBy getInitiatedBy() { 
+    @Column(nullable = false)
+    private Boolean active = true;
+
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
+
+    public InitiatedBy getInitiatedBy() {
         return initiatedBy; 
     }
     public void setInitiatedBy(InitiatedBy initiatedBy) { 

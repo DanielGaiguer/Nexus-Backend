@@ -13,5 +13,6 @@ public record MatchResponseDTO(
         LocalDateTime createdAt,
         ProjectResponseDTO project,
         ProfessionalSummaryDTO professional,
-        ScoreBreakdownDTO scoreBreakdown
+        ScoreBreakdownDTO scoreBreakdown,
+        Boolean active
 ) {}

@@ -176,6 +176,42 @@ public class NotificationService {
         );
     }
 
+    public void notifyMatchStatusCheck(User companyUser,
+                                       String professionalName, String projectTitle,
+                                       Long matchId) {
+        notify(
+            companyUser,
+            NotificationType.MATCH_STATUS_CHECK,
+            "Como está indo o match?",
+            "Seu match com " + professionalName + " no projeto \"" + projectTitle + "\" completa 30 dias em 15 dias. Que tal nos contar como está sendo?",
+            "/matches/" + matchId + "/status-check"
+        );
+    }
+
+    public void notifyMatchExpiredForCompany(User companyUser,
+                                             String professionalName, String projectTitle,
+                                             Long matchId) {
+        notify(
+            companyUser,
+            NotificationType.MATCH_EXPIRED_REVIEW_REQUEST,
+            "Chegou a hora do feedback!",
+            "Seu match com " + professionalName + " no projeto \"" + projectTitle + "\" completou 30 dias. Compartilhe como foi a experiência.",
+            "/matches/" + matchId + "/review"
+        );
+    }
+
+    public void notifyMatchExpiredForProfessional(User professionalUser,
+                                                  String companyName, String projectTitle,
+                                                  Long matchId) {
+        notify(
+            professionalUser,
+            NotificationType.MATCH_EXPIRED_REVIEW_REQUEST,
+            "Como foi sua experiência?",
+            "Seu match com " + companyName + " no projeto \"" + projectTitle + "\" completou 30 dias. Que tal avaliar como foi?",
+            "/matches/" + matchId + "/review"
+        );
+    }
+
     public void notifyProjectClosed(User professionalUser,
                                     String projectTitle, String companyName) {
         notify(

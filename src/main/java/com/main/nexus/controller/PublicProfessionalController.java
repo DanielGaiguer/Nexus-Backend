@@ -1,5 +1,6 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.CompanyPreviousProjectDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
 import com.main.nexus.dto.PublicProfessionalDTO;
 import com.main.nexus.dto.PublicProjectDTO;
@@ -17,6 +18,7 @@ import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
+import com.main.nexus.service.MatchService;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +43,9 @@ public class PublicProfessionalController {
 
     @Autowired
     private CompanyRepository companyRepository;
+
+    @Autowired
+    private MatchService matchService;
 
     @GetMapping("/professional/{id}")
     public ResponseEntity<PublicProfessionalDTO> getProfessional(@PathVariable Long id) {
@@ -133,7 +138,8 @@ public class PublicProfessionalController {
                 c.getProfilePhotoUrl(),
                 null,
                 c.getTaxId(),
-                c.getStatus().name()
+                c.getStatus().name(),
+                List.of()
         );
 
         ProjectResponseDTO dto = new ProjectResponseDTO(
@@ -194,6 +200,11 @@ public class PublicProfessionalController {
 
         ReputationMetrics metrics = reputationMetricsRepository.findByCompanyId(id).orElse(null);
 
+        List<CompanyPreviousProjectDTO> previousProjects = matchService.getPreviousProjectsByCompany(id)
+                .stream()
+                .map(m -> new CompanyPreviousProjectDTO(m.getId(), m.getProject().getTitle(), m.getCreatedAt()))
+                .toList();
+
         PublicCompanyDTO dto = new PublicCompanyDTO(
                 c.getId(),
                 c.getCompanyName(),
@@ -204,7 +215,8 @@ public class PublicProfessionalController {
                 c.getProfilePhotoUrl(),
                 metrics != null ? toReputationDTO(metrics) : null,
                 c.getTaxId(),
-                c.getStatus().name()
+                c.getStatus().name(),
+                previousProjects
         );
 
         return ResponseEntity.ok(dto);

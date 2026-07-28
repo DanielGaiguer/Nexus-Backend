@@ -140,7 +140,7 @@ public class PdfService {
                 for (PreviousProject p : projects) {
                     String year = p.getYearOfCompletion() != null
                             ? String.valueOf(p.getYearOfCompletion()) : "—";
-                    String techs = p.getTechnologies() != null ? p.getTechnologies() : "";
+                    String techs = p.getTechnologies() != null ? String.join(", ", p.getTechnologies()) : "";
 
                     Paragraph projParagraph = new Paragraph()
                             .setFont(fontRegular).setFontSize(10)

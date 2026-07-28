@@ -4,5 +4,6 @@ public record ProfessionalSummaryDTO(
         Long id,
         String name,
         String phone,
-        Double reputation
+        Double reputation,
+        String profilePhotoUrl
 ) {}

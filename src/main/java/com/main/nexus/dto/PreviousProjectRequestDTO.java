@@ -1,10 +1,12 @@
 
 package com.main.nexus.dto;
 
+import java.util.List;
+
 public record PreviousProjectRequestDTO(
         Long id,
         String title,
         String description,
-        String technologies,
+        List<String> technologies,
         Integer yearOfCompletion
 ) {}

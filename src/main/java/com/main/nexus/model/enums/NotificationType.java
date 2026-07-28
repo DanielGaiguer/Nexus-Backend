@@ -13,5 +13,7 @@ public enum NotificationType {
     PROJECT_CLOSED,          // um projeto foi encerrado
     NEW_INTEREST_RECEIVED,   // profissional demonstrou interesse na empresa
     COMPLETE_YOUR_PROFILE,
-    NEW_COMPANY_REGISTRATION // empresa se cadastrou e aguarda aprovação do admin
+    NEW_COMPANY_REGISTRATION, // empresa se cadastrou e aguarda aprovação do admin
+    MATCH_STATUS_CHECK,      // match está próximo dos 30 dias, pede feedback de status à empresa
+    MATCH_EXPIRED_REVIEW_REQUEST // match completou 30 dias e expirou, pede avaliação a ambos os lados
 }

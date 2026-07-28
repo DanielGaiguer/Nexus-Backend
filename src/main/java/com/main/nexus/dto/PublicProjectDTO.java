@@ -1,7 +1,9 @@
 package com.main.nexus.dto;
 
+import java.util.List;
+
 public record PublicProjectDTO(
         String title,
-        String technologies,
+        List<String> technologies,
         Integer yearOfCompletion
 ) {}

@@ -95,6 +95,31 @@ public class MatchController {
         return ResponseEntity.ok("Match cancelled.");
     }
 
+    // ── Cancelamento genérico — acessível por empresa ou profissional dono do match ──
+
+    @PostMapping("/{matchId}/cancel")
+    public ResponseEntity<String> cancelMatch(@PathVariable Long matchId) {
+        UserDTO logged = getLoggedUser();
+
+        Long companyId = null;
+        Long professionalId = null;
+        String changedBy;
+
+        if ("COMPANY".equals(logged.role())) {
+            companyId = getLoggedCompanyId();
+            changedBy = "COMPANY";
+        } else if ("PROFESSIONAL".equals(logged.role())) {
+            professionalId = getLoggedProfessionalId();
+            changedBy = "PROFESSIONAL";
+        } else {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "Only companies or professionals can cancel a match.");
+        }
+
+        matchService.cancelMatch(matchId, companyId, professionalId, changedBy);
+        return ResponseEntity.ok("Match cancelled.");
+    }
+
     // ── Profissional responde a um interesse da empresa ─────────────────────
 
     @PostMapping("/{matchId}/professional-accept")
@@ -129,9 +154,11 @@ public class MatchController {
                         professional.getId(),
                         professional.getName(),
                         professional.getPhone(),
-                        professional.getReputation()
+                        professional.getReputation(),
+                        professional.getProfilePhotoUrl()
                 ),
-                null
+                null,
+                m.getActive()
         );
     }
 
@@ -147,7 +174,8 @@ public class MatchController {
                 c.getProfilePhotoUrl(),
                 null,
                 c.getTaxId(),
-                c.getStatus().name()
+                c.getStatus().name(),
+                List.of()
         );
         return new ProjectResponseDTO(
                 p.getId(),

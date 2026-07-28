@@ -215,7 +215,7 @@ public class ReputationService {
         metrics.setTotalReviews(allReviews.size());
         metrics.setTotalReviewsRecent(recentReviews.size());
         metrics.setTotalRejectionsReceived(allRejections.size());
-        metrics.setConfidenceScore(Math.min(1.0, allReviews.size() / CONFIDENCE_THRESHOLD));
+        metrics.setConfidenceScore(Math.min(1.0, (double) allReviews.size() / CONFIDENCE_THRESHOLD));
     }
 
     // =========================================================
@@ -275,7 +275,7 @@ public class ReputationService {
         metrics.setTotalReviews(allReviews.size());
         metrics.setTotalReviewsRecent(recentReviews.size());
         metrics.setTotalRejectionsReceived(allRejections.size());
-        metrics.setConfidenceScore(Math.min(1.0, allReviews.size() / CONFIDENCE_THRESHOLD));
+        metrics.setConfidenceScore(Math.min(1.0, (double) allReviews.size() / CONFIDENCE_THRESHOLD));
     }
 
     // =========================================================

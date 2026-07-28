@@ -528,6 +528,7 @@ public class MatchService {
     // FLUXO BILATERAL DE INTERESSE
     // =========================================================
 
+    @Transactional
     public Match companyShowsInterest(Long matchId, Long companyId) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
@@ -571,6 +572,7 @@ public class MatchService {
         return saved;
     }
 
+    @Transactional
     public Match companyAccepts(Long matchId, Long companyId) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
@@ -609,6 +611,7 @@ public class MatchService {
         return saved;
     }
 
+    @Transactional
     public Match companyCancelsMatch(Long matchId, Long companyId) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
@@ -656,6 +659,7 @@ public class MatchService {
         return saved;
     }
 
+    @Transactional
     public Match professionalAccepts(Long matchId, Long professionalId) {
         Match match = findById(matchId);
         validateProfessionalOwnership(match, professionalId);
@@ -710,6 +714,60 @@ public class MatchService {
         }
     }
 
+    // ── Cancelamento genérico (empresa ou profissional) — marca active = false ──
+
+    @Transactional
+    public Match cancelMatch(Long matchId, Long companyId, Long professionalId, String changedBy) {
+        Match match = findById(matchId);
+
+        if (companyId != null) {
+            validateCompanyOwnership(match, companyId);
+        } else if (professionalId != null) {
+            validateProfessionalOwnership(match, professionalId);
+        } else {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "You are not authorized to cancel this match.");
+        }
+
+        if (match.getStatus() != StatusMatch.MATCHED || Boolean.FALSE.equals(match.getActive())) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "This match cannot be cancelled.");
+        }
+
+        String fromStatus = match.getStatus().name();
+        match.setActive(false);
+        match.setStatus(StatusMatch.REJECTED);
+        decrementFilledPositions(match.getProject());
+        matchHistoryService.record(match, fromStatus, match.getStatus().name(), changedBy);
+        Match saved = matchRepository.save(match);
+
+        String companyName = match.getProject().getCompany().getCompanyName();
+        String professionalName = match.getProfessional().getName();
+        String projectTitle = match.getProject().getTitle();
+
+        if ("COMPANY".equals(changedBy)) {
+            notificationService.notifyMatchCancelled(
+                match.getProfessional().getUser(), companyName, projectTitle);
+            emailService.send(
+                match.getProfessional().getUser().getEmail(),
+                "Match cancelado — Nexus",
+                "Olá " + professionalName + ",\n\n" +
+                companyName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+            );
+        } else {
+            notificationService.notifyMatchCancelled(
+                match.getProject().getCompany().getUser(), professionalName, projectTitle);
+            emailService.send(
+                match.getProject().getCompany().getUser().getEmail(),
+                "Match cancelado — Nexus",
+                "Olá " + companyName + ",\n\n" +
+                professionalName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+            );
+        }
+
+        return saved;
+    }
+
     // ── Persistência de feedback de rejeição, separado por quem rejeita ────────
 
     private void saveProfessionalRejection(Match match, List<ProfessionalRejectionReason> reasons) {
@@ -757,6 +815,7 @@ public class MatchService {
 
         return matchRepository.findByProfessionalId(professionalId)
                 .stream()
+                .filter(m -> !Boolean.FALSE.equals(m.getActive()))
                 .filter(m -> m.getProject().getStatus() == ProjectStatus.OPEN)
                 .filter(m -> m.getStatus() == StatusMatch.WAITING
                           || m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
@@ -823,6 +882,7 @@ public class MatchService {
     public List<Match> getRankingByProject(Long projectId) {
         return matchRepository.findByProjectId(projectId)
                 .stream()
+                .filter(m -> !Boolean.FALSE.equals(m.getActive()))
                 .sorted(Comparator.comparingDouble(Match::getMatchScore).reversed())
                 .toList();
     }
@@ -943,6 +1003,10 @@ public class MatchService {
 
     public List<Match> getMatchesByCompany(Long companyId) {
         return matchRepository.findByProjectCompanyId(companyId);
+    }
+
+    public List<Match> getPreviousProjectsByCompany(Long companyId) {
+        return matchRepository.findByCompanyIdAndStatusAndActiveFalse(companyId, StatusMatch.MATCHED);
     }
 
     // =========================================================

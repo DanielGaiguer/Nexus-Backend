@@ -1,6 +1,8 @@
 package com.main.nexus.model;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -8,6 +10,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "tb_previous_project")
@@ -27,8 +32,13 @@ public class PreviousProject {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(length = 500)
-    private String technologies;
+    @ElementCollection
+    @CollectionTable(
+        name = "tb_previous_project_technologies",
+        joinColumns = @JoinColumn(name = "previous_project_id")
+    )
+    @Column(name = "technology", length = 100)
+    private List<String> technologies = new ArrayList<>();
 
     private Integer yearOfCompletion;
 
@@ -64,12 +74,12 @@ public class PreviousProject {
         this.description = description;
     }
 
-    public String getTechnologies() {
+    public List<String> getTechnologies() {
         return technologies;
     }
 
-    public void setTechnologies(String technologies) {
-        this.technologies = technologies;
+    public void setTechnologies(List<String> technologies) {
+        this.technologies = technologies != null ? technologies : new ArrayList<>();
     }
 
     public Integer getYearOfCompletion() {

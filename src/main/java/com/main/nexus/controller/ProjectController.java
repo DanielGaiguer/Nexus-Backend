@@ -56,6 +56,13 @@ public class ProjectController {
         return ResponseEntity.ok(skillService.findAll());
     }
 
+    @GetMapping("/previous")
+    public ResponseEntity<List<MatchResponseDTO>> getPreviousProjects() {
+        Company company = getLoggedCompany();
+        List<Match> matches = matchService.getPreviousProjectsByCompany(company.getId());
+        return ResponseEntity.ok(matches.stream().map(this::toMatchResponseDTO).toList());
+    }
+
     @GetMapping
     public ResponseEntity<List<ProjectResponseDTO>> listMyProjects() {
         Company company = getLoggedCompany();
@@ -263,9 +270,11 @@ public class ProjectController {
                         professional.getId(),
                         professional.getName(),
                         professional.getPhone(),
-                        professional.getReputation()
+                        professional.getReputation(),
+                        professional.getProfilePhotoUrl()
                 ),
-                matchService.getScoreBreakdown(professional, m.getProject(), m)
+                matchService.getScoreBreakdown(professional, m.getProject(), m),
+                m.getActive()
         );
     }
 

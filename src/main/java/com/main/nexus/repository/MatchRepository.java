@@ -14,6 +14,12 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByProjectId(Long projectId);
     List<Match> findByProfessionalId(Long professionalId);
     List<Match> findByStatus(StatusMatch status);
+    // Trata active = NULL (matches criados antes da coluna existir) como ativo
+    @Query("SELECT m FROM Match m WHERE m.status = :status AND m.createdAt < :createdAtBefore " +
+           "AND (m.active = true OR m.active IS NULL)")
+    List<Match> findByStatusAndCreatedAtBeforeAndActiveTrue(
+            @Param("status") StatusMatch status,
+            @Param("createdAtBefore") java.time.LocalDateTime createdAtBefore);
     Optional<Match> findByProjectIdAndProfessionalId(Long projectId, Long professionalId);
     List<Match> findByProjectCompanyId(Long companyId);
     
@@ -43,6 +49,13 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     // Contagem total de matches de uma empresa
     @Query("SELECT COUNT(m) FROM Match m WHERE m.project.company.id = :companyId")
     long countByCompanyId(@Param("companyId") Long companyId);
+
+    // Projetos anteriores de uma empresa — matches que foram confirmados e já encerraram (ativo = false)
+    @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId " +
+           "AND m.status = :status AND m.active = false ORDER BY m.createdAt DESC")
+    List<Match> findByCompanyIdAndStatusAndActiveFalse(
+            @Param("companyId") Long companyId,
+            @Param("status") StatusMatch status);
 
     // Matches por mês de uma empresa — retorna [year, month, status, count]
     @Query("SELECT YEAR(m.createdAt), MONTH(m.createdAt), m.status, COUNT(m) " +

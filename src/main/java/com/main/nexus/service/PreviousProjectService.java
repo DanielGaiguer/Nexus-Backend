@@ -14,6 +14,9 @@ import java.util.List;
 @Service
 public class PreviousProjectService {
 
+    private static final int MAX_TECHNOLOGIES = 15;
+    private static final int MAX_TECHNOLOGY_LENGTH = 100;
+
     @Autowired
     private PreviousProjectRepository previousProjectRepository;
 
@@ -31,7 +34,33 @@ public class PreviousProjectService {
     }
 
     public PreviousProject save(PreviousProject project) {
+        project.setTechnologies(normalizeTechnologies(project.getTechnologies()));
         return previousProjectRepository.save(project);
+    }
+
+    private List<String> normalizeTechnologies(List<String> technologies) {
+        if (technologies == null) {
+            return List.of();
+        }
+
+        List<String> normalized = technologies.stream()
+                .filter(tech -> tech != null && !tech.isBlank())
+                .map(String::trim)
+                .toList();
+
+        if (normalized.size() > MAX_TECHNOLOGIES) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Máximo de " + MAX_TECHNOLOGIES + " tecnologias por projeto.");
+        }
+
+        for (String tech : normalized) {
+            if (tech.length() > MAX_TECHNOLOGY_LENGTH) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Tecnologia '" + tech + "' excede o limite de " + MAX_TECHNOLOGY_LENGTH + " caracteres.");
+            }
+        }
+
+        return normalized;
     }
 
     public void delete(Long id, Long professionalId) {

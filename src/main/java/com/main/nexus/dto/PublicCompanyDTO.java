@@ -1,5 +1,7 @@
 package com.main.nexus.dto;
 
+import java.util.List;
+
 public record PublicCompanyDTO(
         Long id,
         String companyName,
@@ -10,5 +12,6 @@ public record PublicCompanyDTO(
         String profilePhotoUrl,
         ReputationExplanationDTO reputationDetails,
         String taxId,
-        String status
+        String status,
+        List<CompanyPreviousProjectDTO> previousProjects
 ) {}

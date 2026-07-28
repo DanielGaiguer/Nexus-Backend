@@ -253,9 +253,11 @@ public class AdminController {
                         professional.getId(),
                         professional.getName(),
                         professional.getPhone(),
-                        professional.getReputation()
+                        professional.getReputation(),
+                        professional.getProfilePhotoUrl()
                 ),
-                null
+                null,
+                m.getActive()
         );
     }
 
@@ -349,7 +351,8 @@ public class AdminController {
                 p.getFreelanceMaxExpectation(),
                 missing.isEmpty(),
                 missing,
-                p.getLinkedinUrl()
+                p.getLinkedinUrl(),
+                p.getResume()
         );
     }
 }

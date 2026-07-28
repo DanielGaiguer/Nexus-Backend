@@ -1,6 +1,7 @@
 package com.main.nexus.repository;
 
 import com.main.nexus.model.Notification;
+import com.main.nexus.model.enums.NotificationType;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -19,6 +20,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     // Contagem de não lidas — usada no badge do sino
     long countByUserIdAndReadFalse(Long userId);
+
+    // Verifica se já existe notificação desse tipo/actionUrl para o usuário — evita duplicidade
+    boolean existsByUserIdAndTypeAndActionUrl(Long userId, NotificationType type, String actionUrl);
 
     // Marca todas as notificações de um usuário como lidas
     @Modifying

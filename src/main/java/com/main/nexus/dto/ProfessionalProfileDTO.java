@@ -33,5 +33,6 @@ public record ProfessionalProfileDTO(
         boolean profileComplete,
         List<String> missingFields,
 
-        String linkedinUrl
+        String linkedinUrl,
+        String resume
 ) {}

@@ -299,9 +299,11 @@ public class ProfessionalController {
                         professional.getId(),
                         professional.getName(),
                         professional.getPhone(),
-                        professional.getReputation()
+                        professional.getReputation(),
+                        professional.getProfilePhotoUrl()
                 ),
-                matchService.getScoreBreakdown(professional, m.getProject(), m)
+                matchService.getScoreBreakdown(professional, m.getProject(), m),
+                m.getActive()
         );
     }
 
@@ -317,7 +319,8 @@ public class ProfessionalController {
                 c.getProfilePhotoUrl(),
                 null,
                 c.getTaxId(),
-                c.getStatus().name()
+                c.getStatus().name(),
+                List.of()
         );
         return new ProjectResponseDTO(
                 p.getId(),
@@ -385,7 +388,8 @@ public class ProfessionalController {
                 p.getFreelanceMaxExpectation(),
                 missing.isEmpty(),
                 missing,
-                p.getLinkedinUrl()
+                p.getLinkedinUrl(),
+                p.getResume()
         );
     }
 
