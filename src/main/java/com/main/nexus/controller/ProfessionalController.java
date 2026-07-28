@@ -22,7 +22,6 @@ import com.main.nexus.repository.PreviousProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.EmailService;
-import com.main.nexus.service.FileStorageService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.NotificationService;
@@ -73,9 +72,6 @@ public class ProfessionalController {
     
     @Autowired
     private GeolocationService geolocationService;
-    
-    @Autowired
-    private FileStorageService fileStorageService;
     
     @Autowired
     private SupabaseStorageService supabaseStorageService;
@@ -426,13 +422,11 @@ public class ProfessionalController {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Profile not found"));
 
-        // Remove o currículo anterior se existir
-        if (professional.getResume() != null) {
-            fileStorageService.deleteResume(professional.getResume());
-        }
+        // Remove o currículo anterior do bucket se existir
+        supabaseStorageService.deleteResume(professional.getResume());
 
-        String fileName = fileStorageService.storeResume(file, professional.getId());
-        professional.setResume(fileName);
+        String resumeUrl = supabaseStorageService.uploadResume(file, professional.getId());
+        professional.setResume(resumeUrl);
         professionalService.update(professional);
 
         return ResponseEntity.ok("Resume uploaded successfully.");
@@ -448,7 +442,7 @@ public class ProfessionalController {
                     "This professional has no resume.");
         }
 
-        byte[] content = fileStorageService.loadResume(professional.getResume());
+        byte[] content = supabaseStorageService.downloadResume(professional.getResume());
 
         return ResponseEntity.ok()
                 .header("Content-Type", "application/pdf")

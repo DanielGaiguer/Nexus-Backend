@@ -18,8 +18,11 @@ public class SupabaseStorageService {
     @Value("${supabase.url}")
     private String supabaseUrl;
 
-    @Value("${supabase.bucket}")
-    private String bucket;
+    @Value("${supabase.bucket.profile-images}")
+    private String profileImagesBucket;
+
+    @Value("${supabase.bucket.resumes}")
+    private String resumeBucket;
 
     @Value("${supabase.service-key}")
     private String serviceKey;
@@ -31,6 +34,36 @@ public class SupabaseStorageService {
 
         String extension = getExtension(file.getOriginalFilename());
         String fileName = folder + "/" + entityId + "_" + UUID.randomUUID() + "." + extension;
+
+        return uploadToBucket(file, profileImagesBucket, fileName);
+    }
+
+    public void deleteProfilePhoto(String publicUrl) {
+        deleteFromBucket(publicUrl, profileImagesBucket);
+    }
+
+    public String uploadResume(MultipartFile file, Long professionalId) {
+        validateResumeFile(file);
+
+        String fileName = "professionals/" + professionalId + "_" + UUID.randomUUID() + ".pdf";
+
+        return uploadToBucket(file, resumeBucket, fileName);
+    }
+
+    public void deleteResume(String publicUrl) {
+        deleteFromBucket(publicUrl, resumeBucket);
+    }
+
+    public byte[] downloadResume(String publicUrl) {
+        try {
+            return restTemplate.getForObject(publicUrl, byte[].class);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(404),
+                    "Resume file not found.");
+        }
+    }
+
+    private String uploadToBucket(MultipartFile file, String bucket, String fileName) {
         String uploadUrl = supabaseUrl + "/storage/v1/object/" + bucket + "/" + fileName;
 
         HttpHeaders headers = new HttpHeaders();
@@ -45,14 +78,14 @@ public class SupabaseStorageService {
             restTemplate.exchange(uploadUrl, HttpMethod.POST, entity, String.class);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(502),
-                    "Failed to upload image to storage. Please try again.");
+                    "Failed to upload file to storage. Please try again.");
         }
 
-        // Retorna a URL pública da imagem
+        // Retorna a URL pública do arquivo
         return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + fileName;
     }
 
-    public void deleteProfilePhoto(String publicUrl) {
+    private void deleteFromBucket(String publicUrl, String bucket) {
         if (publicUrl == null || publicUrl.isBlank()) return;
 
         // Extrai o path relativo da URL pública
@@ -93,6 +126,25 @@ public class SupabaseStorageService {
         if (file.getSize() > maxSize) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "Image size must not exceed 5MB.");
+        }
+    }
+
+    private void validateResumeFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Resume file is required.");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.equals("application/pdf")) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Only PDF files are accepted.");
+        }
+
+        long maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.getSize() > maxSize) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Resume size must not exceed 10MB.");
         }
     }
 
