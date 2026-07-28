@@ -35,6 +35,11 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/public/**").permitAll()
 
+                // Handshake SockJS/STOMP (/ws/info, /ws/*/*/{xhr,websocket}, ...) não
+                // envia o header Authorization — a autenticação real acontece no
+                // WebSocketAuthInterceptor durante o CONNECT (ver WebSocketConfig).
+                .requestMatchers("/ws/**").permitAll()
+
                 // Reputação agregada não contém dados sensíveis — pode ser exibida
                 // nas páginas públicas de perfil sem exigir autenticação
                 .requestMatchers(HttpMethod.GET, "/api/reputation/**").permitAll()
@@ -43,6 +48,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/professional/profile/export").authenticated()
                     
                 .requestMatchers("/api/notifications/**").authenticated()
+
+                .requestMatchers("/api/chat/**").authenticated()
 
                 // Stats: profissional e admin acessam
                 .requestMatchers("/api/professional/stats").hasAnyRole("PROFESSIONAL", "ADMIN")

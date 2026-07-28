@@ -320,7 +320,8 @@ public class ProfessionalController {
                 null,
                 c.getTaxId(),
                 c.getStatus().name(),
-                List.of()
+                List.of(),
+                c.getUser() != null ? c.getUser().getEmail() : null
         );
         return new ProjectResponseDTO(
                 p.getId(),

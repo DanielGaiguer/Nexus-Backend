@@ -139,7 +139,8 @@ public class PublicProfessionalController {
                 null,
                 c.getTaxId(),
                 c.getStatus().name(),
-                List.of()
+                List.of(),
+                c.getUser() != null ? c.getUser().getEmail() : null
         );
 
         ProjectResponseDTO dto = new ProjectResponseDTO(
@@ -216,7 +217,8 @@ public class PublicProfessionalController {
                 metrics != null ? toReputationDTO(metrics) : null,
                 c.getTaxId(),
                 c.getStatus().name(),
-                previousProjects
+                previousProjects,
+                c.getUser() != null ? c.getUser().getEmail() : null
         );
 
         return ResponseEntity.ok(dto);

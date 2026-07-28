@@ -33,7 +33,7 @@ public class Message {
     @Column(nullable = false)
     private LocalDateTime sentAt = LocalDateTime.now();
 
-    @Column(nullable = false)
+    @Column(name = "is_read", nullable = false)
     private Boolean read = false;
 
     public Long getId() {

@@ -13,5 +13,6 @@ public record PublicCompanyDTO(
         ReputationExplanationDTO reputationDetails,
         String taxId,
         String status,
-        List<CompanyPreviousProjectDTO> previousProjects
+        List<CompanyPreviousProjectDTO> previousProjects,
+        String contactEmail
 ) {}
