@@ -59,14 +59,12 @@ public class ReviewService {
         Review saved = reviewRepository.save(review);
         
         if (review.getAuthorType() == AuthorType.COMPANY) {
-            // Empresa avaliou o profissional — notifica o profissional
             notificationService.notifyNewReviewReceived(
                 review.getMatch().getProfessional().getUser(),
                 review.getMatch().getProject().getCompany().getCompanyName(),
                 review.getRating()
             );
         } else {
-            // Profissional avaliou a empresa — notifica a empresa
             notificationService.notifyNewReviewReceived(
                 review.getMatch().getProject().getCompany().getUser(),
                 review.getMatch().getProfessional().getName(),
@@ -74,12 +72,9 @@ public class ReviewService {
             );
         }
 
-        // Dispara o recálculo de reputação de quem foi avaliado
         if (review.getAuthorType() == AuthorType.COMPANY) {
-            // Empresa avaliou o profissional → recalcula o profissional
             reputationService.recalculateForProfessional(match.getProfessional().getId());
         } else {
-            // Profissional avaliou a empresa → recalcula a empresa
             reputationService.recalculateForCompany(match.getProject().getCompany().getId());
         }
 

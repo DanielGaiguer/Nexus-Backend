@@ -36,7 +36,6 @@ public class JwtFilter extends OncePerRequestFilter {
             if (tokenService.validToken(token)) {
                 UserDTO user = tokenService.extractClaims(token);
 
-                // Monta a authority no formato ROLE_ADMIN, ROLE_COMPANY, ROLE_PROFESSIONAL
                 SimpleGrantedAuthority authority =
                         new SimpleGrantedAuthority("ROLE_" + user.role());
 

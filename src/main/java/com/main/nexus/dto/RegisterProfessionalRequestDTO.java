@@ -9,14 +9,8 @@ public record RegisterProfessionalRequestDTO(
         String password,
         String name,
         String phone,
-
-        // Opcional no cadastro — notificado se ausente
         String cep,
-
-        // Regime de contratação desejado — notificado se ausente
         List<OpportunityType> preferredOpportunityTypes,
-
-        // Pretensões — notificadas se ausentes conforme regime selecionado
         Double expectedSalaryCLT,
         Double expectedSalaryPJ,
         Double freelanceMinExpectation,

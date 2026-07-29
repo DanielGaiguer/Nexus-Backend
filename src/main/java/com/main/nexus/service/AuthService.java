@@ -66,7 +66,7 @@ public class AuthService {
     private String frontendBaseUrl;
 
     public void registerProfessional(RegisterProfessionalRequestDTO request) {
-        // ── 1. Validações de campos obrigatórios ───────────────────────────────
+        // Validações de campos obrigatórios
         if (request.email() == null || request.email().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Email is required.");
@@ -80,13 +80,13 @@ public class AuthService {
                     "Name is required.");
         }
 
-        // ── 2. Validação de unicidade ──────────────────────────────────────────
+        // Validação de unicidad
         if (userRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Email already registered in the system.");
         }
 
-        // ── 3. Resolução do CEP ANTES de qualquer persistência ────────────────
+        // Resolução do CEP ANTES de qualquer persistência 
         GeolocationService.AddressData addressData = null;
         if (request.cep() != null && !request.cep().isBlank()) {
             try {

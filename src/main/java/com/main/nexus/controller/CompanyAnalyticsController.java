@@ -25,7 +25,7 @@ public class CompanyAnalyticsController {
     @Autowired
     private CompanyService companyService;
 
-    // ── Dashboard da empresa autenticada ─────────────────────────────────────
+    // Dashboard da empresa autenticada
 
     @GetMapping("/company/dashboard")
     public ResponseEntity<CompanyDashboardAnalyticsDTO> getMyDashboard() {
@@ -37,7 +37,7 @@ public class CompanyAnalyticsController {
         return ResponseEntity.ok(analyticsService.buildDashboard(company.getId()));
     }
 
-    // ── Dashboard de qualquer empresa — somente Admin ─────────────────────────
+    // Dashboard de qualquer empresa domente Admin
 
     @GetMapping("/company/{companyId}/dashboard")
     public ResponseEntity<CompanyDashboardAnalyticsDTO> getDashboardByAdmin(

@@ -10,7 +10,6 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
-import com.main.nexus.model.Skill;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
@@ -111,7 +110,7 @@ public class ProjectController {
         return ResponseEntity.ok(toResponseDTO(projectService.update(existing)));
     }
 
-    // ── Método de populate centralizado ──────────────────────────────────────────
+    // Método de populate centralizado
 
     private void populate(Project project, ProjectRequestDTO r) {
         project.setTitle(r.title());
@@ -137,7 +136,7 @@ public class ProjectController {
                         "CEP '" + r.cep() + "' is invalid or could not be resolved.");
             }
         } else {
-            // Limpa a localização própria se o CEP foi removido (voltará a usar o da empresa)
+            // limpa a localização própria se o CEP foi removido 
             project.setCep(null);
             project.setLatitude(null);
             project.setLongitude(null);
@@ -186,7 +185,7 @@ public class ProjectController {
             @RequestParam(required = false) Double maxSalary,
             @RequestParam(required = false) String skill) {
         Company company = getLoggedCompany();
-        // Garante que só o dono do projeto vê o ranking dele
+        // garante que so o dono do projeto vê o ranking dele
         projectService.findByIdAndCompany(id, company.getId());
         boolean hasFilters = (city != null && !city.isBlank())
                 || (uf != null && !uf.isBlank())
@@ -233,7 +232,7 @@ public class ProjectController {
                 p.getCompany().getId(),
                 p.getCompany().getCompanyName(),
 
-                // Localização efetiva — da vaga ou da empresa como fallback
+                // Localização efetiva da vaga ou da empresa como fallback
                 p.getCep() != null ? p.getCep() : p.getCompany().getCep(),
                 p.getEffectiveLatitude(),
                 p.getEffectiveLongitude(),

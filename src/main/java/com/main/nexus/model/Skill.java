@@ -23,7 +23,7 @@ public class Skill {
     private String name;
 
     @Column(length = 80)
-    private String category; // e.g. "Backend", "Frontend", "DevOps"
+    private String category;
 
     public Long getId() {
         return id;

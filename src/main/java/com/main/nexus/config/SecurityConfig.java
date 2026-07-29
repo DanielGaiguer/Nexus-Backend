@@ -35,32 +35,20 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/public/**").permitAll()
 
-                // Handshake SockJS/STOMP (/ws/info, /ws/*/*/{xhr,websocket}, ...) não
-                // envia o header Authorization — a autenticação real acontece no
-                // WebSocketAuthInterceptor durante o CONNECT (ver WebSocketConfig).
                 .requestMatchers("/ws/**").permitAll()
 
-                // Reputação agregada não contém dados sensíveis — pode ser exibida
-                // nas páginas públicas de perfil sem exigir autenticação
                 .requestMatchers(HttpMethod.GET, "/api/reputation/**").permitAll()
 
-                // Export de PDF: qualquer autenticado pode baixar
                 .requestMatchers("/api/professional/profile/export").authenticated()
                     
                 .requestMatchers("/api/notifications/**").authenticated()
 
                 .requestMatchers("/api/chat/**").authenticated()
 
-                // Stats: profissional e admin acessam
                 .requestMatchers("/api/professional/stats").hasAnyRole("PROFESSIONAL", "ADMIN")
 
-                // Admin pode ver perfil de profissional por ID
                 .requestMatchers("/api/professional/*/admin-profile").hasRole("ADMIN")
 
-                // Regras específicas de /api/professional e /api/company precisam vir
-                // ANTES das regras amplas hasRole abaixo — do contrário a regra ampla
-                // (que também casa com esses paths) sempre vence primeiro e a específica
-                // nunca é avaliada (era o caso do download de currículo por empresas).
                 .requestMatchers("/api/professional/*/resume").hasAnyRole("PROFESSIONAL", "COMPANY")
                 .requestMatchers("/api/professional/*/contact").hasRole("COMPANY")
                 .requestMatchers("/api/company/*/contact").hasRole("PROFESSIONAL")
@@ -87,13 +75,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/analytics/professional/dashboard").hasRole("PROFESSIONAL")
                 .requestMatchers("/api/analytics/professional/*/dashboard").hasRole("ADMIN")
 
-                // Match: tanto empresa quanto profissional acessam
                 .requestMatchers("/api/matches/**").hasAnyRole("COMPANY", "PROFESSIONAL")
 
-                // Reviews: ambos podem avaliar
                 .requestMatchers("/api/reviews/**").hasAnyRole("COMPANY", "PROFESSIONAL")
                 
-                 //Libera o mapa para profissional, empresa e admin
                  .requestMatchers("/api/map/**").hasAnyRole("PROFESSIONAL", "COMPANY", "ADMIN")
 
                 .anyRequest().authenticated()

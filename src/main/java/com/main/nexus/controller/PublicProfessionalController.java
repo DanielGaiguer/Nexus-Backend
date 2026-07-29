@@ -9,7 +9,6 @@ import com.main.nexus.dto.ReputationExplanationDTO;
 import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
-import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.enums.CompanyStatus;
@@ -122,7 +121,7 @@ public class PublicProfessionalController {
 
         Project p = optional.get();
 
-        // Only return OPEN projects
+        // apenas projetos abertos
         if (p.getStatus() != com.main.nexus.model.enums.ProjectStatus.OPEN) {
             return ResponseEntity.notFound().build();
         }

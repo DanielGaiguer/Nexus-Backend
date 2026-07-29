@@ -26,15 +26,31 @@ public class ReputationMetrics {
     @JoinColumn(name = "company_id", unique = true)
     private Company company;
 
+    @Column(nullable = false)
     private Double technicalCompetence;
+    
+    @Column(nullable = false)
     private Double communication;
+    
+    @Column(nullable = false)
     private Double reliability;
+    
+    @Column(nullable = false)
     private Double punctuality;
+    
+    @Column(nullable = false)
     private Double professionalism;
+    
+    @Column(nullable = false)
     private Double satisfactionAverage;
+    
+    @Column(nullable = false)
     private Double recommendationRate;
 
+    @Column(nullable = false)
     private Double reputationScore;
+    
+    @Column(nullable = false)
     private Double confidenceScore;
 
     @Column(nullable = false)

@@ -29,28 +29,28 @@ public class NotificationController {
     @Autowired
     private UserRepository userRepository;
 
-    // Resumo completo — todas as notificações + contagem de não lidas
+    // Resumo completo todas as notificações e contagem de nao lidas
     @GetMapping
     public ResponseEntity<NotificationSummaryDTO> getSummary() {
         User user = getLoggedUserEntity();
         return ResponseEntity.ok(notificationService.getSummary(user.getId()));
     }
 
-    // Só as não lidas — usado para popular o badge do sino no primeiro load
+    // so as nao lidas — usado para popular o badge do sino no primeiro load
     @GetMapping("/unread")
     public ResponseEntity<List<NotificationDTO>> getUnread() {
         User user = getLoggedUserEntity();
         return ResponseEntity.ok(notificationService.getUnread(user.getId()));
     }
 
-    // Contagem de não lidas — endpoint leve para polling periódico do frontend
+    // Contagem de não lidas endpoint leve para polling periódico do frontend
     @GetMapping("/unread/count")
     public ResponseEntity<Long> getUnreadCount() {
         User user = getLoggedUserEntity();
         return ResponseEntity.ok(notificationService.getUnreadCount(user.getId()));
     }
 
-    // Marca todas como lidas
+    // marca todas como lidas
     @PutMapping("/read-all")
     public ResponseEntity<String> markAllAsRead() {
         User user = getLoggedUserEntity();
@@ -58,7 +58,7 @@ public class NotificationController {
         return ResponseEntity.ok("All notifications marked as read.");
     }
 
-    // Marca uma notificação específica como lida
+    // marca uma notificação específica como lida
     @PutMapping("/{id}/read")
     public ResponseEntity<String> markAsRead(@PathVariable Long id) {
         User user = getLoggedUserEntity();
@@ -66,7 +66,7 @@ public class NotificationController {
         return ResponseEntity.ok("Notification marked as read.");
     }
 
-    // Remove notificações lidas com mais de 30 dias
+    // remove notificações lidas com mais de 30 dias
     @DeleteMapping("/old")
     public ResponseEntity<String> deleteOld() {
         User user = getLoggedUserEntity();
