@@ -65,12 +65,10 @@ public class MatchService {
     @Autowired
     private ProfileCompletionService profileCompletionService;
 
-    // -------------------------------------------------------
     // SCORE ENGINE — fórmula principal
     // ScoreMatch = (Skills*0.35) + (Budget*0.25) + (History*0.20) + (Reputation*0.10) + (Availability*0.10)
     // ou, para ONSITE/HYBRID:
     // ScoreMatch = (Skills*0.30) + (Budget*0.20) + (History*0.17) + (Reputation*0.09) + (Availability*0.09) + (Distance*0.15)
-    // -------------------------------------------------------
     public double getScore(Professional professional, Project project) {
 
         double skillScore        = calculateSkillScore(professional, project);
@@ -86,7 +84,7 @@ public class MatchService {
         double baseScore;
 
         if (considersDistance && considersExperience) {
-            // Cenário 4 — ONSITE/HYBRID com experiência (7 componentes)
+            // ONSITE/HYBRID com experiência (7 componentes)
             double distanceScore   = calculateDistanceScore(professional, project);
             double experienceScore = calculateExperienceScore(professional, project);
 
@@ -99,7 +97,7 @@ public class MatchService {
                       + (experienceScore   * 0.12);
 
         } else if (considersDistance) {
-            // Cenário 3 — ONSITE/HYBRID sem experiência (6 componentes)
+            // ONSITE/HYBRID sem experiência (6 componentes)
             double distanceScore = calculateDistanceScore(professional, project);
 
             baseScore = (skillScore        * 0.30)
@@ -110,7 +108,7 @@ public class MatchService {
                       + (distanceScore     * 0.15);
 
         } else if (considersExperience) {
-            // Cenário 2 — REMOTO com experiência (6 componentes)
+            // REMOTO com experiência (6 componentes)
             double experienceScore = calculateExperienceScore(professional, project);
 
             baseScore = (skillScore        * 0.30)
@@ -121,7 +119,7 @@ public class MatchService {
                       + (experienceScore   * 0.12);
 
         } else {
-            // Cenário 1 — REMOTO sem experiência (5 componentes, fórmula original)
+            // REMOTO sem experiência (5 componentes, fórmula original)
             baseScore = (skillScore        * 0.35)
                       + (budgetScore       * 0.25)
                       + (historyScore      * 0.20)
@@ -135,11 +133,11 @@ public class MatchService {
         return baseScore * (1 + professionalAdjustment + companyAdjustment);
     }
 
-    // ── Reconstrói o score componente a componente para exibição na UI ────────
-    // (ranking e comparação de candidatos usam o mesmo cálculo). O "finalScore"
-    // reaproveita match.getMatchScore() — o valor armazenado, o mesmo exibido em
-    // toda outra tela do sistema — para nunca divergir do que a empresa já viu
-    // em outro lugar. Os componentes individuais são recalculados "ao vivo",
+    //  Reconstrói o score componente a componente para exibição no front
+    // ranking e comparação de candidatos usam o mesmo calculo, o finalScore
+    // reaproveita match.getMatchScore(), o valor armazenado, o mesmo exibido em
+    // toda outra tela do sistema para nunca divergir do que a empresa já viu
+    // em outro lugar. Os componentes individuais são recalculados ao vivo,
     // já que nunca são persistidos.
 
     public ScoreBreakdownDTO getScoreBreakdown(Professional professional, Project project, Match match) {
@@ -180,7 +178,7 @@ public class MatchService {
     }
 
     // Mesma fórmula de ponderação usada em getScore(), mas sem o multiplicador
-    // de reputação — aqui isolamos o "base score" para poder mostrar o quanto
+    // de reputação, e juntado o base score para poder mostrar o quanto
     // desse multiplicador contribuiu (reputationAdjustment) separadamente.
     private double computeBaseScoreForBreakdown(
             double skill, double budget, double history,
@@ -229,7 +227,7 @@ public class MatchService {
 
     // Orçamento: para vagas CLT/PJ, compara a pretensão única do profissional contra o
     // range salarial da vaga via tabela de penalidade por % de diferença. Para vagas
-    // freelance/temporárias e para PROJECT, mantém a lógica de faixa (min/max) existente.
+    // freelance/temporárias e para PROJECT, e usada a lógica de faixa (min/max)
     public double calculateBudgetScore(Professional professional, Project project) {
         if (project.getOpportunityType() == OpportunityType.JOB && project.getContractType() != null) {
             return switch (project.getContractType()) {
@@ -245,7 +243,7 @@ public class MatchService {
             };
         }
 
-        // PROJECT — usa a pretensão freelance (faixa min/max)
+        // PROJECT usa a pretensão freelance (faixa min/max)
         return calculateRangeScore(
                 professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation(),
                 project.getMinimumBudget(), project.getMaximumBudget());
@@ -282,7 +280,7 @@ public class MatchService {
         return 50.0;
     }
 
-    // Lógica de faixa (min/max) original — usada para freelance/temporário e para PROJECT
+    // Lógica de faixa (min/max) original — usada para freelance e temporário e para PROJECT
     private double calculateRangeScore(Double profMin, Double profMax, Double projMin, Double projMax) {
         if (profMin == null || projMax == null) return 50.0;
 
@@ -300,7 +298,7 @@ public class MatchService {
         return Math.max(0, 100.0 - (excesso * 100));
     }
 
-    // Pretensão salarial única e relevante para o regime da vaga/projeto — usada fora do
+    // Pretensão salarial única e relevante para o regime da vaga/projeto e usada fora do
     // cálculo de score (filtros de ranking, comparação de candidatos)
     public Double calculateExpectedSalary(Professional professional, Project project) {
         if (project.getOpportunityType() == OpportunityType.JOB && project.getContractType() != null) {
@@ -320,7 +318,7 @@ public class MatchService {
         return (min + max) / 2.0;
     }
 
-    // Histórico: baseado na quantidade de projetos anteriores (máx 10 projetos = 100)
+    // historico e baseado na quantidade de projetos anteriores (máx 10 projetos = 100)
     public double calculateHistoryScore(Professional professional) {
         int count = professional.getProjects() != null
                 ? professional.getProjects().size()
@@ -328,7 +326,7 @@ public class MatchService {
         return Math.min(count * 10.0, 100.0);
     }
 
-    // Reputação: média de estrelas (1-5) normalizada para 0-100
+    // reputacao: média de estrelas (1-5) normalizada para 0-100
     public double calculateReputationScore(Professional professional) {
         double rep = professional.getReputation() != null ? professional.getReputation() : 0.0;
         return (rep / 5.0) * 100.0;
@@ -339,7 +337,7 @@ public class MatchService {
         return Boolean.TRUE.equals(professional.getAvailable()) ? 100.0 : 0.0;
     }
 
-    // Distância: calculada via Haversine entre profissional e empresa
+    // distancia: calculada via Haversine entre profissional e empresa
     public double calculateDistanceScore(Professional professional, Project project) {
         Double profLat = professional.getLatitude();
         Double profLon = professional.getLongitude();
@@ -397,12 +395,12 @@ public class MatchService {
         if (distance == 0) return 100.0;
 
         if (distance > 0) {
-            // Profissional ACIMA do nível pedido — penalidade leve
+            // Profissional acima do nível pedido,  penalidade leve
             if (distance == 1) return 85.0;
             if (distance == 2) return 65.0;
             return 45.0; // distance >= 3
         } else {
-            // Profissional ABAIXO do nível pedido — penalidade mais forte
+            // Profissional abaixo do nível pedido, penalidade mais forte
             int absDistance = Math.abs(distance);
             if (absDistance == 1) return 70.0;
             if (absDistance == 2) return 40.0;
@@ -410,14 +408,9 @@ public class MatchService {
         }
     }
 
-    // =========================================================
-    // PENALIDADE COMPORTAMENTAL — camada pós-cálculo
-    // =========================================================
-
     
-    // =========================================================
-    // RANKING — geração e recálculo
-    // =========================================================
+
+    // RANKING geração e calculo
 
     public List<Match> generateRankingForProject(Project project) {
         List<Professional> allProfessionals = professionalRepository.findAll();
@@ -524,9 +517,7 @@ public class MatchService {
         return true;
     }
 
-    // =========================================================
     // FLUXO BILATERAL DE INTERESSE
-    // =========================================================
 
     @Transactional
     public Match companyShowsInterest(Long matchId, Long companyId) {
@@ -698,7 +689,7 @@ public class MatchService {
         return saved;
     }
 
-    // ── Validações de posse ───────────────────────────────────────────────────
+    // validações de posse
 
     private void validateCompanyOwnership(Match match, Long companyId) {
         if (!match.getProject().getCompany().getId().equals(companyId)) {
@@ -714,7 +705,7 @@ public class MatchService {
         }
     }
 
-    // ── Cancelamento genérico (empresa ou profissional) — marca active = false ──
+    // cancelamento genérico (empresa ou profissional) marca active = fals
 
     @Transactional
     public Match cancelMatch(Long matchId, Long companyId, Long professionalId, String changedBy) {
@@ -768,8 +759,8 @@ public class MatchService {
         return saved;
     }
 
-    // ── Persistência de feedback de rejeição, separado por quem rejeita ────────
-
+    // prersistência de feedback de rejeicao, separado por quem rejeita 
+    
     private void saveProfessionalRejection(Match match, List<ProfessionalRejectionReason> reasons) {
         RejectionFeedback feedback = new RejectionFeedback();
         feedback.setMatch(match);
@@ -788,9 +779,7 @@ public class MatchService {
         reputationService.recalculateForProfessional(match.getProfessional().getId());
     }
 
-    // =========================================================
     // PROFISSIONAL — OPORTUNIDADES E INICIATIVA
-    // =========================================================
 
     public List<Match> getOpportunitiesForProfessional(Long professionalId) {
         Professional professional = professionalRepository.findById(professionalId)
@@ -875,9 +864,7 @@ public class MatchService {
         return saved;
     }
 
-    // =========================================================
     // CONSULTAS
-    // =========================================================
 
     public List<Match> getRankingByProject(Long projectId) {
         return matchRepository.findByProjectId(projectId)
@@ -985,8 +972,8 @@ public class MatchService {
                 .toList();
     }
 
-    // ── Verifica se empresa e profissional têm um match confirmado entre si ──
-    // Usado para liberar dados de contato (telefone/e-mail) só depois do match.
+    // Verifica se empresa e profissional têm um match confirmado entre eles
+    // Usado para liberar dados de contat só depois do match.
     public boolean hasConfirmedMatchBetween(Long companyId, Long professionalId) {
         return matchRepository.findByProfessionalId(professionalId)
                 .stream()
@@ -1009,9 +996,7 @@ public class MatchService {
         return matchRepository.findByCompanyIdAndStatusAndActiveFalse(companyId, StatusMatch.MATCHED);
     }
 
-    // =========================================================
     // NOTIFICAÇÕES
-    // =========================================================
 
     private void notifyMutualMatch(Match match) {
         String professionalEmail = match.getProfessional().getUser().getEmail();

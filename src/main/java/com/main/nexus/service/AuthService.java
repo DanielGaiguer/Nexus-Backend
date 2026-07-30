@@ -148,7 +148,7 @@ public class AuthService {
 
          emailService.send(savedUser.getEmail(), "Bem-vindo ao Nexus!", emailBody);
 
-         // Notificação in-app de perfil incompleto
+         // Notificação de perfil incompleto
          if (incomplete) {
              notificationService.notifyIncompleteProfile(savedUser, missing);
          }
@@ -297,14 +297,28 @@ public class AuthService {
         };
     }
 
-    // ── Sign In with LinkedIn (OpenID Connect) ──────────────────────────────
-    // Observação: o /v2/userinfo do LinkedIn não retorna a URL pública do
-    // perfil, só sub/name/email/picture. Por isso este fluxo autentica e
-    // vincula a conta (via "sub"), mas a linkedinUrl exibida no perfil
-    // continua sendo informada manualmente pelo usuário.
+    public String getLinkedInLoginUrl(String redirect) {
+        return linkedInService.buildAuthorizationUrl(withRedirect("login", redirect));
+    }
 
-    public String getLinkedInLoginUrl() {
-        return linkedInService.buildAuthorizationUrl("login");
+    // Embute o destino pós-login no "state" do OAuth — ele viaja intacto até o
+    // LinkedIn e volta no callback, então não precisa de escaping extra aqui:
+    // o "state" inteiro já é URL-encoded/decoded uma única vez no transporte.
+    private String withRedirect(String mode, String redirect) {
+        if (redirect == null || redirect.isBlank()) {
+            return mode;
+        }
+        return mode + ";redirect=" + redirect;
+    }
+
+    private String extractRedirect(String state) {
+        int idx = state.indexOf(";redirect=");
+        return idx < 0 ? null : state.substring(idx + ";redirect=".length());
+    }
+
+    private String stripRedirect(String state) {
+        int idx = state.indexOf(";redirect=");
+        return idx < 0 ? state : state.substring(0, idx);
     }
 
     public String getLinkedInRegisterUrl(String role) {
@@ -324,20 +338,23 @@ public class AuthService {
             return frontendBaseUrl + "/auth/login?linkedinError=denied";
         }
 
+        String redirect = extractRedirect(state);
+        String mode = stripRedirect(state);
+
         try {
-            if (state.startsWith("link:")) {
-                return handleLinkedInLink(code, state.substring("link:".length()));
+            if (mode.startsWith("link:")) {
+                return handleLinkedInLink(code, mode.substring("link:".length()));
             }
-            if (state.startsWith("register:")) {
-                return handleLinkedInRegister(code, state.substring("register:".length()));
+            if (mode.startsWith("register:")) {
+                return handleLinkedInRegister(code, mode.substring("register:".length()));
             }
-            return handleLinkedInLogin(code);
+            return handleLinkedInLogin(code, redirect);
         } catch (ResponseStatusException e) {
             return frontendBaseUrl + "/auth/login?linkedinError=failed";
         }
     }
 
-    private String handleLinkedInLogin(String code) {
+    private String handleLinkedInLogin(String code, String redirect) {
         LinkedInService.LinkedInUserInfo info = linkedInService.exchangeCodeForUserInfo(code);
 
         User user = findUserByLinkedInInfo(info).orElse(null);
@@ -345,7 +362,7 @@ public class AuthService {
             return frontendBaseUrl + "/auth/login?linkedinError=no_account";
         }
 
-        return loginExistingLinkedInUser(user, info);
+        return loginExistingLinkedInUser(user, info, redirect);
     }
 
     private Optional<User> findUserByLinkedInInfo(LinkedInService.LinkedInUserInfo info) {
@@ -355,7 +372,7 @@ public class AuthService {
                         : Optional.empty());
     }
 
-    private String loginExistingLinkedInUser(User user, LinkedInService.LinkedInUserInfo info) {
+    private String loginExistingLinkedInUser(User user, LinkedInService.LinkedInUserInfo info, String redirect) {
         if (!user.getActive()) {
             return frontendBaseUrl + "/auth/login?linkedinError=inactive";
         }
@@ -370,7 +387,7 @@ public class AuthService {
             }
         }
 
-        // Auto-vincula na primeira vez que o e-mail bater (login social por e-mail)
+        // vincula na primeira vez que o e-mail bater 
         if (user.getLinkedinId() == null) {
             user.setLinkedinId(info.sub());
             userRepository.save(user);
@@ -382,16 +399,20 @@ public class AuthService {
         UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), user.getType().name());
         String jwt = tokenService.generateToken(userDTO);
 
-        return frontendBaseUrl + "/auth/linkedin/complete"
+        String url = frontendBaseUrl + "/auth/linkedin/complete"
                 + "?token=" + urlEncode(jwt)
                 + "&userId=" + user.getId()
                 + "&email=" + urlEncode(user.getEmail())
                 + "&name=" + urlEncode(name)
                 + "&role=" + user.getType().name();
+        if (redirect != null && !redirect.isBlank()) {
+            url += "&redirect=" + urlEncode(redirect);
+        }
+        return url;
     }
 
-    // Usa a foto do LinkedIn como foto de perfil apenas se o usuário ainda
-    // não tiver uma — nunca sobrescreve uma foto que a pessoa já escolheu.
+    // usa a foto do LinkedIn como foto de perfil apenas se o usuário ainda
+    // não tiver uma nunca sobrescreve uma foto que a pessoa já escolheu.
     private void backfillProfilePhoto(User user, String pictureUrl) {
         if (pictureUrl == null || pictureUrl.isBlank()) {
             return;
@@ -413,7 +434,7 @@ public class AuthService {
         }
     }
 
-    // ── Cadastro via LinkedIn ────────────────────────────────────────────────
+    // Cadastro via LinkedIn 
     // Profissional: o LinkedIn fornece nome + e-mail, os dois únicos campos
     // obrigatórios — a conta é criada de imediato (senha aleatória; o login
     // seguinte sempre será via LinkedIn). Empresa: o LinkedIn não fornece
@@ -427,10 +448,10 @@ public class AuthService {
             return frontendBaseUrl + "/auth/login?linkedinError=no_email";
         }
 
-        // Já existe conta com esse LinkedIn/e-mail? Não duplica — apenas loga.
+        // Já existe conta com esse LinkedIn ou e-mail?
         User existing = findUserByLinkedInInfo(info).orElse(null);
         if (existing != null) {
-            return loginExistingLinkedInUser(existing, info);
+            return loginExistingLinkedInUser(existing, info, null);
         }
 
         if ("COMPANY".equals(role)) {
@@ -576,7 +597,7 @@ public class AuthService {
         }
     }
 
-    // ── Notifica administradores sobre novo cadastro de empresa pendente ────
+    // ── notifica administradores sobre novo cadastro de empresa pendente 
     private void notifyAdminsOfNewCompany(Company company) {
         List<User> admins = userRepository.findByType(UserType.ADMIN);
 

@@ -68,7 +68,7 @@ public class PreviousProjectService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Project not found: " + id));
 
-        // Garante que o profissional só deleta o próprio projeto
+        // profissional só deleta o próprio projeto
         if (!project.getProfessional().getId().equals(professionalId)) {
             throw new ResponseStatusException(
                     HttpStatusCode.valueOf(403), "Not authorized.");

@@ -45,7 +45,7 @@ public class ScorePreviewController {
                 scorePreviewService.previewForCompany(company.getId(), professionalId, projectId));
     }
 
-    // Profissional consultando seu próprio score em uma vaga/projeto
+    // Profissional consultando seu proprio score em uma vaga/projeto
     @GetMapping("/preview/self")
     public ResponseEntity<ScorePreviewResponseDTO> previewSelf(@RequestParam Long projectId) {
         UserDTO logged = getLoggedUser();

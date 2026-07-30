@@ -24,9 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class CompanyAnalyticsService {
@@ -40,7 +38,7 @@ public class CompanyAnalyticsService {
     @Autowired
     private ReputationMetricsRepository reputationMetricsRepository;
 
-    // ── Ponto de entrada principal ────────────────────────────────────────────
+    // Ponto de entrada principal
 
     public CompanyDashboardAnalyticsDTO buildDashboard(Long companyId) {
         return new CompanyDashboardAnalyticsDTO(
@@ -53,10 +51,10 @@ public class CompanyAnalyticsService {
         );
     }
 
-    // ── 1. Resumo geral de matches ────────────────────────────────────────────
+    // Resumo geral de matches
 
     private MatchSummaryDTO buildMatchSummary(Long companyId) {
-        // WAITING é apenas o candidato pontuado automaticamente pelo ranking —
+        // WAITING é apenas o candidato pontuado automaticamente pelo ranking 
         // nunca virou um convite/interesse real, então não deve contar como
         // "match" nem inflar os pendentes (ver MatchService.generateRankingForProject).
         long companyInterested      = matchRepository.countByCompanyIdAndStatus(companyId, StatusMatch.COMPANY_INTERESTED);
@@ -85,7 +83,7 @@ public class CompanyAnalyticsService {
         );
     }
 
-    // ── 2. Matches por mês (últimos 12 meses) ────────────────────────────────
+    // Matches por mês (últimos 12 meses)
 
     private List<MonthlyMatchDTO> buildMonthlyMatches(Long companyId) {
         LocalDateTime since = LocalDateTime.now().minusMonths(12);
@@ -124,7 +122,7 @@ public class CompanyAnalyticsService {
         return result;
     }
 
-    // ── 3. Distribuição de scores em faixas ──────────────────────────────────
+    // Distribuição de scores em faixas 
 
     private List<ScoreDistributionDTO> buildScoreDistribution(Long companyId) {
         List<Double> scores = matchRepository.findAllScoresByCompany(companyId);
@@ -151,14 +149,14 @@ public class CompanyAnalyticsService {
         return result;
     }
 
-    // ── 4. Taxa de aceitação por projeto ─────────────────────────────────────
+    // taxa de aceitação por projeto
 
     private List<ProjectAcceptanceRateDTO> buildAcceptanceRatePerProject(Long companyId) {
         List<Project> projects = projectRepository.findByCompanyId(companyId);
         List<ProjectAcceptanceRateDTO> result = new ArrayList<>();
 
         for (Project project : projects) {
-            // Exclui candidatos WAITING (nunca contatados) — mesma razão do buildMatchSummary()
+            // Exclui candidatos WAITING
             List<Match> matches = matchRepository.findByProjectIdOrderByScore(project.getId())
                     .stream()
                     .filter(m -> m.getStatus() != StatusMatch.WAITING)
@@ -196,7 +194,7 @@ public class CompanyAnalyticsService {
         return result;
     }
 
-    // ── 5. Skills mais exigidas nos projetos da empresa ──────────────────────
+    // Skills mais exigidas nos projetos da empresa
 
     private List<SkillDemandDTO> buildMostRequiredSkills(Long companyId) {
         List<Object[]> raw = projectRepository.findMostRequiredSkillsByCompany(companyId);
@@ -212,7 +210,7 @@ public class CompanyAnalyticsService {
         return result;
     }
 
-    // ── 6. Resumo de reputação da empresa ────────────────────────────────────
+    //Resumo de reputação da empresa
 
     private ReputationSummaryDTO buildReputationSummary(Long companyId) {
         Optional<ReputationMetrics> metricsOpt =

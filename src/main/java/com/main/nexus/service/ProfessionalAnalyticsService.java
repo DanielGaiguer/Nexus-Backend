@@ -34,7 +34,7 @@ public class ProfessionalAnalyticsService {
     @Autowired
     private ReputationMetricsRepository reputationMetricsRepository;
 
-    // ── Ponto de entrada principal ────────────────────────────────────────────
+    // Ponto de entrada principal
 
     public ProfessionalDashboardAnalyticsDTO buildDashboard(Long professionalId) {
         return new ProfessionalDashboardAnalyticsDTO(
@@ -47,12 +47,12 @@ public class ProfessionalAnalyticsService {
         );
     }
 
-    // ── 1. Resumo geral de matches ────────────────────────────────────────────
+    // Resumo geral de matches
 
     private MatchSummaryDTO buildMatchSummary(Long professionalId) {
-        // WAITING é apenas o candidato pontuado automaticamente pelo ranking/oportunidades —
-        // nunca virou um convite/interesse real, então não deve contar como "match"
-        // nem inflar os pendentes (ver MatchService.getOpportunitiesForProfessional).
+        // waiting e apenas o candidato pontuado automaticamente pelo ranking oi oportunidades
+        // nunca virou um convite  e interesse real, então não deve contar como match
+        // nem inflar os pendentes ver MatchService.getOpportunitiesForProfessional.
         long companyInterested      = matchRepository.countByProfessionalIdAndStatus(professionalId, StatusMatch.COMPANY_INTERESTED);
         long professionalInterested = matchRepository.countByProfessionalIdAndStatus(professionalId, StatusMatch.PROFESSIONAL_INTERESTED);
         long confirmed = matchRepository.countByProfessionalIdAndStatus(professionalId, StatusMatch.MATCHED);
@@ -79,7 +79,7 @@ public class ProfessionalAnalyticsService {
         );
     }
 
-    // ── 2. Matches por mês (últimos 12 meses) ────────────────────────────────
+    // Matches por mês ultimos 12 meses
 
     private List<MonthlyMatchDTO> buildMonthlyMatches(Long professionalId) {
         LocalDateTime since = LocalDateTime.now().minusMonths(12);
@@ -117,7 +117,7 @@ public class ProfessionalAnalyticsService {
         return result;
     }
 
-    // ── 3. Distribuição de scores em faixas ──────────────────────────────────
+    // Distribuição de scores em faixa 
 
     private List<ScoreDistributionDTO> buildScoreDistribution(Long professionalId) {
         List<Double> scores = matchRepository.findAllScoresByProfessional(professionalId);
@@ -144,8 +144,8 @@ public class ProfessionalAnalyticsService {
         return result;
     }
 
-    // ── 4. Taxa de aceitação por empresa ─────────────────────────────────────
-    // Análogo profissional do "por projeto" da empresa: uma empresa pode ter
+    // Taxa de aceitação por empresa
+    // Análogo profissional do por projeto da empresa uma empresa pode ter
     // gerado vários matches com o profissional em projetos diferentes.
 
     private List<CompanyAcceptanceRateDTO> buildAcceptanceRatePerCompany(Long professionalId) {
@@ -197,7 +197,7 @@ public class ProfessionalAnalyticsService {
         return result;
     }
 
-    // ── 5. Skills mais presentes nos projetos em que o profissional deu match
+    // Skills mais presentes nos projetos em que o profissional deu match
 
     private List<SkillDemandDTO> buildMostRequiredSkills(Long professionalId) {
         List<Object[]> raw = matchRepository.findMostRequiredSkillsByProfessional(professionalId);
@@ -213,7 +213,7 @@ public class ProfessionalAnalyticsService {
         return result;
     }
 
-    // ── 6. Resumo de reputação do profissional ───────────────────────────────
+    //  Resumo de reputação do profissional 
 
     private ReputationSummaryDTO buildReputationSummary(Long professionalId) {
         Optional<ReputationMetrics> metricsOpt =

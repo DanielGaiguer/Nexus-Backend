@@ -64,7 +64,7 @@ public class MessageController {
     public ResponseEntity<Long> getUnreadTotal() {
         UserDTO logged = getLoggedUser();
 
-        // Só soma chats ainda ativos — não faz sentido contar não lidas
+        // so soma chats ainda ativos nao conta nao lidas
         // de um match encerrado no badge de notificação.
         long total = getMatchedMatches(logged.id()).stream()
                 .filter(m -> Boolean.TRUE.equals(m.getActive()))
@@ -74,7 +74,7 @@ public class MessageController {
         return ResponseEntity.ok(total);
     }
 
-    // ── Matches confirmados do usuário logado (ativos ou encerrados) ─────────
+    // Matches confirmados do usuário logado
 
     private List<Match> getMatchedMatches(Long userId) {
         List<Match> matches;
@@ -99,7 +99,7 @@ public class MessageController {
         UserDTO logged = getLoggedUser();
         Match match = chatService.validateReadAccess(matchId, logged.id());
 
-        // Não faz sentido marcar mensagens como lidas em um chat encerrado
+        // nao marcar mensagens como lidas em um chat encerrado
         if (Boolean.TRUE.equals(match.getActive())) {
             messageRepository.markAllAsReadInMatch(matchId, logged.id());
         }
@@ -118,7 +118,7 @@ public class MessageController {
         return ResponseEntity.ok(count);
     }
 
-    // ── Conversão para DTO ────────────────────────────────────────────────────
+    // conversão para DTO 
 
     private ChatSummaryDTO toChatSummaryDTO(Match match, Long myUserId) {
         boolean iAmProfessional = myUserId.equals(match.getProfessional().getUser().getId());
@@ -197,7 +197,7 @@ public class MessageController {
                 message.getRead());
     }
 
-    // ── Utilitários de identidade ────────────────────────────────────────────
+    // Utilitários de identidade
 
     private UserDTO getLoggedUser() {
         return (UserDTO) SecurityContextHolder.getContext()

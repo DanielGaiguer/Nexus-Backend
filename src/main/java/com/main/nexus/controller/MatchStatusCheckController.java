@@ -34,7 +34,7 @@ public class MatchStatusCheckController {
         return ResponseEntity.ok("Status check answered.");
     }
 
-    // ── Utilitários de identidade ────────────────────────────────────────────
+    // Utilitários de identidade 
 
     private UserDTO getLoggedUser() {
         return (UserDTO) SecurityContextHolder.getContext()

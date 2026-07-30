@@ -40,16 +40,7 @@ public class ChatWebSocketHandler {
     private SimpMessagingTemplate simpMessagingTemplate;
 
     @Autowired
-    private MatchRepository matchRepository;
-
-    @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private ProfessionalRepository professionalRepository;
-
-    @Autowired
-    private CompanyRepository companyRepository;
 
     @MessageMapping("/chat/{matchId}/send")
     @Transactional
@@ -100,7 +91,7 @@ public class ChatWebSocketHandler {
         }
     }
 
-    // ── Conversão para DTO ────────────────────────────────────────────────────
+    // Conversão para DTO
 
     private MessageDTO toMessageDTO(Message message, Match match) {
         boolean senderIsProfessional = message.getSender().getId()

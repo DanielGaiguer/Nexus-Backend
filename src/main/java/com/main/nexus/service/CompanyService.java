@@ -64,7 +64,7 @@ public class CompanyService {
         
         Company saved = companyRepository.save(company);
 
-        // Notifica a empresa in-app
+        // Notifica a empresa
         notificationService.notifyCompanyApproved(
             company.getUser(), company.getCompanyName());
 
@@ -88,7 +88,7 @@ public class CompanyService {
         company.setStatus(CompanyStatus.REJECTED);
         Company saved = companyRepository.save(company);
 
-        // Notifica a empresa in-app
+        // Notifica a empresa
         notificationService.notifyCompanyRejected(
             company.getUser(), company.getCompanyName());
 

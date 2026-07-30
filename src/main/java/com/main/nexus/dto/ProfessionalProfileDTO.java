@@ -22,14 +22,13 @@ public record ProfessionalProfileDTO(
         ExperienceLevel experienceLevel,
         String profilePhotoUrl,
 
-        // Novos campos de regime
         List<OpportunityType> preferredOpportunityTypes,
         Double expectedSalaryCLT,
         Double expectedSalaryPJ,
         Double freelanceMinExpectation,
         Double freelanceMaxExpectation,
 
-        // Status de completude
+        // Status se esta completo
         boolean profileComplete,
         List<String> missingFields,
 

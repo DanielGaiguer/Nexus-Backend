@@ -1,4 +1,3 @@
-// CandidateComparisonItemDTO.java
 package com.main.nexus.dto;
 
 import com.main.nexus.model.enums.ExperienceLevel;

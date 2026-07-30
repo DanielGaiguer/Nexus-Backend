@@ -60,7 +60,7 @@ public class CandidateComparisonService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Project not found."));
 
-        // Valida que o projeto pertence à empresa autenticada
+        // Valida que o projeto pertence a empresa autenticada
         if (!project.getCompany().getId().equals(companyId)) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(403),
                     "This project does not belong to your company.");
@@ -76,7 +76,7 @@ public class CandidateComparisonService {
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatusCode.valueOf(404), "Match not found: " + matchId));
 
-            // Garante que o match pertence ao projeto informado
+            // garante que o match pertence ao projeto informado
             if (!match.getProject().getId().equals(project.getId())) {
                 throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                         "Match " + matchId + " does not belong to project " + project.getId() + ".");
@@ -101,7 +101,7 @@ public class CandidateComparisonService {
         );
     }
 
-    // ── Monta o item de comparação de um candidato ────────────────────────────
+    // Monta o item de comparação de um candidato 
 
     private CandidateComparisonItemDTO buildComparisonItem(
             Match match,
@@ -153,9 +153,8 @@ public class CandidateComparisonService {
         );
     }
 
-    // ── Faixa de pretensão salarial relevante para o regime da vaga/projeto ──
+    // Faixa de pretensão salarial relevante para o regime da vaga/projeto 
     // CLT/PJ são valores únicos (min = max); freelance/temporário e PROJECT
-    // usam a faixa min/max informada pelo profissional.
 
     private record SalaryRange(Double min, Double max) {}
 

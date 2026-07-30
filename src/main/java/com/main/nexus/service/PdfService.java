@@ -49,7 +49,7 @@ public class PdfService {
             var fontRegular = PdfFontFactory.createFont("Helvetica");
             var fontItalic = PdfFontFactory.createFont("Helvetica-Oblique");
 
-            // ── Header ──
+            // Header
             doc.add(new Paragraph("NEXUS")
                     .setFont(fontBold).setFontSize(26)
                     .setFontColor(NEXUS_PRIMARY)
@@ -68,7 +68,7 @@ public class PdfService {
             doc.add(new LineSeparator(divider)
                     .setMarginBottom(16));
 
-            // ── Name ──
+            // Name
             doc.add(new Paragraph(professional.getName())
                     .setFont(fontBold).setFontSize(18)
                     .setMarginBottom(4));
@@ -85,7 +85,7 @@ public class PdfService {
                     .setFontColor(GRAY_TEXT)
                     .setMarginBottom(16));
 
-            // ── Skills ──
+            // Skills 
             addSectionTitle(doc, fontBold, "Habilidades");
             List<Skill> skills = professional.getSkills();
             if (skills != null && !skills.isEmpty()) {
@@ -99,7 +99,7 @@ public class PdfService {
                 addEmptyField(doc, fontRegular);
             }
 
-            // ── Salary ──
+            // Salary
             addSectionTitle(doc, fontBold, "Pretensão salarial");
             Double cltSalary = professional.getExpectedSalaryCLT();
             Double pjSalary = professional.getExpectedSalaryPJ();
@@ -134,7 +134,7 @@ public class PdfService {
                 addEmptyField(doc, fontRegular);
             }
 
-            // ── Projects ──
+            // Projects 
             addSectionTitle(doc, fontBold, "Histórico de projetos");
             if (projects != null && !projects.isEmpty()) {
                 for (PreviousProject p : projects) {
@@ -166,7 +166,7 @@ public class PdfService {
                 addEmptyField(doc, fontRegular);
             }
 
-            // ── Reputation ──
+            // reputation
             addSectionTitle(doc, fontBold, "Reputação");
             if (reputation != null) {
                 double score = reputation.getReputationScore() != null
@@ -188,7 +188,7 @@ public class PdfService {
                 addEmptyField(doc, fontRegular);
             }
 
-            // ── Footer ──
+            // footer
             SolidLine footerLine = new SolidLine(1);
             footerLine.setColor(ColorConstants.LIGHT_GRAY);
 

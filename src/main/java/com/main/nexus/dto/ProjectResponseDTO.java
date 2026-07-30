@@ -44,6 +44,5 @@ public record ProjectResponseDTO(
         LocalDate startDate,
         Integer workloadHoursPerWeek,
 
-        // Nested company (only populated on public detail endpoint)
         PublicCompanyDTO company
 ) {}

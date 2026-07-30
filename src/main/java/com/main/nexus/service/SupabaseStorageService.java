@@ -103,7 +103,7 @@ public class SupabaseStorageService {
             HttpEntity<Void> entity = new HttpEntity<>(headers);
             restTemplate.exchange(deleteUrl, HttpMethod.DELETE, entity, String.class);
         } catch (Exception e) {
-            // Falha silenciosa na deleção — arquivo pode já ter sido removido
+            // Falha silenciosa na deleção, arquivo pode já ter sido removido
         }
     }
 

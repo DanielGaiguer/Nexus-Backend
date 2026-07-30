@@ -9,7 +9,6 @@ import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
-import com.main.nexus.model.MatchHistory;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.enums.CompanyRejectionReason;
@@ -61,7 +60,7 @@ public class MatchController {
         return ResponseEntity.ok(history);
     }
 
-    // ── Empresa demonstra interesse (primeiro contato) ──────────────────────
+    // Empresa demonstra interesse─
 
     @PostMapping("/{matchId}/company-interest")
     public ResponseEntity<String> companyShowsInterest(@PathVariable Long matchId) {
@@ -70,7 +69,7 @@ public class MatchController {
         return ResponseEntity.ok("Interest sent to professional.");
     }
 
-    // ── Empresa responde a um interesse do profissional ─────────────────────
+    // Empresa responde a um interesse do profissional
 
     @PostMapping("/{matchId}/company-accept")
     public ResponseEntity<String> companyAccepts(@PathVariable Long matchId) {
@@ -95,7 +94,7 @@ public class MatchController {
         return ResponseEntity.ok("Match cancelled.");
     }
 
-    // ── Cancelamento genérico — acessível por empresa ou profissional dono do match ──
+    // Cancelamento genérico
 
     @PostMapping("/{matchId}/cancel")
     public ResponseEntity<String> cancelMatch(@PathVariable Long matchId) {
@@ -120,7 +119,7 @@ public class MatchController {
         return ResponseEntity.ok("Match cancelled.");
     }
 
-    // ── Profissional responde a um interesse da empresa ─────────────────────
+    // Profissional responde um interesse 
 
     @PostMapping("/{matchId}/professional-accept")
     public ResponseEntity<String> professionalAccepts(@PathVariable Long matchId) {
@@ -138,7 +137,7 @@ public class MatchController {
         return ResponseEntity.ok("Invite rejected.");
     }
 
-    // ── Conversão para DTO ───────────────────────────────────────────────────
+    // Conversão pra DTO
 
     private MatchResponseDTO toMatchResponseDTO(Match m) {
         Professional professional = m.getProfessional();
@@ -219,7 +218,7 @@ public class MatchController {
         );
     }
 
-    // ── Utilitários de identidade ────────────────────────────────────────────
+    //  Utilitários de identidade 
 
     private UserDTO getLoggedUser() {
         return (UserDTO) SecurityContextHolder.getContext()

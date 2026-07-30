@@ -18,9 +18,7 @@ public class NotificationService {
     @Autowired
     private NotificationRepository notificationRepository;
 
-    // =========================================================
     // API PÚBLICA — criação de notificações
-    // =========================================================
 
     @Async
     public void notify(User user, NotificationType type,
@@ -34,10 +32,8 @@ public class NotificationService {
         notificationRepository.save(notification);
     }
 
-    // =========================================================
     // MÉTODOS DE FÁBRICA — um por tipo de evento
-    // Centralizam o texto das notificações num único lugar
-    // =========================================================
+    // Centralizam o texto das notificações num único luga
 
     public void notifyNewInvite(User professional,
                                 String companyName, String projectTitle,
@@ -247,9 +243,7 @@ public class NotificationService {
         );
     }
 
-    // =========================================================
     // CONSULTAS — consumidas pelo controller
-    // =========================================================
 
     public NotificationSummaryDTO getSummary(Long userId) {
         long unread = notificationRepository.countByUserIdAndReadFalse(userId);
@@ -288,9 +282,7 @@ public class NotificationService {
         );
     }
 
-    // =========================================================
     // CONVERSÃO
-    // =========================================================
 
     private NotificationDTO toDTO(Notification n) {
         return new NotificationDTO(

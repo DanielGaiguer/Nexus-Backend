@@ -25,7 +25,7 @@ public class ProfessionalAnalyticsController {
     @Autowired
     private ProfessionalService professionalService;
 
-    // ── Dashboard do profissional autenticado ────────────────────────────────
+    // Dashboard do profissional autenticado 
 
     @GetMapping("/professional/dashboard")
     public ResponseEntity<ProfessionalDashboardAnalyticsDTO> getMyDashboard() {
@@ -37,7 +37,7 @@ public class ProfessionalAnalyticsController {
         return ResponseEntity.ok(analyticsService.buildDashboard(professional.getId()));
     }
 
-    // ── Dashboard de qualquer profissional — somente Admin ────────────────────
+    // Dashboard de qualquer profissional, somente Admin 
 
     @GetMapping("/professional/{professionalId}/dashboard")
     public ResponseEntity<ProfessionalDashboardAnalyticsDTO> getDashboardByAdmin(

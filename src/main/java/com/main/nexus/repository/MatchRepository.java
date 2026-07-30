@@ -14,7 +14,6 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByProjectId(Long projectId);
     List<Match> findByProfessionalId(Long professionalId);
     List<Match> findByStatus(StatusMatch status);
-    // Trata active = NULL (matches criados antes da coluna existir) como ativo
     @Query("SELECT m FROM Match m WHERE m.status = :status AND m.createdAt < :createdAtBefore " +
            "AND (m.active = true OR m.active IS NULL)")
     List<Match> findByStatusAndCreatedAtBeforeAndActiveTrue(
@@ -50,14 +49,14 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     @Query("SELECT COUNT(m) FROM Match m WHERE m.project.company.id = :companyId")
     long countByCompanyId(@Param("companyId") Long companyId);
 
-    // Projetos anteriores de uma empresa — matches que foram confirmados e já encerraram (ativo = false)
+    // Projetos anteriores de uma empresa, matches que foram confirmados e já encerraram 
     @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId " +
            "AND m.status = :status AND m.active = false ORDER BY m.createdAt DESC")
     List<Match> findByCompanyIdAndStatusAndActiveFalse(
             @Param("companyId") Long companyId,
             @Param("status") StatusMatch status);
 
-    // Matches por mês de uma empresa — retorna [year, month, status, count]
+    // Matches por mês de uma empresa retorna [year, month, status, count]
     @Query("SELECT YEAR(m.createdAt), MONTH(m.createdAt), m.status, COUNT(m) " +
            "FROM Match m " +
            "WHERE m.project.company.id = :companyId " +
@@ -68,7 +67,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
             @Param("companyId") Long companyId,
             @Param("since") java.time.LocalDateTime since);
 
-    // Scores de todos os matches de uma empresa — para calcular distribuição
+    // Scores de todos os matches de uma empresa para calcular distribuição
     @Query("SELECT m.matchScore FROM Match m WHERE m.project.company.id = :companyId")
     List<Double> findAllScoresByCompany(@Param("companyId") Long companyId);
 
@@ -76,7 +75,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     @Query("SELECT m FROM Match m WHERE m.project.id = :projectId ORDER BY m.matchScore DESC")
     List<Match> findByProjectIdOrderByScore(@Param("projectId") Long projectId);
 
-    // Matches por mês de um profissional — retorna [year, month, status, count]
+    // Matches por mês de um profissional retorna [year, month, status, count]
     @Query("SELECT YEAR(m.createdAt), MONTH(m.createdAt), m.status, COUNT(m) " +
            "FROM Match m " +
            "WHERE m.professional.id = :professionalId " +
@@ -87,7 +86,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
             @Param("professionalId") Long professionalId,
             @Param("since") java.time.LocalDateTime since);
 
-    // Scores de todos os matches de um profissional — para calcular distribuição
+    // Scores de todos os matches de um profissional para calcular distribuição
     @Query("SELECT m.matchScore FROM Match m WHERE m.professional.id = :professionalId")
     List<Double> findAllScoresByProfessional(@Param("professionalId") Long professionalId);
 

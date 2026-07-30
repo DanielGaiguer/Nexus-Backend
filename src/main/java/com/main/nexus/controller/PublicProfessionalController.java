@@ -234,48 +234,71 @@ public class PublicProfessionalController {
 
         List<ProjectResponseDTO> openProjects = projectRepository.findByCompanyId(id).stream()
                 .filter(project -> project.getStatus() == ProjectStatus.OPEN)
-                .map(project -> new ProjectResponseDTO(
-                        project.getId(),
-                        project.getTitle(),
-                        project.getDescription(),
-                        project.getWorkMode(),
-                        project.getExperienceLevel(),
-                        project.getStatus(),
-                        project.getMaxPositions(),
-                        project.getFilledPositions(),
-                        project.getCreatedAt(),
-                        project.getOpportunityType(),
-                        project.getRequiredSkills().stream()
-                                .map(skill -> new SkillResponseDTO(
-                                        skill.getId(),
-                                        skill.getName(),
-                                        skill.getCategory()
-                                ))
-                                .toList(),
-                        c.getId(),
-                        c.getCompanyName(),
-
-                        project.getCep() != null ? project.getCep() : c.getCep(),
-                        project.getEffectiveLatitude(),
-                        project.getEffectiveLongitude(),
-                        project.getEffectiveCity(),
-                        project.getEffectiveUf(),
-
-                        project.getMinimumBudget(),
-                        project.getMaximumBudget(),
-                        project.getDeadline(),
-
-                        project.getMonthlySalaryMin(),
-                        project.getMonthlySalaryMax(),
-                        project.getContractType(),
-                        project.getBenefits(),
-                        project.getStartDate(),
-                        project.getWorkloadHoursPerWeek(),
-
-                        null
-                ))
+                .map(project -> toProjectResponseDTO(project, c))
                 .toList();
 
         return ResponseEntity.ok(openProjects);
+    }
+
+    // Histórico de oportunidades encerradas (vagas e projetos) — visível publicamente
+    // para admin, profissionais e demais empresas no perfil da empresa
+    @GetMapping("/company/{id}/projects/closed")
+    public ResponseEntity<List<ProjectResponseDTO>> getCompanyClosedProjects(@PathVariable Long id) {
+        Optional<Company> optional = companyRepository.findById(id);
+        if (optional.isEmpty() || optional.get().getStatus() != CompanyStatus.APPROVED) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Company c = optional.get();
+
+        List<ProjectResponseDTO> closedProjects = projectRepository.findByCompanyId(id).stream()
+                .filter(project -> project.getStatus() == ProjectStatus.CLOSED)
+                .map(project -> toProjectResponseDTO(project, c))
+                .toList();
+
+        return ResponseEntity.ok(closedProjects);
+    }
+
+    private ProjectResponseDTO toProjectResponseDTO(Project project, Company c) {
+        return new ProjectResponseDTO(
+                project.getId(),
+                project.getTitle(),
+                project.getDescription(),
+                project.getWorkMode(),
+                project.getExperienceLevel(),
+                project.getStatus(),
+                project.getMaxPositions(),
+                project.getFilledPositions(),
+                project.getCreatedAt(),
+                project.getOpportunityType(),
+                project.getRequiredSkills().stream()
+                        .map(skill -> new SkillResponseDTO(
+                                skill.getId(),
+                                skill.getName(),
+                                skill.getCategory()
+                        ))
+                        .toList(),
+                c.getId(),
+                c.getCompanyName(),
+
+                project.getCep() != null ? project.getCep() : c.getCep(),
+                project.getEffectiveLatitude(),
+                project.getEffectiveLongitude(),
+                project.getEffectiveCity(),
+                project.getEffectiveUf(),
+
+                project.getMinimumBudget(),
+                project.getMaximumBudget(),
+                project.getDeadline(),
+
+                project.getMonthlySalaryMin(),
+                project.getMonthlySalaryMax(),
+                project.getContractType(),
+                project.getBenefits(),
+                project.getStartDate(),
+                project.getWorkloadHoursPerWeek(),
+
+                null
+        );
     }
 }

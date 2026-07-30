@@ -98,7 +98,7 @@ public class CompanyController {
 
         companyService.update(existing);
 
-        // Se o perfil estava incompleto e agora está completo, notifica
+        // Se o perfil estava incompleto e agora está completo notifica
         boolean nowComplete = profileCompletionService.isProfileComplete(existing);
         if (wasIncomplete && nowComplete) {
             notificationService.notify(
@@ -110,7 +110,7 @@ public class CompanyController {
             );
         }
 
-        // Se ainda incompleto, lembra o que falta
+        // Se ainda incompleto lembra o que falta
         if (!nowComplete) {
             List<String> missing = profileCompletionService.getMissingFields(existing);
             notificationService.notifyIncompleteCompanyProfile(existing.getUser(), missing);
@@ -139,7 +139,7 @@ public class CompanyController {
                 .getPrincipal();
     }
 
-    // Contato (telefone/e-mail) — só liberado para profissional com match confirmado
+    // Contato só liberado para profissional com match confirmado
     @GetMapping("/{companyId}/contact")
     public ResponseEntity<ContactInfoDTO> getContact(@PathVariable Long companyId) {
         UserDTO logged = getLoggedUser();

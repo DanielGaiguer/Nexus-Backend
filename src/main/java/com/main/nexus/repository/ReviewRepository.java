@@ -16,10 +16,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     boolean existsByMatchIdAndAuthorType(Long matchId, AuthorType authorType);
 
-    // Todas as reviews recebidas por um profissional (histórico completo, sem filtro de data)
     List<Review> findByMatchProfessionalId(Long professionalId);
 
-    // Todas as reviews recebidas por uma empresa (histórico completo, sem filtro de data)
     List<Review> findByMatchProjectCompanyId(Long companyId);
 
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.match.professional.id = :professionalId")

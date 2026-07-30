@@ -28,7 +28,7 @@ public class ScorePreviewService {
     @Autowired
     private MatchService matchService;
 
-    // Empresa consultando o score de um profissional em um dos seus projetos
+    // empresa consultando o score de um profissional em um dos seus projetos
     public ScorePreviewResponseDTO previewForCompany(Long companyId, Long professionalId, Long projectId) {
         Project project = findProject(projectId);
 
@@ -41,7 +41,7 @@ public class ScorePreviewService {
         return buildPreview(professional, project);
     }
 
-    // Profissional consultando seu próprio score em uma vaga/projeto
+    // profissional consultando seu próprio score em uma vaga/projeto
     public ScorePreviewResponseDTO previewForProfessional(Long professionalId, Long projectId) {
         Project project = findProject(projectId);
         Professional professional = findProfessional(professionalId);
@@ -49,8 +49,8 @@ public class ScorePreviewService {
     }
 
     // Reaproveita o Match existente (se houver) para não divergir do score já
-    // visto em outra tela; senão monta um Match transitório (não salvo) só
-    // para calcular o breakdown sob demanda.
+    // visto em outra tela; senão monta um Match transitório não salvo só
+    // para calcular o breakdown
     private ScorePreviewResponseDTO buildPreview(Professional professional, Project project) {
         Match match = matchRepository
                 .findByProjectIdAndProfessionalId(project.getId(), professional.getId())

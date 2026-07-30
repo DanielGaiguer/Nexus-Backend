@@ -21,7 +21,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // Contagem de não lidas — usada no badge do sino
     long countByUserIdAndReadFalse(Long userId);
 
-    // Verifica se já existe notificação desse tipo/actionUrl para o usuário — evita duplicidade
+    // Verifica se já existe notificação desse tipo
     boolean existsByUserIdAndTypeAndActionUrl(Long userId, NotificationType type, String actionUrl);
 
     // Marca todas as notificações de um usuário como lidas
@@ -34,7 +34,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("UPDATE Notification n SET n.read = true WHERE n.id = :id AND n.user.id = :userId")
     void markAsReadByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 
-    // Remove notificações antigas — útil para limpeza periódica
+    // Remove notificações antigas
     @Modifying
     @Query("DELETE FROM Notification n WHERE n.user.id = :userId AND n.read = true AND n.createdAt < :before")
     void deleteOldReadNotifications(

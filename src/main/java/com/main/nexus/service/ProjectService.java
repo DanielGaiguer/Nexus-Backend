@@ -96,7 +96,7 @@ public class ProjectService {
                         HttpStatusCode.valueOf(404), "Project not found: " + id));
     }
 
-    // ── Novo: busca validando que o projeto pertence à empresa ──────────────
+    // busca validando que o projeto pertence à empresa 
     public Project findByIdAndCompany(Long id, Long companyId) {
         Project project = findById(id);
         validateOwnership(project, companyId);
@@ -120,7 +120,7 @@ public class ProjectService {
         project.setStatus(ProjectStatus.CLOSED);
         projectRepository.save(project);
 
-        // Notifica profissionais que tinham match WAITING ou COMPANY_INTERESTED
+        // notifica profissionais que tinham match WAITING ou COMPANY_INTERESTED
         matchRepository.findByProjectId(project.getId())
                 .stream()
                 .filter(m -> m.getStatus() == StatusMatch.WAITING
@@ -133,8 +133,8 @@ public class ProjectService {
                 ));
     }
 
-    // ── Reativa um projeto encerrado — opcionalmente ajustando o nº de posições,
-    // já que a vaga costuma ter sido encerrada por estar totalmente preenchida ──
+    // Reativa um projeto encerrado opcionalmente ajustando o nº de posições,
+    // já que a vaga costuma ter sido encerrada por estar totalmente preenchida 
     public Project reopenProject(Long id, Long companyId, Integer newMaxPositions) {
         Project project = findByIdAndCompany(id, companyId);
 
@@ -162,7 +162,7 @@ public class ProjectService {
         projectRepository.delete(project);
     }
 
-    // ── Validação de posse ───────────────────────────────────────────────────
+    // Validação de posse 
     private void validateOwnership(Project project, Long companyId) {
         if (!project.getCompany().getId().equals(companyId)) {
             throw new ResponseStatusException(

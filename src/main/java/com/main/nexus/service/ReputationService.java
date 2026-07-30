@@ -31,7 +31,7 @@ public class ReputationService {
     @Autowired private ProfessionalRepository professionalRepository;
     @Autowired private CompanyRepository companyRepository;
 
-    // ── Constantes de configuração ──────────────────────────────────────────
+    // Constantes de configuração
     private static final double RECENT_WEIGHT = 0.70;
     private static final double HISTORICAL_WEIGHT = 0.30;
     private static final double MAX_ADJUSTMENT = 0.20;
@@ -42,9 +42,7 @@ public class ReputationService {
     private static final double BAYESIAN_CONFIDENCE_CONSTANT = 5.0; // C — peso de "avaliações neutras" na média bayesiana
     private static final double BAYESIAN_GLOBAL_PRIOR = 50.0;       // m — média global assumida para um indicador 0-100
 
-    // =========================================================
     // API PÚBLICA — consumida pelo MatchService
-    // =========================================================
 
     public double getScoreAdjustment(Long entityId, AuthorType type) {
         ReputationMetrics metrics = (type == AuthorType.PROFESSIONAL)
@@ -59,9 +57,7 @@ public class ReputationService {
         return rawAdjustment * metrics.getConfidenceScore();
     }
 
-    // =========================================================
     // RECÁLCULO — disparado por evento (Review ou RejectionFeedback novos)
-    // =========================================================
 
     public void recalculateForProfessional(Long professionalId) {
         Professional professional = professionalRepository.findById(professionalId)
@@ -123,7 +119,7 @@ public class ReputationService {
         reputationMetricsRepository.save(metrics);
     }
 
-    // ── Helpers de leitura (calcula sob demanda se nunca foi calculado) ──────
+    // Helpers de leitura
 
     private ReputationMetrics getOrCalculateForProfessional(Long professionalId) {
         return reputationMetricsRepository.findByProfessionalId(professionalId)
@@ -141,9 +137,7 @@ public class ReputationService {
                 });
     }
 
-    // =========================================================
     // CÁLCULO — PROFISSIONAL
-    // =========================================================
 
     private void applyProfessionalCalculation(
             ReputationMetrics metrics,
@@ -198,7 +192,7 @@ public class ReputationService {
                 List.of(NegativeReason.UNPROFESSIONAL, NegativeReason.DID_NOT_MEET_EXPECTATIONS, NegativeReason.OTHER));
         metrics.setProfessionalism(blend(profRecent, profHist));
 
-        // Satisfaction & Recommendation rate
+        // Satisfaction e Recommendation rate
         metrics.setSatisfactionAverage(bayesianRating(allReviews));
         metrics.setRecommendationRate(recommendationRate(allReviews));
 
@@ -217,10 +211,8 @@ public class ReputationService {
         metrics.setTotalRejectionsReceived(allRejections.size());
         metrics.setConfidenceScore(Math.min(1.0, (double) allReviews.size() / CONFIDENCE_THRESHOLD));
     }
-
-    // =========================================================
-    // CÁLCULO — EMPRESA (espelha o profissional, motivos diferentes)
-    // =========================================================
+    
+    // CÁLCULO  EMPRESA igual ao profissional motivos diferentes
 
     private void applyCompanyCalculation(
             ReputationMetrics metrics,
@@ -257,7 +249,7 @@ public class ReputationService {
                 List.of(NegativeReason.UNPROFESSIONAL, NegativeReason.OTHER));
         metrics.setProfessionalism(blend(profRecent, profHist));
 
-        // Empresa não tem "competência técnica" própria — usamos o mesmo peso redistribuído
+        // Empresa não tem "competência técnica" própria, e usado o mesmo peso redistribuído
         // entre os 4 indicadores restantes (sem technicalCompetence)
         metrics.setTechnicalCompetence(null); // não se aplica a empresas
 
@@ -278,16 +270,14 @@ public class ReputationService {
         metrics.setConfidenceScore(Math.min(1.0, (double) allReviews.size() / CONFIDENCE_THRESHOLD));
     }
 
-    // =========================================================
     // MATEMÁTICA AUXILIAR
-    // =========================================================
 
     // Combina recente (70%) e histórico (30%)
     private double blend(double recent, double historical) {
         return (RECENT_WEIGHT * recent) + (HISTORICAL_WEIGHT * historical);
     }
 
-    // Indicador 0-100 a partir da contagem de motivos positivos/negativos nas reviews, via Bayesian average
+    // Indicador 0-100 a partir da contagem de motivos positivos e negativos nas reviews, via Bayesian 
     private double indicatorFromReviews(List<Review> reviews, List<PositiveReason> positives, List<NegativeReason> negatives) {
         if (reviews.isEmpty()) return BAYESIAN_GLOBAL_PRIOR;
 
@@ -308,7 +298,7 @@ public class ReputationService {
 
         double rawRatio = ((double) positiveCount / totalMentions) * 100.0;
 
-        // Bayesian average: puxa para o prior global quando há poucas menções
+        // Bayesian: puxa para o prior global quando há poucas menções
         return ((BAYESIAN_CONFIDENCE_CONSTANT * BAYESIAN_GLOBAL_PRIOR) + (rawRatio * totalMentions))
                 / (BAYESIAN_CONFIDENCE_CONSTANT + totalMentions);
     }
@@ -331,7 +321,7 @@ public class ReputationService {
         return ((double) recommended / reviews.size()) * 100.0;
     }
 
-    // Proporção de rejeições recebidas pelo profissional com um motivo específico, convertida em penalidade 0-30
+    // proporcao de rejeições recebidas pelo profissional com um motivo específico convertida em penalidade 0-30
     private double rejectionRatioForProfessional(List<RejectionFeedback> rejections, List<CompanyRejectionReason> targetReasons) {
         if (rejections.isEmpty()) return 0.0;
 

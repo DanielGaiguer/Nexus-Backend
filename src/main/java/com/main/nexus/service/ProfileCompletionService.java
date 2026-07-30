@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProfileCompletionService {
 
-    // ── Itens que sempre são obrigatórios ────────────────────────────────────
+    // sempre obrigatórios 
     // CEP (latitude/longitude preenchidos = CEP foi resolvido)
     // preferredOpportunityTypes (pelo menos um regime)
     // skills (pelo menos uma)
@@ -65,8 +65,8 @@ public class ProfileCompletionService {
         return missing;
     }
 
-    // Score só é calculado se o perfil estiver completo o suficiente
-    // CEP e pretensões são os únicos campos que, se ausentes, invalidam o score
+    // score só é calculado se o perfil estiver completo o suficiente
+    // cep e pretensões são os únicos campos que, se ausentes, invalidam o score
     public boolean canParticipateInRanking(Professional professional) {
         if (professional.getLatitude() == null || professional.getLongitude() == null) {
             return false;
@@ -89,9 +89,9 @@ public class ProfileCompletionService {
         return true;
     }
 
-    // ── Empresas ──────────────────────────────────────────────────────────────
+    // companies
     // CEP (latitude/longitude preenchidos = CEP foi resolvido)
-    // CNPJ, telefone e descrição — companyName e email já são obrigatórios no cadastro
+    // CNPJ, telefone e descrição companyName e email já são obrigatórios no cadastro
 
     public boolean isProfileComplete(Company company) {
         return getMissingFields(company).isEmpty();

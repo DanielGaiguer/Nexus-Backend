@@ -77,9 +77,6 @@ public class ProfessionalController {
     private SupabaseStorageService supabaseStorageService;
 
     @Autowired
-    private EmailService emailService;
-
-    @Autowired
     private PdfService pdfService;
 
     @Autowired
@@ -186,7 +183,7 @@ public class ProfessionalController {
             );
         }
 
-        // Se ainda incompleto, lembra o que falta
+        // Se ainda incompleto lembra o que fatla
         if (!nowComplete) {
             List<String> missing = profileCompletionService.getMissingFields(existing);
             notificationService.notifyIncompleteProfile(existing.getUser(), missing);
@@ -390,7 +387,7 @@ public class ProfessionalController {
         );
     }
 
-    // Lista oportunidades compatíveis — "projetos vistos por mim"
+    // Lista oportunidades compatíveis , projetos vistos por mim
     @GetMapping("/opportunities")
     public ResponseEntity<List<MatchResponseDTO>> getOpportunities() {
         UserDTO logged = getLoggedUser();
@@ -422,7 +419,7 @@ public class ProfessionalController {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Profile not found"));
 
-        // Remove o currículo anterior do bucket se existir
+        // Remove o curriculo anterior do bucket se existir
         supabaseStorageService.deleteResume(professional.getResume());
 
         String resumeUrl = supabaseStorageService.uploadResume(file, professional.getId());
@@ -432,7 +429,7 @@ public class ProfessionalController {
         return ResponseEntity.ok("Resume uploaded successfully.");
     }
 
-    // Download do currículo — acessível por COMPANY e PROFESSIONAL autenticados
+    // dowload do curcciulo  acessivel por company e professional autenticados
     @GetMapping("/{professionalId}/resume")
     public ResponseEntity<byte[]> downloadResume(@PathVariable Long professionalId) {
         Professional professional = professionalService.findById(professionalId);
@@ -451,7 +448,7 @@ public class ProfessionalController {
                 .body(content);
     }
     
-    // Contato (telefone/e-mail) — só liberado para empresa com match confirmado
+    // Contato so liberado para empresa com match confirmado
     @GetMapping("/{professionalId}/contact")
     public ResponseEntity<ContactInfoDTO> getContact(@PathVariable Long professionalId) {
         UserDTO logged = getLoggedUser();
@@ -479,7 +476,7 @@ public class ProfessionalController {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Profile not found"));
 
-        // Remove a foto antiga do bucket se existir
+        // remove a foto antiga do bucket se existir
         supabaseStorageService.deleteProfilePhoto(professional.getProfilePhotoUrl());
 
         String photoUrl = supabaseStorageService.uploadProfilePhoto(

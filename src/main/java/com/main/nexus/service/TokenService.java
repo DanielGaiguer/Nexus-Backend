@@ -67,7 +67,7 @@ public class TokenService {
         }
     }
 
-    // ── Ticket temporário de cadastro via LinkedIn ──────────────────────────
+    // Ticket temporário de cadastro via LinkedIn 
     // Carrega a identidade já verificada pelo LinkedIn (sub/email/name) entre
     // o callback do OAuth e o formulário de finalização do cadastro de
     // empresa (o LinkedIn não fornece razão social, então a empresa precisa

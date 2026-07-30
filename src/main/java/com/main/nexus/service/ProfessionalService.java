@@ -43,7 +43,7 @@ public class ProfessionalService {
         professionalRepository.deleteById(id);
     }
 
-    // Atualiza reputação após nova avaliação
+    // Atualiza reputação apos nova avaliação
     public void updateReputation(Long professionalId, Double newAverage) {
         Professional professional = findById(professionalId);
         professional.setReputation(newAverage);

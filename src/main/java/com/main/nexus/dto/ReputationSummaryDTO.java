@@ -1,4 +1,3 @@
-// ReputationSummaryDTO.java
 package com.main.nexus.dto;
 
 public record ReputationSummaryDTO(

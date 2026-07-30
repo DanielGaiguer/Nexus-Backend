@@ -45,11 +45,11 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    // ── Sign In with LinkedIn (OpenID Connect) ──────────────────────────────
+    // Sign In Linkedin 
 
     @GetMapping("/linkedin/login")
-    public ResponseEntity<Void> linkedInLogin() {
-        return redirect(authService.getLinkedInLoginUrl());
+    public ResponseEntity<Void> linkedInLogin(@RequestParam(required = false) String redirect) {
+        return redirect(authService.getLinkedInLoginUrl(redirect));
     }
 
     @GetMapping("/linkedin/register")
