@@ -1,6 +1,10 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.CompanyDirectoryItemDTO;
+import com.main.nexus.dto.CompanyDirectoryPageDTO;
 import com.main.nexus.dto.CompanyPreviousProjectDTO;
+import com.main.nexus.dto.ProfessionalDirectoryItemDTO;
+import com.main.nexus.dto.ProfessionalDirectoryPageDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
 import com.main.nexus.dto.PublicProfessionalDTO;
 import com.main.nexus.dto.PublicProjectDTO;
@@ -21,10 +25,15 @@ import com.main.nexus.service.MatchService;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -95,6 +104,59 @@ public class PublicProfessionalController {
         );
 
         return ResponseEntity.ok(dto);
+    }
+
+    // Diretório de empresas — paginado, com busca por nome, disponível para qualquer role logada
+    @GetMapping("/companies")
+    public ResponseEntity<CompanyDirectoryPageDTO> listCompanies(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("companyName").ascending());
+        Page<Company> result = companyRepository.findByStatusAndCompanyNameContainingIgnoreCase(
+                CompanyStatus.APPROVED, search != null ? search : "", pageable);
+
+        List<CompanyDirectoryItemDTO> content = result.getContent().stream()
+                .map(c -> new CompanyDirectoryItemDTO(
+                        c.getId(),
+                        c.getCompanyName(),
+                        c.getCity(),
+                        c.getUf(),
+                        c.getReputation(),
+                        c.getProfilePhotoUrl(),
+                        c.getDescription()
+                ))
+                .toList();
+
+        return ResponseEntity.ok(new CompanyDirectoryPageDTO(content, result.hasNext()));
+    }
+
+    // Diretório de profissionais — paginado, com busca por nome, disponível para qualquer role logada
+    @GetMapping("/professionals")
+    public ResponseEntity<ProfessionalDirectoryPageDTO> listProfessionals(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
+        Page<Professional> result = professionalRepository.findByNameContainingIgnoreCase(
+                search != null ? search : "", pageable);
+
+        List<ProfessionalDirectoryItemDTO> content = result.getContent().stream()
+                .map(p -> new ProfessionalDirectoryItemDTO(
+                        p.getId(),
+                        p.getName(),
+                        p.getCity(),
+                        p.getUf(),
+                        p.getReputation(),
+                        p.getProfilePhotoUrl(),
+                        p.getExperienceLevel() != null ? p.getExperienceLevel().name() : null,
+                        p.getSkills() != null ? p.getSkills().stream().map(s -> s.getName()).toList() : List.of()
+                ))
+                .toList();
+
+        return ResponseEntity.ok(new ProfessionalDirectoryPageDTO(content, result.hasNext()));
     }
 
     private ReputationExplanationDTO toReputationDTO(ReputationMetrics m) {
