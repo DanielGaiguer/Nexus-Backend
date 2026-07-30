@@ -3,9 +3,13 @@ package com.main.nexus.controller;
 import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.ContactInfoDTO;
+import com.main.nexus.dto.ProjectResponseDTO;
+import com.main.nexus.dto.PublicCompanyDTO;
+import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
+import com.main.nexus.model.Project;
 import com.main.nexus.model.enums.NotificationType;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
@@ -137,6 +141,79 @@ public class CompanyController {
         return (UserDTO) SecurityContextHolder.getContext()
                 .getAuthentication()
                 .getPrincipal();
+    }
+
+    // Vitrine de todas as oportunidades da plataforma, para a company navegar o mercado
+    @GetMapping("/opportunities")
+    public ResponseEntity<List<ProjectResponseDTO>> listAllOpportunities() {
+        List<ProjectResponseDTO> projects = projectService.findAllOpen()
+                .stream()
+                .map(this::toResponseDTO)
+                .toList();
+        return ResponseEntity.ok(projects);
+    }
+
+    private ProjectResponseDTO toResponseDTO(Project p) {
+        return new ProjectResponseDTO(
+                p.getId(),
+                p.getTitle(),
+                p.getDescription(),
+                p.getWorkMode(),
+                p.getExperienceLevel(),
+                p.getStatus(),
+                p.getMaxPositions(),
+                p.getFilledPositions(),
+                p.getCreatedAt(),
+                p.getOpportunityType(),
+                p.getType(),
+                p.getRequiredSkills().stream()
+                    .map(skill -> new SkillResponseDTO(
+                            skill.getId(),
+                            skill.getName(),
+                            skill.getCategory()
+                    ))
+                    .toList(),
+                p.getCompany().getId(),
+                p.getCompany().getCompanyName(),
+
+                // Localização efetiva — da vaga ou da empresa como fallback
+                p.getCep() != null ? p.getCep() : p.getCompany().getCep(),
+                p.getEffectiveLatitude(),
+                p.getEffectiveLongitude(),
+                p.getEffectiveCity(),
+                p.getEffectiveUf(),
+
+                // PROJECT
+                p.getMinimumBudget(),
+                p.getMaximumBudget(),
+                p.getDeadline(),
+
+                // JOB
+                p.getMonthlySalaryMin(),
+                p.getMonthlySalaryMax(),
+                p.getContractType(),
+                p.getBenefits(),
+                p.getStartDate(),
+                p.getWorkloadHoursPerWeek(),
+                toPublicCompanyDTO(p.getCompany())
+        );
+    }
+
+    private PublicCompanyDTO toPublicCompanyDTO(Company c) {
+        return new PublicCompanyDTO(
+                c.getId(),
+                c.getCompanyName(),
+                c.getDescription(),
+                c.getCity(),
+                c.getUf(),
+                c.getReputation(),
+                c.getProfilePhotoUrl(),
+                null,
+                c.getTaxId(),
+                c.getStatus().name(),
+                List.of(),
+                c.getUser() != null ? c.getUser().getEmail() : null
+        );
     }
 
     // Contato só liberado para profissional com match confirmado
