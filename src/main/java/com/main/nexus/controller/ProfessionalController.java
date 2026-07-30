@@ -327,6 +327,7 @@ public class ProfessionalController {
                 p.getFilledPositions(),
                 p.getCreatedAt(),
                 p.getOpportunityType(),
+                p.getType(),
                 p.getRequiredSkills().stream()
                         .map(skill -> new SkillResponseDTO(
                                 skill.getId(),

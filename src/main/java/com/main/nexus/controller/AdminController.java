@@ -6,6 +6,7 @@ import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.PreviousProjectRequestDTO;
 import com.main.nexus.dto.ProfessionalDashboardDTO;
+import com.main.nexus.dto.PublicCompanyDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
@@ -27,6 +28,7 @@ import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
+import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SkillService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -76,6 +79,9 @@ public class AdminController {
     @Autowired
     private ProfileCompletionService profileCompletionService;
 
+    @Autowired
+    private ProjectService projectService;
+
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardDTO> dashboard() {
         long totalProfessionals = professionalRepository.count();
@@ -110,9 +116,24 @@ public class AdminController {
         return ResponseEntity.ok(projects);
     }
 
+    @PutMapping("/projects/{id}/close")
+    public ResponseEntity<String> closeProject(@PathVariable Long id) {
+        projectService.closeProjectAsAdmin(id);
+        return ResponseEntity.ok("Project closed.");
+    }
+
     @GetMapping("/companies/pending")
     public ResponseEntity<?> pendingCompanies() {
         return ResponseEntity.ok(companyService.findPending());
+    }
+
+    @GetMapping("/companies")
+    public ResponseEntity<List<CompanyProfileDTO>> listCompanies() {
+        List<CompanyProfileDTO> companies = companyRepository.findAll()
+                .stream()
+                .map(this::toCompanyProfileDTO)
+                .toList();
+        return ResponseEntity.ok(companies);
     }
 
     @PostMapping("/companies/{id}/approve")
@@ -273,6 +294,7 @@ public class AdminController {
                 p.getFilledPositions(),
                 p.getCreatedAt(),
                 p.getOpportunityType(),
+                p.getType(),
                p.getRequiredSkills().stream()
                     .map(skill -> new SkillResponseDTO(
                             skill.getId(),
@@ -302,7 +324,24 @@ public class AdminController {
                 p.getBenefits(),
                 p.getStartDate(),
                 p.getWorkloadHoursPerWeek(),
-                null
+                toPublicCompanyDTO(p.getCompany())
+        );
+    }
+
+    private PublicCompanyDTO toPublicCompanyDTO(Company c) {
+        return new PublicCompanyDTO(
+                c.getId(),
+                c.getCompanyName(),
+                c.getDescription(),
+                c.getCity(),
+                c.getUf(),
+                c.getReputation(),
+                c.getProfilePhotoUrl(),
+                null,
+                c.getTaxId(),
+                c.getStatus().name(),
+                List.of(),
+                c.getUser() != null ? c.getUser().getEmail() : null
         );
     }
 

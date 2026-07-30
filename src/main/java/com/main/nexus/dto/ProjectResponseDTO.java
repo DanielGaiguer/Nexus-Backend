@@ -6,6 +6,7 @@ import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.model.enums.ProjectType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,6 +22,7 @@ public record ProjectResponseDTO(
         Integer filledPositions,
         LocalDateTime createdAt,
         OpportunityType opportunityType,
+        ProjectType type,
         List<SkillResponseDTO> requiredSkills,
         Long companyId,
         String companyName,

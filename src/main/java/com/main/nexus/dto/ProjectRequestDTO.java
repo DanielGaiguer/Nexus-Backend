@@ -4,6 +4,7 @@ import com.main.nexus.model.enums.ContractType;
 import com.main.nexus.model.enums.ExperienceLevel;
 import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.OpportunityType;
+import com.main.nexus.model.enums.ProjectType;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -12,6 +13,7 @@ public record ProjectRequestDTO(
         String title,
         String description,
         Modality workMode,
+        ProjectType type,
         ExperienceLevel experienceLevel,
         Integer maxPositions,
         OpportunityType opportunityType,

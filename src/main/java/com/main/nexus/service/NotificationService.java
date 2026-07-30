@@ -218,6 +218,17 @@ public class NotificationService {
             "/opportunities"
         );
     }
+
+    public void notifyProjectClosedByAdmin(User companyUser, String projectTitle) {
+        notify(
+            companyUser,
+            NotificationType.PROJECT_CLOSED_BY_ADMIN,
+            "Oportunidade encerrada pelo administrador",
+            "A sua oportunidade \"" + projectTitle + "\" foi encerrada por um Administrador. " +
+            "Para mais informações, entre em contato com admin@gmail.com.",
+            "/company/dashboard"
+        );
+    }
     
     @Async
     public void notifyIncompleteProfile(User user, List<String> missingFields) {

@@ -116,6 +116,7 @@ public class ProjectController {
         project.setTitle(r.title());
         project.setDescription(r.description());
         project.setWorkMode(r.workMode());
+        project.setType(r.type());
         project.setExperienceLevel(r.experienceLevel());
         project.setOpportunityType(r.opportunityType());
 
@@ -222,6 +223,7 @@ public class ProjectController {
                 p.getFilledPositions(),
                 p.getCreatedAt(),
                 p.getOpportunityType(),
+                p.getType(),
                 p.getRequiredSkills().stream()
                     .map(skill -> new SkillResponseDTO(
                             skill.getId(),

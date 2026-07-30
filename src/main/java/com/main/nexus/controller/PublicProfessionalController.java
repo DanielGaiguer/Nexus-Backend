@@ -215,6 +215,7 @@ public class PublicProfessionalController {
                 p.getFilledPositions(),
                 p.getCreatedAt(),
                 p.getOpportunityType(),
+                p.getType(),
                 p.getRequiredSkills().stream()
                         .map(skill -> new SkillResponseDTO(
                                 skill.getId(),
@@ -333,6 +334,7 @@ public class PublicProfessionalController {
                 project.getFilledPositions(),
                 project.getCreatedAt(),
                 project.getOpportunityType(),
+                project.getType(),
                 project.getRequiredSkills().stream()
                         .map(skill -> new SkillResponseDTO(
                                 skill.getId(),

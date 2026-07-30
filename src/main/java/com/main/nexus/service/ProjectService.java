@@ -2,6 +2,7 @@ package com.main.nexus.service;
 
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.User;
 import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.StatusMatch;
@@ -27,6 +28,9 @@ public class ProjectService {
 
     @Autowired
     private MatchRepository matchRepository;
+
+    @Autowired
+    private EmailService emailService;
 
     public Project save(Project project) {
         validateByType(project);
@@ -117,6 +121,25 @@ public class ProjectService {
 
     public void closeProject(Long id, Long companyId) {
         Project project = findByIdAndCompany(id, companyId);
+        closeProjectInternal(project);
+    }
+
+    // Encerramento por um administrador, sem exigir vínculo com a empresa dona do projeto
+    public void closeProjectAsAdmin(Long id) {
+        Project project = findById(id);
+        closeProjectInternal(project);
+
+        User companyUser = project.getCompany().getUser();
+        notificationService.notifyProjectClosedByAdmin(companyUser, project.getTitle());
+        emailService.send(
+            companyUser.getEmail(),
+            "Oportunidade encerrada — Nexus",
+            "Olá,\n\nA sua oportunidade \"" + project.getTitle() + "\" foi encerrada por um Administrador. " +
+            "Para mais informações, entre em contato com admin@gmail.com.\n\nEquipe Nexus"
+        );
+    }
+
+    private void closeProjectInternal(Project project) {
         project.setStatus(ProjectStatus.CLOSED);
         projectRepository.save(project);
 
