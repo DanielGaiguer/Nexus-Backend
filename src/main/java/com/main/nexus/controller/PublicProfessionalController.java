@@ -10,18 +10,21 @@ import com.main.nexus.dto.PublicProfessionalDTO;
 import com.main.nexus.dto.PublicProjectDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.ReputationExplanationDTO;
-import com.main.nexus.dto.SkillResponseDTO;
+import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
+import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.ProjectResponseAssembler;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +33,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,6 +59,34 @@ public class PublicProfessionalController {
 
     @Autowired
     private MatchService matchService;
+
+    @Autowired
+    private CompanyService companyService;
+
+    @Autowired
+    private ProjectResponseAssembler projectResponseAssembler;
+
+    // Endpoints em /api/public são permitAll, mas o JwtFilter ainda popula o SecurityContext
+    // quando um Authorization Bearer válido é enviado. Assim conseguimos identificar se quem
+    // está olhando é a própria empresa dona, outra empresa, um profissional, o admin, ou
+    // um visitante anônimo (tratado como profissional para fins de visibilidade de salário).
+    private ProjectResponseAssembler.Viewer resolveViewer() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserDTO logged)) {
+            return ProjectResponseAssembler.Viewer.ANONYMOUS;
+        }
+
+        UserType type = UserType.valueOf(logged.role());
+        if (type == UserType.COMPANY) {
+            return companyService.findByUserId(logged.id())
+                    .map(c -> ProjectResponseAssembler.Viewer.company(c.getId()))
+                    .orElse(ProjectResponseAssembler.Viewer.ANONYMOUS);
+        }
+        if (type == UserType.ADMIN) {
+            return ProjectResponseAssembler.Viewer.ADMIN;
+        }
+        return ProjectResponseAssembler.Viewer.professional();
+    }
 
     @GetMapping("/professional/{id}")
     public ResponseEntity<PublicProfessionalDTO> getProfessional(@PathVariable Long id) {
@@ -184,7 +217,7 @@ public class PublicProfessionalController {
         Project p = optional.get();
 
         // apenas projetos abertos
-        if (p.getStatus() != com.main.nexus.model.enums.ProjectStatus.OPEN) {
+        if (p.getStatus() != ProjectStatus.OPEN) {
             return ResponseEntity.notFound().build();
         }
 
@@ -204,49 +237,11 @@ public class PublicProfessionalController {
                 c.getUser() != null ? c.getUser().getEmail() : null
         );
 
-        ProjectResponseDTO dto = new ProjectResponseDTO(
-                p.getId(),
-                p.getTitle(),
-                p.getDescription(),
-                p.getWorkMode(),
-                p.getExperienceLevel(),
-                p.getStatus(),
-                p.getMaxPositions(),
-                p.getFilledPositions(),
-                p.getCreatedAt(),
-                p.getOpportunityType(),
-                p.getType(),
-                p.getRequiredSkills().stream()
-                        .map(skill -> new SkillResponseDTO(
-                                skill.getId(),
-                                skill.getName(),
-                                skill.getCategory()
-                        ))
-                        .toList(),
-                c.getId(),
-                c.getCompanyName(),
-
-                p.getCep() != null ? p.getCep() : c.getCep(),
-                p.getEffectiveLatitude(),
-                p.getEffectiveLongitude(),
-                p.getEffectiveCity(),
-                p.getEffectiveUf(),
-
-                p.getMinimumBudget(),
-                p.getMaximumBudget(),
-                p.getDeadline(),
-
-                p.getMonthlySalaryMin(),
-                p.getMonthlySalaryMax(),
-                p.getContractType(),
-                p.getBenefits(),
-                p.getStartDate(),
-                p.getWorkloadHoursPerWeek(),
-
-                companyDTO
-        );
-
-        return ResponseEntity.ok(dto);
+        // Se outra empresa acessar diretamente uma oportunidade marcada como não visível
+        // para empresas, tratamos como não encontrada — o link direto não pode burlar a regra.
+        return projectResponseAssembler.toVisibleDTO(p, resolveViewer(), companyDTO)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/company/{id}")
@@ -293,18 +288,19 @@ public class PublicProfessionalController {
             return ResponseEntity.notFound().build();
         }
 
-        Company c = optional.get();
-
+        ProjectResponseAssembler.Viewer viewer = resolveViewer();
         List<ProjectResponseDTO> openProjects = projectRepository.findByCompanyId(id).stream()
                 .filter(project -> project.getStatus() == ProjectStatus.OPEN)
-                .map(project -> toProjectResponseDTO(project, c))
+                .map(project -> projectResponseAssembler.toVisibleDTO(project, viewer, null))
+                .flatMap(Optional::stream)
                 .toList();
 
         return ResponseEntity.ok(openProjects);
     }
 
     // Histórico de oportunidades encerradas (vagas e projetos) — visível publicamente
-    // para admin, profissionais e demais empresas no perfil da empresa
+    // para admin, profissionais e demais empresas no perfil da empresa (respeitando a
+    // mesma regra de "não visível para outras empresas")
     @GetMapping("/company/{id}/projects/closed")
     public ResponseEntity<List<ProjectResponseDTO>> getCompanyClosedProjects(@PathVariable Long id) {
         Optional<Company> optional = companyRepository.findById(id);
@@ -312,57 +308,13 @@ public class PublicProfessionalController {
             return ResponseEntity.notFound().build();
         }
 
-        Company c = optional.get();
-
+        ProjectResponseAssembler.Viewer viewer = resolveViewer();
         List<ProjectResponseDTO> closedProjects = projectRepository.findByCompanyId(id).stream()
                 .filter(project -> project.getStatus() == ProjectStatus.CLOSED)
-                .map(project -> toProjectResponseDTO(project, c))
+                .map(project -> projectResponseAssembler.toVisibleDTO(project, viewer, null))
+                .flatMap(Optional::stream)
                 .toList();
 
         return ResponseEntity.ok(closedProjects);
-    }
-
-    private ProjectResponseDTO toProjectResponseDTO(Project project, Company c) {
-        return new ProjectResponseDTO(
-                project.getId(),
-                project.getTitle(),
-                project.getDescription(),
-                project.getWorkMode(),
-                project.getExperienceLevel(),
-                project.getStatus(),
-                project.getMaxPositions(),
-                project.getFilledPositions(),
-                project.getCreatedAt(),
-                project.getOpportunityType(),
-                project.getType(),
-                project.getRequiredSkills().stream()
-                        .map(skill -> new SkillResponseDTO(
-                                skill.getId(),
-                                skill.getName(),
-                                skill.getCategory()
-                        ))
-                        .toList(),
-                c.getId(),
-                c.getCompanyName(),
-
-                project.getCep() != null ? project.getCep() : c.getCep(),
-                project.getEffectiveLatitude(),
-                project.getEffectiveLongitude(),
-                project.getEffectiveCity(),
-                project.getEffectiveUf(),
-
-                project.getMinimumBudget(),
-                project.getMaximumBudget(),
-                project.getDeadline(),
-
-                project.getMonthlySalaryMin(),
-                project.getMonthlySalaryMax(),
-                project.getContractType(),
-                project.getBenefits(),
-                project.getStartDate(),
-                project.getWorkloadHoursPerWeek(),
-
-                null
-        );
     }
 }

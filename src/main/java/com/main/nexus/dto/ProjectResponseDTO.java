@@ -46,5 +46,12 @@ public record ProjectResponseDTO(
         LocalDate startDate,
         Integer workloadHoursPerWeek,
 
+        // Visibilidade. Os dois campos de configuração só vêm preenchidos para o dono/ADMIN;
+        // para os demais viewers, vêm nulos e "salaryVisible" já diz se o salário pode ser exibido.
+        Boolean visibleToCompanies,
+        Boolean salaryVisibleToProfessionals,
+        Boolean salaryVisibleToCompanies,
+        Boolean salaryVisible,
+
         PublicCompanyDTO company
 ) {}

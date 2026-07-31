@@ -79,7 +79,7 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/reviews/**").hasAnyRole("COMPANY", "PROFESSIONAL")
                 
-                 .requestMatchers("/api/map/**").hasAnyRole("PROFESSIONAL", "COMPANY", "ADMIN")
+                .requestMatchers("/api/map/**").hasAnyRole("PROFESSIONAL", "COMPANY", "ADMIN")
 
                 .anyRequest().authenticated()
             )

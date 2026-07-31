@@ -5,11 +5,9 @@ import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.ContactInfoDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
-import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
-import com.main.nexus.model.Project;
 import com.main.nexus.model.enums.NotificationType;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
@@ -17,9 +15,11 @@ import com.main.nexus.service.MatchService;
 import com.main.nexus.service.NotificationService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
+import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SupabaseStorageService;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -63,6 +63,9 @@ public class CompanyController {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private ProjectResponseAssembler projectResponseAssembler;
 
     @GetMapping("/profile")
     public ResponseEntity<CompanyProfileDTO> getProfile() {
@@ -143,60 +146,27 @@ public class CompanyController {
                 .getPrincipal();
     }
 
-    // Vitrine de todas as oportunidades da plataforma, para a company navegar o mercado
+    // Vitrine de todas as oportunidades da plataforma, para a company navegar o mercado.
+    // Oportunidades marcadas como não visíveis para outras empresas ficam de fora, exceto
+    // as da própria empresa logada.
     @GetMapping("/opportunities")
     public ResponseEntity<List<ProjectResponseDTO>> listAllOpportunities() {
+        Company company = getLoggedCompany();
+        ProjectResponseAssembler.Viewer viewer = ProjectResponseAssembler.Viewer.company(company.getId());
+
         List<ProjectResponseDTO> projects = projectService.findAllOpen()
                 .stream()
-                .map(this::toResponseDTO)
+                .map(p -> projectResponseAssembler.toVisibleDTO(p, viewer, toPublicCompanyDTO(p.getCompany())))
+                .flatMap(Optional::stream)
                 .toList();
         return ResponseEntity.ok(projects);
     }
 
-    private ProjectResponseDTO toResponseDTO(Project p) {
-        return new ProjectResponseDTO(
-                p.getId(),
-                p.getTitle(),
-                p.getDescription(),
-                p.getWorkMode(),
-                p.getExperienceLevel(),
-                p.getStatus(),
-                p.getMaxPositions(),
-                p.getFilledPositions(),
-                p.getCreatedAt(),
-                p.getOpportunityType(),
-                p.getType(),
-                p.getRequiredSkills().stream()
-                    .map(skill -> new SkillResponseDTO(
-                            skill.getId(),
-                            skill.getName(),
-                            skill.getCategory()
-                    ))
-                    .toList(),
-                p.getCompany().getId(),
-                p.getCompany().getCompanyName(),
-
-                // Localização efetiva — da vaga ou da empresa como fallback
-                p.getCep() != null ? p.getCep() : p.getCompany().getCep(),
-                p.getEffectiveLatitude(),
-                p.getEffectiveLongitude(),
-                p.getEffectiveCity(),
-                p.getEffectiveUf(),
-
-                // PROJECT
-                p.getMinimumBudget(),
-                p.getMaximumBudget(),
-                p.getDeadline(),
-
-                // JOB
-                p.getMonthlySalaryMin(),
-                p.getMonthlySalaryMax(),
-                p.getContractType(),
-                p.getBenefits(),
-                p.getStartDate(),
-                p.getWorkloadHoursPerWeek(),
-                toPublicCompanyDTO(p.getCompany())
-        );
+    private Company getLoggedCompany() {
+        UserDTO logged = getLoggedUser();
+        return companyService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Company not found"));
     }
 
     private PublicCompanyDTO toPublicCompanyDTO(Company c) {

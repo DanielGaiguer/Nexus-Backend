@@ -4,18 +4,21 @@ import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectRequestDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
-import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.enums.UserType;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SkillService;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +53,9 @@ public class ProjectController {
     @Autowired
     private GeolocationService geolocationService;
 
+    @Autowired
+    private ProjectResponseAssembler projectResponseAssembler;
+
     @GetMapping("/skills")
     public ResponseEntity<?> listSkills() {
         return ResponseEntity.ok(skillService.findAll());
@@ -59,7 +65,7 @@ public class ProjectController {
     public ResponseEntity<List<MatchResponseDTO>> getPreviousProjects() {
         Company company = getLoggedCompany();
         List<Match> matches = matchService.getPreviousProjectsByCompany(company.getId());
-        return ResponseEntity.ok(matches.stream().map(this::toMatchResponseDTO).toList());
+        return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
     }
 
     @GetMapping
@@ -68,15 +74,15 @@ public class ProjectController {
         return ResponseEntity.ok(
                 projectService.findByCompany(company)
                         .stream()
-                        .map(this::toResponseDTO)
+                        .map(p -> toResponseDTO(p, company))
                         .toList());
     }
 
-    @GetMapping("/{id}")   
+    @GetMapping("/{id}")
     public ResponseEntity<ProjectResponseDTO> findById(@PathVariable Long id) {
         Company company = getLoggedCompany();
         Project project = projectService.findByIdAndCompany(id, company.getId());
-        return ResponseEntity.ok(toResponseDTO(project));
+        return ResponseEntity.ok(toResponseDTO(project, company));
     }
 
     @PostMapping
@@ -87,7 +93,7 @@ public class ProjectController {
         project.setCompany(company);
         populate(project, request);
 
-        return ResponseEntity.ok(toResponseDTO(projectService.save(project)));
+        return ResponseEntity.ok(toResponseDTO(projectService.save(project), company));
     }
 
     @PutMapping("/{id}")
@@ -107,7 +113,7 @@ public class ProjectController {
             existing.setMaxPositions(request.maxPositions());
         }
 
-        return ResponseEntity.ok(toResponseDTO(projectService.update(existing)));
+        return ResponseEntity.ok(toResponseDTO(projectService.update(existing), company));
     }
 
     // Método de populate centralizado
@@ -157,6 +163,23 @@ public class ProjectController {
         project.setBenefits(r.benefits());
         project.setStartDate(r.startDate());
         project.setWorkloadHoursPerWeek(r.workloadHoursPerWeek());
+
+        // Visibilidade — nulo é tratado como "visível/aberto" (nosso frontend sempre envia
+        // um valor explícito; um cliente de API externo que não conheça o campo mantém o
+        // comportamento anterior à feature)
+        project.setVisibleToCompanies(r.visibleToCompanies() == null || r.visibleToCompanies());
+
+        Set<UserType> salaryVisibleTo = new HashSet<>();
+        if (r.salaryVisibleToProfessionals() == null || r.salaryVisibleToProfessionals()) {
+            salaryVisibleTo.add(UserType.PROFESSIONAL);
+        }
+        if (r.salaryVisibleToCompanies() == null || r.salaryVisibleToCompanies()) {
+            salaryVisibleTo.add(UserType.COMPANY);
+        }
+        project.setSalaryVisibleTo(salaryVisibleTo);
+        // A partir daqui o projeto tem uma configuração explícita — mesmo que o conjunto
+        // acima fique vazio, o backfill de migração não deve mais mexer nele.
+        project.setSalaryVisibilityConfigured(true);
     }
 
     @PutMapping("/{id}/close")
@@ -172,7 +195,7 @@ public class ProjectController {
             @RequestParam(required = false) Integer maxPositions) {
         Company company = getLoggedCompany();
         Project project = projectService.reopenProject(id, company.getId(), maxPositions);
-        return ResponseEntity.ok(toResponseDTO(project));
+        return ResponseEntity.ok(toResponseDTO(project, company));
     }
 
     @GetMapping("/{id}/ranking")
@@ -201,7 +224,7 @@ public class ProjectController {
                         id, city, uf, experienceLevel, available, minSalary, maxSalary, skill)
                 : matchService.getRankingByProject(id);
 
-        return ResponseEntity.ok(matches.stream().map(this::toMatchResponseDTO).toList());
+        return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
     }
 
     @DeleteMapping("/{id}")
@@ -211,53 +234,14 @@ public class ProjectController {
         return ResponseEntity.ok("Project deleted.");
     }
 
-    private ProjectResponseDTO toResponseDTO(Project p) {
-        return new ProjectResponseDTO(
-                p.getId(),
-                p.getTitle(),
-                p.getDescription(),
-                p.getWorkMode(),
-                p.getExperienceLevel(),
-                p.getStatus(),
-                p.getMaxPositions(),
-                p.getFilledPositions(),
-                p.getCreatedAt(),
-                p.getOpportunityType(),
-                p.getType(),
-                p.getRequiredSkills().stream()
-                    .map(skill -> new SkillResponseDTO(
-                            skill.getId(),
-                            skill.getName(),
-                            skill.getCategory()
-                    ))
-                    .toList(),
-                p.getCompany().getId(),
-                p.getCompany().getCompanyName(),
-
-                // Localização efetiva da vaga ou da empresa como fallback
-                p.getCep() != null ? p.getCep() : p.getCompany().getCep(),
-                p.getEffectiveLatitude(),
-                p.getEffectiveLongitude(),
-                p.getEffectiveCity(),
-                p.getEffectiveUf(),
-
-                // PROJECT
-                p.getMinimumBudget(),
-                p.getMaximumBudget(),
-                p.getDeadline(),
-
-                // JOB
-                p.getMonthlySalaryMin(),
-                p.getMonthlySalaryMax(),
-                p.getContractType(),
-                p.getBenefits(),
-                p.getStartDate(),
-                p.getWorkloadHoursPerWeek(),
-                null
-        );
+    // O dono do projeto sempre tem acesso total — a lista de skills embutida não usa mapper
+    // de mascaramento porque não há o que mascarar aqui.
+    private ProjectResponseDTO toResponseDTO(Project p, Company loggedCompany) {
+        return projectResponseAssembler.toDTO(
+                p, ProjectResponseAssembler.Viewer.company(loggedCompany.getId()), null);
     }
 
-    private MatchResponseDTO toMatchResponseDTO(Match m) {
+    private MatchResponseDTO toMatchResponseDTO(Match m, Company loggedCompany) {
         Professional professional = m.getProfessional();
         return new MatchResponseDTO(
                 m.getId(),
@@ -266,7 +250,7 @@ public class ProjectController {
                 m.getProfessionalStatus(),
                 m.getStatus(),
                 m.getCreatedAt(),
-                toResponseDTO(m.getProject()),
+                toResponseDTO(m.getProject(), loggedCompany),
                 new ProfessionalSummaryDTO(
                         professional.getId(),
                         professional.getName(),

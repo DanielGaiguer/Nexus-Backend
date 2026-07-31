@@ -10,7 +10,6 @@ import com.main.nexus.dto.PublicCompanyDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
-import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserSummaryDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
@@ -28,6 +27,7 @@ import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
+import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SkillService;
 import java.util.List;
@@ -81,6 +81,9 @@ public class AdminController {
 
     @Autowired
     private ProjectService projectService;
+
+    @Autowired
+    private ProjectResponseAssembler projectResponseAssembler;
 
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardDTO> dashboard() {
@@ -282,50 +285,10 @@ public class AdminController {
         );
     }
 
+    // ADMIN sempre tem acesso total — sem ocultação nem mascaramento de salário.
     private ProjectResponseDTO toResponseDTO(Project p) {
-        return new ProjectResponseDTO(
-                p.getId(),
-                p.getTitle(),
-                p.getDescription(),
-                p.getWorkMode(),
-                p.getExperienceLevel(),
-                p.getStatus(),
-                p.getMaxPositions(),
-                p.getFilledPositions(),
-                p.getCreatedAt(),
-                p.getOpportunityType(),
-                p.getType(),
-               p.getRequiredSkills().stream()
-                    .map(skill -> new SkillResponseDTO(
-                            skill.getId(),
-                            skill.getName(),
-                            skill.getCategory()
-                    ))
-                    .toList(),
-                p.getCompany().getId(),
-                p.getCompany().getCompanyName(),
-
-                // Localização efetiva — da vaga ou da empresa como fallback
-                p.getCep() != null ? p.getCep() : p.getCompany().getCep(),
-                p.getEffectiveLatitude(),
-                p.getEffectiveLongitude(),
-                p.getEffectiveCity(),
-                p.getEffectiveUf(),
-
-                // PROJECT
-                p.getMinimumBudget(),
-                p.getMaximumBudget(),
-                p.getDeadline(),
-
-                // JOB
-                p.getMonthlySalaryMin(),
-                p.getMonthlySalaryMax(),
-                p.getContractType(),
-                p.getBenefits(),
-                p.getStartDate(),
-                p.getWorkloadHoursPerWeek(),
-                toPublicCompanyDTO(p.getCompany())
-        );
+        return projectResponseAssembler.toDTO(
+                p, ProjectResponseAssembler.Viewer.ADMIN, toPublicCompanyDTO(p.getCompany()));
     }
 
     private PublicCompanyDTO toPublicCompanyDTO(Company c) {

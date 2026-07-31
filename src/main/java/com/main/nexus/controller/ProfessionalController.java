@@ -8,7 +8,6 @@ import com.main.nexus.dto.ProfessionalStatsDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
-import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
@@ -29,6 +28,7 @@ import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.PdfService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
+import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.SkillService;
 import com.main.nexus.service.SupabaseStorageService;
 import java.util.List;
@@ -90,6 +90,9 @@ public class ProfessionalController {
     
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private ProjectResponseAssembler projectResponseAssembler;
 
     @GetMapping("/projects")
     public ResponseEntity<?> listPreviousProjects() {
@@ -316,46 +319,7 @@ public class ProfessionalController {
                 List.of(),
                 c.getUser() != null ? c.getUser().getEmail() : null
         );
-        return new ProjectResponseDTO(
-                p.getId(),
-                p.getTitle(),
-                p.getDescription(),
-                p.getWorkMode(),
-                p.getExperienceLevel(),
-                p.getStatus(),
-                p.getMaxPositions(),
-                p.getFilledPositions(),
-                p.getCreatedAt(),
-                p.getOpportunityType(),
-                p.getType(),
-                p.getRequiredSkills().stream()
-                        .map(skill -> new SkillResponseDTO(
-                                skill.getId(),
-                                skill.getName(),
-                                skill.getCategory()
-                        ))
-                        .toList(),
-                c.getId(),
-                c.getCompanyName(),
-
-                p.getCep() != null ? p.getCep() : c.getCep(),
-                p.getEffectiveLatitude(),
-                p.getEffectiveLongitude(),
-                p.getEffectiveCity(),
-                p.getEffectiveUf(),
-
-                p.getMinimumBudget(),
-                p.getMaximumBudget(),
-                p.getDeadline(),
-
-                p.getMonthlySalaryMin(),
-                p.getMonthlySalaryMax(),
-                p.getContractType(),
-                p.getBenefits(),
-                p.getStartDate(),
-                p.getWorkloadHoursPerWeek(),
-                companyDTO
-        );
+        return projectResponseAssembler.toDTO(p, ProjectResponseAssembler.Viewer.professional(), companyDTO);
     }
 
     private ProfessionalProfileDTO toProfileDTO(Professional p) {

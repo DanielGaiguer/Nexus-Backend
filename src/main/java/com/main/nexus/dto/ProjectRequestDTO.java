@@ -31,5 +31,10 @@ public record ProjectRequestDTO(
         ContractType contractType,
         String benefits,
         LocalDate startDate,
-        Integer workloadHoursPerWeek
+        Integer workloadHoursPerWeek,
+
+        // Visibilidade — nulo é tratado como "visível/aberto" (comportamento anterior à feature)
+        Boolean visibleToCompanies,
+        Boolean salaryVisibleToProfessionals,
+        Boolean salaryVisibleToCompanies
 ) {}

@@ -5,7 +5,6 @@ import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
-import com.main.nexus.dto.SkillResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
@@ -16,6 +15,7 @@ import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
+import com.main.nexus.service.ProjectResponseAssembler;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -42,13 +42,20 @@ public class MatchController {
     @Autowired
     private CompanyService companyService;
 
+    @Autowired
+    private ProjectResponseAssembler projectResponseAssembler;
+
     @GetMapping("/{matchId}")
     public ResponseEntity<MatchResponseDTO> findById(@PathVariable Long matchId) {
-        return ResponseEntity.ok(toMatchResponseDTO(matchService.findById(matchId)));
+        Match match = matchService.findById(matchId);
+        validateParticipant(match);
+        return ResponseEntity.ok(toMatchResponseDTO(match));
     }
 
     @GetMapping("/{matchId}/history")
     public ResponseEntity<List<MatchHistoryDTO>> getHistory(@PathVariable Long matchId) {
+        validateParticipant(matchService.findById(matchId));
+
         List<MatchHistoryDTO> history = matchService.getHistory(matchId)
                 .stream()
                 .map(h -> new MatchHistoryDTO(
@@ -58,6 +65,27 @@ public class MatchController {
                         h.getChangedAt()))
                 .toList();
         return ResponseEntity.ok(history);
+    }
+
+    // Garante que quem está pedindo é a empresa dona do projeto ou o profissional do match —
+    // sem isso, qualquer empresa/profissional autenticado conseguia consultar o match de
+    // outra pessoa só sabendo o ID.
+    private void validateParticipant(Match match) {
+        UserDTO logged = getLoggedUser();
+        if ("COMPANY".equals(logged.role())) {
+            if (!match.getProject().getCompany().getId().equals(getLoggedCompanyId())) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                        "This match does not belong to your company.");
+            }
+        } else if ("PROFESSIONAL".equals(logged.role())) {
+            if (!match.getProfessional().getId().equals(getLoggedProfessionalId())) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                        "This match does not belong to you.");
+            }
+        } else {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "You are not authorized to view this match.");
+        }
     }
 
     // Empresa demonstra interesse─
@@ -177,46 +205,13 @@ public class MatchController {
                 List.of(),
                 c.getUser() != null ? c.getUser().getEmail() : null
         );
-        return new ProjectResponseDTO(
-                p.getId(),
-                p.getTitle(),
-                p.getDescription(),
-                p.getWorkMode(),
-                p.getExperienceLevel(),
-                p.getStatus(),
-                p.getMaxPositions(),
-                p.getFilledPositions(),
-                p.getCreatedAt(),
-                p.getOpportunityType(),
-                p.getType(),
-                p.getRequiredSkills().stream()
-                        .map(skill -> new SkillResponseDTO(
-                                skill.getId(),
-                                skill.getName(),
-                                skill.getCategory()
-                        ))
-                        .toList(),
-                c.getId(),
-                c.getCompanyName(),
 
-                p.getCep() != null ? p.getCep() : c.getCep(),
-                p.getEffectiveLatitude(),
-                p.getEffectiveLongitude(),
-                p.getEffectiveCity(),
-                p.getEffectiveUf(),
+        UserDTO logged = getLoggedUser();
+        ProjectResponseAssembler.Viewer viewer = "COMPANY".equals(logged.role())
+                ? ProjectResponseAssembler.Viewer.company(getLoggedCompanyId())
+                : ProjectResponseAssembler.Viewer.professional();
 
-                p.getMinimumBudget(),
-                p.getMaximumBudget(),
-                p.getDeadline(),
-
-                p.getMonthlySalaryMin(),
-                p.getMonthlySalaryMax(),
-                p.getContractType(),
-                p.getBenefits(),
-                p.getStartDate(),
-                p.getWorkloadHoursPerWeek(),
-                companyDTO
-        );
+        return projectResponseAssembler.toDTO(p, viewer, companyDTO);
     }
 
     //  Utilitários de identidade 

@@ -9,7 +9,7 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 @Configuration
-@EnableWebSocketMessageBroker
+@EnableWebSocketMessageBroker //Habilita o protocolo STOMP
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Autowired
@@ -17,20 +17,22 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic", "/queue");
-        config.setApplicationDestinationPrefixes("/app");
-        config.setUserDestinationPrefix("/user");
+        config.enableSimpleBroker("/topic", "/queue"); //Habilita o broker do proprio Spring
+        // Topic - É um broadcast, um canal para duas ou mais pessoas
+        // Queue - E mensagens direcionadas para um usuario especifico
+        config.setApplicationDestinationPrefixes("/app"); // COnfigura o prefixo app, para receber mensagens do chat, roteia as mensagens para metodos com @messageMapping
+        config.setUserDestinationPrefix("/user"); // Hablitia destinos pessoais por usuario
     }
-
+    
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+        registry.addEndpoint("/ws") // Define o endpoint como handshake inicial, para a conexao Websocket
+                .setAllowedOriginPatterns("*") // Libera o CORS para qualquer origem, deve ser aceito apenas em desenvolvimento
+                .withSockJS(); //Adicione um fallback de compatibilidade, caso o navegador nao tenha suporte ao WebSocket
     }
 
     @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(webSocketAuthInterceptor);
+    public void configureClientInboundChannel(ChannelRegistration registration) { // Registra como interceptador de toda mensagem que entra no servidro, vindo do cliente
+        registration.interceptors(webSocketAuthInterceptor); 
     }
 }

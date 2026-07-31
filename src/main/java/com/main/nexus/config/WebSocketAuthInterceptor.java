@@ -18,8 +18,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+//Com todos os sistemas de seguranca sobreescritos, e necessario fazer a seguranca na mao, para isso que esse arquivo serve
+// Esse arquivo e analogo ao JwtFilter faz para requisicoes HTTP, esse faz para STOMP
 @Component
-public class WebSocketAuthInterceptor implements ChannelInterceptor {
+public class WebSocketAuthInterceptor implements ChannelInterceptor { 
 
     @Autowired
     private TokenService tokenService;
@@ -28,11 +30,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private UserRepository userRepository;
 
     @Override
-    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+    public Message<?> preSend(Message<?> message, MessageChannel channel) { //Esse metodo do ChannelInterceptor e chamado para toda mensagem que entra pelo canal de entrada do cliente
         StompHeaderAccessor accessor =
-                MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+                MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class); // Pega os dados STOMP da mensagem
 
-        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) { // So acontece quando o comando e de CONNECT, o primeiro hadshake, ou seja, a validacao so acontece uma unica vez, nao em cada mensagem
             String header = accessor.getFirstNativeHeader("Authorization");
             if (header == null) {
                 header = accessor.getFirstNativeHeader("token");
@@ -53,7 +55,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
             User user = userRepository.findByEmail(userDTO.email())
                     .orElseThrow(() -> new MessageDeliveryException("Unauthorized: user not found"));
 
-            UsernamePasswordAuthenticationToken authentication =
+            UsernamePasswordAuthenticationToken authentication = 
+                    // Aqui e aonde a idantidade autenticada e associada a sessao STOMP, e isso que permite depois a usar Principal/@AuthenticationPrincipal. Para saber a quem entregar as mensagens pessoais
                     new UsernamePasswordAuthenticationToken(
                             user,
                             null,

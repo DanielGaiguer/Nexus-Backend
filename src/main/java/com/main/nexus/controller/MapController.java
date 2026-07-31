@@ -2,18 +2,22 @@ package com.main.nexus.controller;
 
 import com.main.nexus.dto.MapCompanyDTO;
 import com.main.nexus.dto.MapProfessionalDTO;
+import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.ProjectStatus;
+import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
+import com.main.nexus.service.CompanyService;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,6 +35,9 @@ public class MapController {
 
     @Autowired
     private ProjectRepository projectRepository;
+
+    @Autowired
+    private CompanyService companyService;
 
     @GetMapping("/professionals")
     public ResponseEntity<List<MapProfessionalDTO>> getProfessionals(
@@ -127,9 +134,15 @@ public class MapController {
             @RequestParam(required = false) String type) {
 
         List<Project> all = projectRepository.findByStatus(ProjectStatus.OPEN);
+        Long viewerCompanyId = resolveViewerCompanyId();
 
         return ResponseEntity.ok(
             all.stream()
+                // some do mapa para outras empresas quando marcada como não visível para elas
+                // (não afeta profissionais nem o admin)
+                .filter(p -> !Boolean.FALSE.equals(p.getVisibleToCompanies())
+                        || viewerCompanyId == null
+                        || viewerCompanyId.equals(p.getCompany().getId()))
                 .filter(p -> type == null
                         || p.getOpportunityType().name().equalsIgnoreCase(type))
                 .filter(p -> p.getEffectiveLatitude() != null && p.getEffectiveLongitude() != null)
@@ -155,6 +168,19 @@ public class MapController {
         );
     }
 
+
+    // Retorna o ID da empresa logada, ou null se quem está olhando não é uma empresa
+    // (profissional ou admin) — usado só para a regra de "oculto para outras empresas".
+    private Long resolveViewerCompanyId() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserDTO logged)) {
+            return null;
+        }
+        if (!UserType.COMPANY.name().equals(logged.role())) {
+            return null;
+        }
+        return companyService.findByUserId(logged.id()).map(Company::getId).orElse(null);
+    }
 
     private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
         final double EARTH_RADIUS_KM = 6371.0;
