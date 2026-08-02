@@ -17,7 +17,7 @@ import java.io.IOException;
 import java.util.List;
 
 @Component
-public class JwtFilter extends OncePerRequestFilter {
+public class JwtFilter extends OncePerRequestFilter { // Apenas uma vez por requisicao
 
     @Autowired
     private TokenService tokenService;
@@ -33,7 +33,7 @@ public class JwtFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
 
-            if (tokenService.validToken(token)) {
+            if (tokenService.validToken(token)) { // Somente se o token for valido e nao tiver expirado
                 UserDTO user = tokenService.extractClaims(token);
 
                 SimpleGrantedAuthority authority =
@@ -43,6 +43,7 @@ public class JwtFilter extends OncePerRequestFilter {
                         new UsernamePasswordAuthenticationToken(user, null, List.of(authority));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                 // Esse e o que efetivamente "loga" o usuario no sistema, e isso que as regras no security config consultas, no hasRole
             }
         }
 

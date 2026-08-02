@@ -83,6 +83,7 @@ public class ProfileCompletionService {
                 }
                 case PROJECT -> {
                     if (professional.getFreelanceMinExpectation() == null) return false;
+                    if (professional.getFreelanceMaxExpectation() == null) return false;
                 }
             }
         }

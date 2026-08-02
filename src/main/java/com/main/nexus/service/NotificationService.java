@@ -20,7 +20,6 @@ public class NotificationService {
 
     // API PÚBLICA — criação de notificações
 
-    @Async
     public void notify(User user, NotificationType type,
                        String title, String message, String actionUrl) {
         Notification notification = new Notification();
@@ -34,7 +33,7 @@ public class NotificationService {
 
     // MÉTODOS DE FÁBRICA — um por tipo de evento
     // Centralizam o texto das notificações num único luga
-
+    @Async
     public void notifyNewInvite(User professional,
                                 String companyName, String projectTitle,
                                 Long matchId) {
@@ -46,7 +45,7 @@ public class NotificationService {
             "/matches/" + matchId
         );
     }
-
+    @Async
     public void notifyNewInterestReceived(User companyUser,
                                           String professionalName, String projectTitle,
                                           Long matchId) {
@@ -58,7 +57,7 @@ public class NotificationService {
             "/projects/ranking/" + matchId
         );
     }
-
+    @Async
     public void notifyMatchConfirmed(User user,
                                      String otherPartyName, String projectTitle,
                                      Long matchId) {
@@ -70,7 +69,7 @@ public class NotificationService {
             "/matches/" + matchId
         );
     }
-
+    @Async
     public void notifyMatchCancelled(User user,
                                      String otherPartyName, String projectTitle) {
         notify(
@@ -81,7 +80,7 @@ public class NotificationService {
             "/matches"
         );
     }
-
+    @Async
     public void notifyInviteCancelled(User user,
                                       String companyName, String projectTitle) {
         notify(
@@ -92,7 +91,7 @@ public class NotificationService {
             "/matches"
         );
     }
-
+    @Async
     public void notifyInviteRejected(User user,
                                      String otherPartyName, String projectTitle) {
         notify(
@@ -103,7 +102,7 @@ public class NotificationService {
             "/matches"
         );
     }
-
+    @Async
     public void notifyNewReviewReceived(User user,
                                         String reviewerName, int rating) {
         String stars = "★".repeat(rating) + "☆".repeat(5 - rating);
@@ -115,7 +114,7 @@ public class NotificationService {
             "/profile"
         );
     }
-
+    @Async
     public void notifyHighScoreOpportunity(User professional,
                                            String projectTitle, String companyName,
                                            double score, Long projectId) {
@@ -128,7 +127,7 @@ public class NotificationService {
             "/opportunities/" + projectId
         );
     }
-
+    @Async
     public void notifyHighScoreCandidate(User companyUser,
                                          String professionalName, String projectTitle,
                                          double score, Long projectId) {
@@ -141,7 +140,7 @@ public class NotificationService {
             "/company/projects/" + projectId + "/ranking"
         );
     }
-
+    @Async
     public void notifyNewCompanyRegistration(User adminUser, String companyName, Long companyId) {
         notify(
             adminUser,
@@ -151,7 +150,7 @@ public class NotificationService {
             "/admin/company/" + companyId
         );
     }
-
+    @Async
     public void notifyCompanyApproved(User companyUser, String companyName) {
         notify(
             companyUser,
@@ -161,7 +160,7 @@ public class NotificationService {
             "/company/dashboard"
         );
     }
-
+    @Async
     public void notifyCompanyRejected(User companyUser, String companyName) {
         notify(
             companyUser,
@@ -171,7 +170,7 @@ public class NotificationService {
             null
         );
     }
-
+    @Async
     public void notifyMatchStatusCheck(User companyUser,
                                        String professionalName, String projectTitle,
                                        Long matchId) {
@@ -183,7 +182,7 @@ public class NotificationService {
             "/matches/" + matchId + "/status-check"
         );
     }
-
+    @Async
     public void notifyMatchExpiredForCompany(User companyUser,
                                              String professionalName, String projectTitle,
                                              Long matchId) {
@@ -195,7 +194,7 @@ public class NotificationService {
             "/matches/" + matchId + "/review"
         );
     }
-
+    @Async
     public void notifyMatchExpiredForProfessional(User professionalUser,
                                                   String companyName, String projectTitle,
                                                   Long matchId) {
@@ -207,7 +206,7 @@ public class NotificationService {
             "/matches/" + matchId + "/review"
         );
     }
-
+    @Async
     public void notifyProjectClosed(User professionalUser,
                                     String projectTitle, String companyName) {
         notify(
@@ -218,7 +217,7 @@ public class NotificationService {
             "/opportunities"
         );
     }
-
+    @Async
     public void notifyProjectClosedByAdmin(User companyUser, String projectTitle) {
         notify(
             companyUser,

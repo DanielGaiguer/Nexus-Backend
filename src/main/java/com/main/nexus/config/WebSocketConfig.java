@@ -17,10 +17,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic", "/queue"); //Habilita o broker do proprio Spring
+        config.enableSimpleBroker("/topic", "/queue"); //Habilita o broker do proprio Spring, ta dizendo para o broker cuidar de todos os destinos que comecam com /topic e /queue
         // Topic - É um broadcast, um canal para duas ou mais pessoas
         // Queue - E mensagens direcionadas para um usuario especifico
-        config.setApplicationDestinationPrefixes("/app"); // COnfigura o prefixo app, para receber mensagens do chat, roteia as mensagens para metodos com @messageMapping
+        config.setApplicationDestinationPrefixes("/app"); // COnfigura o prefixo app, para receber mensagens de todo client, encaminha todas as mensagens para metodos com @messageMapping
         config.setUserDestinationPrefix("/user"); // Hablitia destinos pessoais por usuario
     }
     

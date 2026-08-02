@@ -287,7 +287,7 @@ public class AuthService {
         return switch (user.getType()) {
             case PROFESSIONAL -> professionalService
                     .findByUserId(user.getId())
-                    .map(Professional::getName)
+                    .map(Professional::getName) // No Type, seria feito assim: professional ? professional.getName() : user.getEmail()
                     .orElse(user.getEmail());
             case COMPANY -> companyService
                     .findByUserId(user.getId())

@@ -49,12 +49,12 @@ public class AuthController {
 
     @GetMapping("/linkedin/login")
     public ResponseEntity<Void> linkedInLogin(@RequestParam(required = false) String redirect) {
-        return redirect(authService.getLinkedInLoginUrl(redirect));
+        return redirect(authService.getLinkedInLoginUrl(redirect)); // Nesse redirect e passado o local onde o usuario estava, para redirecionar depois
     }
 
     @GetMapping("/linkedin/register")
     public ResponseEntity<Void> linkedInRegister(@RequestParam String role) {
-        return redirect(authService.getLinkedInRegisterUrl(role));
+        return redirect(authService.getLinkedInRegisterUrl(role)); // O metodo redirect serve para redirecionar para a URL montada do Linkedin 
     }
 
     @PostMapping("/register/company/linkedin")
