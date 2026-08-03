@@ -46,21 +46,23 @@ public class LinkedInService {
 
     public record LinkedInUserInfo(String sub, String email, String name, String picture) {}
 
-    public String buildAuthorizationUrl(String state) {
+    public String buildAuthorizationUrl(String state) { //monta a URL para onde o browser é redirecionado para o usuário autorizar o app no LinkedIn 
         return AUTHORIZATION_URL
-                + "?response_type=code"
-                + "&client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
-                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
-                + "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8)
-                + "&scope=" + URLEncoder.encode(SCOPE, StandardCharsets.UTF_8);
+                + "?response_type=code" // fluxo de código de autorização, não implícito
+                + "&client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8) // identificam a aplicação registrada no LinkedIn
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8) //identificam a aplicação registrada no LinkedIn
+                + "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8) //um parâmetro que o AuthService usa de forma criativa (veremos abaixo) para carregar contexto próprio através de todo o ciclo OAuth
+                + "&scope=" + URLEncoder.encode(SCOPE, StandardCharsets.UTF_8); // pede apenas identidade básica, não dados profissionais completos como conexões ou histórico de trabalho
     }
 
-    public LinkedInUserInfo exchangeCodeForUserInfo(String code) {
+    public LinkedInUserInfo exchangeCodeForUserInfo(String code) { //orquestra as duas chamadas server-to-server
         String accessToken = fetchAccessToken(code);
         return fetchUserInfo(accessToken);
     }
 
-    private String fetchAccessToken(String code) {
+    //troca o code (recebido no callback) por um access_token, via POST form-urlencoded ao endpoint /oauth/v2/accessToken,
+    //autenticando a aplicação com client_id + client_secret
+    private String fetchAccessToken(String code) { 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("code", code);
@@ -90,6 +92,8 @@ public class LinkedInService {
         return accessToken;
     }
 
+    //fetchUserInfo: usa esse access_token como Bearer para chamar /v2/userinfo (endpoint padrão OIDC), 
+    //extraindo sub (ID único e estável do usuário no LinkedIn — chave primária de identidade), email, name, picture.
     private LinkedInUserInfo fetchUserInfo(String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);

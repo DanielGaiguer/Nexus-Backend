@@ -455,7 +455,7 @@ public class AuthService {
         }
 
         if ("COMPANY".equals(role)) {
-            String ticket = tokenService.generateLinkedInTicket(
+            String ticket = tokenService.generateLinkedInTicket( // Gera um ticket para completar as informacoes da empresa, pois o linkedin nao da todas as necessarias
                     info.sub(), info.email(), info.name(), info.picture());
             return frontendBaseUrl + "/auth/register/company/linkedin"
                     + "?ticket=" + urlEncode(ticket)
