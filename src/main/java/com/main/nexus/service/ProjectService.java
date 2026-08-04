@@ -70,6 +70,15 @@ public class ProjectService {
                 throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                         "Field 'workloadHoursPerWeek' is not allowed for a PROJECT.");
             }
+            // Campos obrigatórios para PROJECT
+            if (project.getMinimumBudget() == null || project.getMaximumBudget() == null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Fields 'minimumBudget' and 'maximumBudget' are required for a PROJECT.");
+            }
+            if (project.getDeadline() == null) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Field 'deadline' is required for a PROJECT.");
+            }
         }
 
         if (project.getOpportunityType() == OpportunityType.JOB) {
@@ -174,6 +183,35 @@ public class ProjectService {
             project.setMaxPositions(newMaxPositions);
         }
 
+        project.setStatus(ProjectStatus.OPEN);
+        Project saved = projectRepository.save(project);
+
+        // Se a empresa reabriu sem aumentar o limite (ex.: manteve o valor default do modal,
+        // que é o maxPositions atual) e o projeto já estava cheio, ele não pode ficar "OPEN"
+        // com 0 vagas reais — pausa de novo e avisa a empresa, igual ao caso automático.
+        matchService.pauseIfPositionsFull(saved);
+        if (saved.getStatus() == ProjectStatus.OPEN) {
+            matchService.recalculateRankingForProject(saved);
+        }
+        return saved;
+    }
+
+    // Resolve a pausa automática por limite de vagas: soma vagas extras ao limite atual
+    // e volta o projeto a ficar OPEN (voltando a gerar ranking com novos profissionais).
+    public Project resumePausedProject(Long id, Long companyId, Integer additionalPositions) {
+        Project project = findByIdAndCompany(id, companyId);
+
+        if (project.getStatus() != ProjectStatus.PAUSED) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Only paused projects can be resumed this way.");
+        }
+
+        if (additionalPositions == null || additionalPositions < 1) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "additionalPositions must be at least 1.");
+        }
+
+        project.setMaxPositions(project.getMaxPositions() + additionalPositions);
         project.setStatus(ProjectStatus.OPEN);
         Project saved = projectRepository.save(project);
         matchService.recalculateRankingForProject(saved);

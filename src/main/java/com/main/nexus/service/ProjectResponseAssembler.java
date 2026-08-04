@@ -7,15 +7,16 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.enums.UserType;
 import java.util.Optional;
+import org.hibernate.type.descriptor.java.CoercionHelper;
 import org.springframework.stereotype.Component;
 
 // Centraliza as regras de visibilidade de oportunidades entre empresas e de mascaramento
 // de salário/orçamento, para que todo endpoint que expõe um Project aplique a mesma lógica.
 // ADMIN sempre enxerga tudo; a empresa dona da oportunidade também sempre enxerga a própria.
-@Component
+@Component // gerencia esse classe como Bean, podendo injetala como @Autowired
 public class ProjectResponseAssembler {
 
-    public record Viewer(UserType type, Long companyId) {
+    public record Viewer(UserType type, Long companyId) {//Quem esta visualizando o projeto?
         public static final Viewer ADMIN = new Viewer(UserType.ADMIN, null);
         public static final Viewer ANONYMOUS = new Viewer(null, null);
 
@@ -55,9 +56,10 @@ public class ProjectResponseAssembler {
             return false;
         }
         return viewer.isCompany() && Boolean.FALSE.equals(p.getVisibleToCompanies());
+        //Se quem está olhando é uma empresa e o projeto está configurado para não aparecer para empresas, então está escondido.
     }
 
-    private boolean isOwner(Project p, Viewer viewer) {
+    private boolean isOwner(Project p, Viewer viewer) { //A empresa que está visualizando é a dona desse projeto?
         return viewer.isCompany() && viewer.companyId() != null
                 && viewer.companyId().equals(p.getCompany().getId());
     }
@@ -67,7 +69,7 @@ public class ProjectResponseAssembler {
         UserType salaryRole = viewer.isCompany() ? UserType.COMPANY : UserType.PROFESSIONAL;
         boolean salaryVisible = fullAccess
                 || (p.getSalaryVisibleTo() != null && p.getSalaryVisibleTo().contains(salaryRole));
-
+        //O salário pode ser visto se o usuário tiver acesso completo OU se o tipo de usuário dele estiver autorizado a ver o salário.
         Company c = p.getCompany();
 
         return new ProjectResponseDTO(

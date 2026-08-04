@@ -138,9 +138,17 @@ public class ProjectController {
                 project.setLongitude(address.longitude());
                 project.setCity(address.city());
                 project.setUf(address.state());
-            } catch (Exception e) {
-                throw new ResponseStatusException(HttpStatusCode.valueOf(422),
-                        "CEP '" + r.cep() + "' is invalid or could not be resolved.");
+            } catch (ResponseStatusException e) {
+                if (e.getStatusCode().value() == 404) {
+                    throw new ResponseStatusException(HttpStatusCode.valueOf(422),
+                            "CEP not found. Please check the ZIP code and try again.");
+                }
+                if (e.getStatusCode().value() == 400) {
+                    throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                            "CEP has an invalid format. Expected format: 00000-000 or 00000000.");
+                }
+                throw new ResponseStatusException(HttpStatusCode.valueOf(502),
+                        "Could not validate the ZIP code at this moment. Please try again in a few seconds.");
             }
         } else {
             // limpa a localização própria se o CEP foi removido 
@@ -149,7 +157,7 @@ public class ProjectController {
             project.setLongitude(null);
             project.setCity(null);
             project.setUf(null);
-        }
+        }   
 
         // Campos de PROJECT
         project.setMinimumBudget(r.minimumBudget());
@@ -170,16 +178,13 @@ public class ProjectController {
         project.setVisibleToCompanies(r.visibleToCompanies() == null || r.visibleToCompanies());
 
         Set<UserType> salaryVisibleTo = new HashSet<>();
-        if (r.salaryVisibleToProfessionals() == null || r.salaryVisibleToProfessionals()) {
+        if (r.salaryVisibleToCompanies() == null || r.salaryVisibleToProfessionals()) {
             salaryVisibleTo.add(UserType.PROFESSIONAL);
         }
         if (r.salaryVisibleToCompanies() == null || r.salaryVisibleToCompanies()) {
             salaryVisibleTo.add(UserType.COMPANY);
         }
         project.setSalaryVisibleTo(salaryVisibleTo);
-        // A partir daqui o projeto tem uma configuração explícita — mesmo que o conjunto
-        // acima fique vazio, o backfill de migração não deve mais mexer nele.
-        project.setSalaryVisibilityConfigured(true);
     }
 
     @PutMapping("/{id}/close")
@@ -195,6 +200,15 @@ public class ProjectController {
             @RequestParam(required = false) Integer maxPositions) {
         Company company = getLoggedCompany();
         Project project = projectService.reopenProject(id, company.getId(), maxPositions);
+        return ResponseEntity.ok(toResponseDTO(project, company));
+    }
+
+    @PutMapping("/{id}/resume")
+    public ResponseEntity<ProjectResponseDTO> resumeProject(
+            @PathVariable Long id,
+            @RequestParam Integer additionalPositions) {
+        Company company = getLoggedCompany();
+        Project project = projectService.resumePausedProject(id, company.getId(), additionalPositions);
         return ResponseEntity.ok(toResponseDTO(project, company));
     }
 

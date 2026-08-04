@@ -1,6 +1,7 @@
 package com.main.nexus.service;
 
 import com.main.nexus.dto.ScoreBreakdownDTO;
+import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.MatchHistory;
 import com.main.nexus.model.Professional;
@@ -413,6 +414,10 @@ public class MatchService {
     // RANKING geração e calculo
 
     public List<Match> generateRankingForProject(Project project) {
+        if (project.getStatus() != ProjectStatus.OPEN) {
+            return List.of();
+        }
+
         List<Professional> allProfessionals = professionalRepository.findAll();
         List<Match> matches = new ArrayList<>();
 
@@ -524,14 +529,21 @@ public class MatchService {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
 
+        if (match.getStatus() == StatusMatch.REJECTED) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "This match was rejected and cannot be reactivated.");
+        }
+
         boolean wasAlreadyProfessionalInterested = match.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED;
         String fromStatus = match.getStatus().name();
 
         if (wasAlreadyProfessionalInterested) {
+            assertProjectHasOpenPositions(match.getProject());
             match.setCompanyStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.MATCHED);
             incrementFilledPositions(match.getProject());
         } else {
+            assertProjectIsOpen(match.getProject());
             match.setCompanyStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.COMPANY_INTERESTED);
             match.setInitiatedBy(InitiatedBy.COMPANY);
@@ -572,6 +584,7 @@ public class MatchService {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "This match is not awaiting a company response.");
         }
+        assertProjectHasOpenPositions(match.getProject());
 
         String fromStatus = match.getStatus().name();
         match.setCompanyStatus(InterestStatus.INTERESTED);
@@ -659,6 +672,7 @@ public class MatchService {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "This match is not awaiting a professional response.");
         }
+        assertProjectHasOpenPositions(match.getProject());
 
         String fromStatus = match.getStatus().name();
         match.setProfessionalStatus(InterestStatus.INTERESTED);
@@ -833,14 +847,21 @@ public class MatchService {
                     return newMatch;
                 });
 
+        if (match.getStatus() == StatusMatch.REJECTED) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "This match was rejected and cannot be reactivated.");
+        }
+
         boolean wasAlreadyCompanyInterested = match.getStatus() == StatusMatch.COMPANY_INTERESTED;
         String fromStatus = match.getStatus().name();
 
         if (wasAlreadyCompanyInterested) {
+            assertProjectHasOpenPositions(match.getProject());
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.MATCHED);
             incrementFilledPositions(match.getProject());
         } else {
+            assertProjectIsOpen(project);
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.PROFESSIONAL_INTERESTED);
         }
@@ -1027,11 +1048,65 @@ public class MatchService {
         );
     }
     
+    // Barra novo engajamento (convite, interesse ou confirmação) numa oportunidade que não
+    // está mais aberta — encerrada ou pausada por ter atingido o limite de vagas.
+    private void assertProjectIsOpen(Project project) {
+        if (project.getStatus() != ProjectStatus.OPEN) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(409),
+                    "This opportunity is not open.");
+        }
+    }
+
+    // Barra a confirmação de mais um match quando o projeto já não tem vagas livres (encerrado,
+    // pausado por ter atingido o limite, ou outro match concorrente acabou de preenchê-lo).
+    private void assertProjectHasOpenPositions(Project project) {
+        assertProjectIsOpen(project);
+        if (!project.hasOpenPositions()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(409),
+                    "This opportunity has reached its position limit.");
+        }
+    }
+
     private void incrementFilledPositions(Project project) {
         projectRepository.incrementFilledPositions(project.getId());
+        // a query acima é um bulk update — sincroniza o objeto em memória pra que a checagem
+        // de limite logo abaixo (e qualquer leitura subsequente na mesma transação) veja o valor atual
+        project.setFilledPositions(project.getFilledPositions() + 1);
+        pauseIfPositionsFull(project);
     }
 
     private void decrementFilledPositions(Project project) {
         projectRepository.decrementFilledPositions(project.getId());
+        project.setFilledPositions(Math.max(0, project.getFilledPositions() - 1));
+    }
+
+    // Ao preencher a última vaga, pausa o projeto automaticamente: ele para de gerar ranking
+    // e some do feed de profissionais até a empresa decidir encerrar ou reabrir com mais vagas.
+    // Público também porque ProjectService.reopenProject reusa essa checagem: reabrir um projeto
+    // fechado sem aumentar o limite de vagas não pode deixá-lo "OPEN" com 0 vagas reais.
+    public void pauseIfPositionsFull(Project project) {
+        if (project.getStatus() != ProjectStatus.OPEN) {
+            return;
+        }
+        if (project.getFilledPositions() < project.getMaxPositions()) {
+            return;
+        }
+
+        project.setStatus(ProjectStatus.PAUSED);
+        projectRepository.save(project);
+
+        Company company = project.getCompany();
+        notificationService.notifyProjectPositionsFull(
+                company.getUser(), project.getTitle(), project.getId());
+
+        emailService.send(
+                company.getUser().getEmail(),
+                "Limite de vagas atingido — Nexus",
+                "Olá " + company.getCompanyName() + ",\n\n" +
+                "O projeto \"" + project.getTitle() + "\" atingiu o limite de " + project.getMaxPositions() +
+                " vaga(s) e foi pausado automaticamente. Ele não aparecerá mais para novos profissionais " +
+                "até que você encerre a oportunidade ou reabra com mais vagas.\n\n" +
+                "Acesse o Nexus em Meus Projetos para decidir.\n\nEquipe Nexus"
+        );
     }
 }

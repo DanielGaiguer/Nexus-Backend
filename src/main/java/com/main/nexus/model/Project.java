@@ -130,22 +130,13 @@ public class Project {
     @Column
     private Boolean visibleToCompanies = true;
 
-    // Quais tipos de usuário podem ver o salário/orçamento real. Um conjunto vazio é um
-    // estado válido e explícito (empresa escondeu de todo mundo) — não pode ser confundido
-    // com "nunca configurado". É por isso que existe o marcador salaryVisibilityConfigured
-    // logo abaixo: sem ele, o backfill de migração não teria como diferenciar as duas coisas
-    // e reverteria a escolha da empresa a cada reinício da aplicação.
+    // Quais tipos de usuário podem ver o salário/orçamento real. Por padrão, visível para
+    // profissionais e empresas.
     @ElementCollection(targetClass = UserType.class, fetch = FetchType.EAGER)
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "tb_project_salary_visibility", joinColumns = @JoinColumn(name = "project_id"))
     @Column(name = "viewer_role", length = 20)
     private Set<UserType> salaryVisibleTo = new HashSet<>(Set.of(UserType.PROFESSIONAL, UserType.COMPANY));
-
-    // Fica null só em projetos gravados antes desta feature existir. Passa a true na primeira
-    // vez que o projeto for criado/editado pela aplicação (ou pelo backfill de migração) e
-    // nunca mais volta a null — a partir daí um salaryVisibleTo vazio é confiável.
-    @Column
-    private Boolean salaryVisibilityConfigured = true;
 
     public Long getId() {
         return id;
@@ -405,13 +396,5 @@ public class Project {
 
     public void setSalaryVisibleTo(Set<UserType> salaryVisibleTo) {
         this.salaryVisibleTo = salaryVisibleTo;
-    }
-
-    public Boolean getSalaryVisibilityConfigured() {
-        return salaryVisibilityConfigured;
-    }
-
-    public void setSalaryVisibilityConfigured(Boolean salaryVisibilityConfigured) {
-        this.salaryVisibilityConfigured = salaryVisibilityConfigured;
     }
 }

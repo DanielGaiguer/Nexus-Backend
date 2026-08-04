@@ -16,5 +16,6 @@ public enum NotificationType {
     COMPLETE_YOUR_PROFILE,   // caso o perfil nao foi completdo
     NEW_COMPANY_REGISTRATION, // empresa se cadastrou e aguarda aprovação do admin
     MATCH_STATUS_CHECK,      // match está próximo dos 30 dias, pede feedback de status à empresa
-    MATCH_EXPIRED_REVIEW_REQUEST // match completou 30 dias e expirou, pede avaliação a ambos os lados
+    MATCH_EXPIRED_REVIEW_REQUEST, // match completou 30 dias e expirou, pede avaliação a ambos os lados
+    PROJECT_POSITIONS_FULL   // projeto atingiu o limite de vagas e foi pausado automaticamente
 }

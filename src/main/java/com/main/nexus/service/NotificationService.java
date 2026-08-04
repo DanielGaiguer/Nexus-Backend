@@ -218,6 +218,17 @@ public class NotificationService {
         );
     }
     @Async
+    public void notifyProjectPositionsFull(User companyUser, String projectTitle, Long projectId) {
+        notify(
+            companyUser,
+            NotificationType.PROJECT_POSITIONS_FULL,
+            "Limite de vagas atingido",
+            "O projeto \"" + projectTitle + "\" atingiu o limite de vagas e foi pausado automaticamente. " +
+            "Acesse Meus Projetos para encerrar ou reabrir com mais vagas.",
+            "/company/projects/" + projectId
+        );
+    }
+    @Async
     public void notifyProjectClosedByAdmin(User companyUser, String projectTitle) {
         notify(
             companyUser,

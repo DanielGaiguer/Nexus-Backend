@@ -33,10 +33,11 @@ public class ReviewService {
 
         boolean matchExpired = Boolean.FALSE.equals(match.getActive());
         boolean matchConfirmed = match.getStatus() == StatusMatch.MATCHED;
+        boolean matchRejected = match.getStatus() == StatusMatch.REJECTED;
 
-        if (!matchExpired && !matchConfirmed) {
+        if (!matchExpired && !matchConfirmed && !matchRejected) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
-                    "Reviews are only allowed after a confirmed match.");
+                    "Reviews are only allowed after a confirmed or rejected match.");
         }
 
         if (reviewRepository.existsByMatchIdAndAuthorType(match.getId(), review.getAuthorType())) {
@@ -44,7 +45,9 @@ public class ReviewService {
                     "A review from this author type already exists for this match.");
         }
 
-        if (review.getAuthorType() == AuthorType.COMPANY
+        // Rejeitados nunca chegaram a ser confirmados, então não há status check
+        // (contato real) a responder — não faz sentido exigi-lo aqui.
+        if (review.getAuthorType() == AuthorType.COMPANY && !matchRejected
                 && !matchStatusCheckRepository.existsByMatchId(match.getId())) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "Please answer the match status check before reviewing.");
