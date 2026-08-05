@@ -19,6 +19,7 @@ import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
+import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
@@ -53,6 +54,9 @@ public class PublicProfessionalController {
 
     @Autowired
     private ProjectRepository projectRepository;
+
+    @Autowired
+    private MatchRepository matchRepository;
 
     @Autowired
     private CompanyRepository companyRepository;
@@ -215,9 +219,13 @@ public class PublicProfessionalController {
         }
 
         Project p = optional.get();
+        ProjectResponseAssembler.Viewer viewer = resolveViewer();
 
-        // apenas projetos abertos
-        if (p.getStatus() != ProjectStatus.OPEN) {
+        // Fora do OPEN (pausado ou encerrado), só quem tem relação direta com o projeto
+        // continua enxergando o detalhe: a própria empresa dona, o admin, ou um profissional
+        // que já tem algum match com ele — pra conseguir acompanhar o que aconteceu com a
+        // oportunidade (aguardando aprovação, confirmada, recusada ou cancelada).
+        if (p.getStatus() != ProjectStatus.OPEN && !canViewNonOpenProject(p, viewer)) {
             return ResponseEntity.notFound().build();
         }
 
@@ -239,9 +247,35 @@ public class PublicProfessionalController {
 
         // Se outra empresa acessar diretamente uma oportunidade marcada como não visível
         // para empresas, tratamos como não encontrada — o link direto não pode burlar a regra.
-        return projectResponseAssembler.toVisibleDTO(p, resolveViewer(), companyDTO)
+        return projectResponseAssembler.toVisibleDTO(p, viewer, companyDTO)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private boolean canViewNonOpenProject(Project project, ProjectResponseAssembler.Viewer viewer) {
+        if (viewer.type() == UserType.ADMIN) {
+            return true;
+        }
+        if (viewer.type() == UserType.COMPANY) {
+            return viewer.companyId() != null && viewer.companyId().equals(project.getCompany().getId());
+        }
+        if (viewer.type() == UserType.PROFESSIONAL) {
+            Long professionalId = resolveLoggedProfessionalId();
+            return professionalId != null
+                    && matchRepository.findByProjectIdAndProfessionalId(project.getId(), professionalId).isPresent();
+        }
+        return false;
+    }
+
+    private Long resolveLoggedProfessionalId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserDTO logged)) {
+            return null;
+        }
+        if (!UserType.PROFESSIONAL.name().equals(logged.role())) {
+            return null;
+        }
+        return professionalRepository.findByUserId(logged.id()).map(Professional::getId).orElse(null);
     }
 
     @GetMapping("/company/{id}")

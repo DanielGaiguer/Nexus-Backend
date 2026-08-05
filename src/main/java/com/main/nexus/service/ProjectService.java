@@ -5,8 +5,6 @@ import com.main.nexus.model.Project;
 import com.main.nexus.model.User;
 import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProjectStatus;
-import com.main.nexus.model.enums.StatusMatch;
-import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProjectRepository;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,9 +23,6 @@ public class ProjectService {
     
     @Autowired
     private NotificationService notificationService;
-
-    @Autowired
-    private MatchRepository matchRepository;
 
     @Autowired
     private EmailService emailService;
@@ -152,17 +147,8 @@ public class ProjectService {
         project.setStatus(ProjectStatus.CLOSED);
         projectRepository.save(project);
 
-        // notifica profissionais que tinham match WAITING ou COMPANY_INTERESTED
-        matchRepository.findByProjectId(project.getId())
-                .stream()
-                .filter(m -> m.getStatus() == StatusMatch.WAITING
-                          || m.getStatus() == StatusMatch.COMPANY_INTERESTED
-                          || m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
-                .forEach(m -> notificationService.notifyProjectClosed(
-                        m.getProfessional().getUser(),
-                        project.getTitle(),
-                        project.getCompany().getCompanyName()
-                ));
+        // cancela e notifica matches que ainda estavam pendentes (nunca confirmados)
+        matchService.cancelPendingMatchesForClosedProject(project);
     }
 
     // Reativa um projeto encerrado opcionalmente ajustando o nº de posições,

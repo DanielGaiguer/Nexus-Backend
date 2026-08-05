@@ -57,6 +57,16 @@ public class ReputationService {
         return rawAdjustment * metrics.getConfidenceScore();
     }
 
+    // Nota consolidada (0-100) do ReputationMetrics, usada como componente aditivo do
+    // score de match — sem a compressão em torno de NEUTRAL_SCORE aplicada em getScoreAdjustment.
+    public double getReputationScore(Long entityId, AuthorType type) {
+        ReputationMetrics metrics = (type == AuthorType.PROFESSIONAL)
+                ? getOrCalculateForProfessional(entityId)
+                : getOrCalculateForCompany(entityId);
+
+        return metrics.getReputationScore() != null ? metrics.getReputationScore() : NEUTRAL_SCORE;
+    }
+
     // RECÁLCULO — disparado por evento (Review ou RejectionFeedback novos)
 
     public void recalculateForProfessional(Long professionalId) {
@@ -72,7 +82,13 @@ public class ReputationService {
 
         LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(RECENT_MONTHS);
 
-        List<Review> allReviews = reviewRepository.findByMatchProfessionalId(professionalId);
+        // Só reviews escritas PELA empresa SOBRE esse profissional — sem esse filtro, uma
+        // review que o próprio profissional escreveu sobre a empresa (mesmo match) entrava
+        // na conta de reputação dele.
+        List<Review> allReviews = reviewRepository.findByMatchProfessionalId(professionalId)
+                .stream()
+                .filter(r -> r.getAuthorType() == AuthorType.COMPANY)
+                .toList();
         List<Review> recentReviews = allReviews.stream()
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();
@@ -87,6 +103,10 @@ public class ReputationService {
 
         metrics.setLastCalculatedAt(LocalDateTime.now());
         reputationMetricsRepository.save(metrics);
+
+        // Nota simples de estrelas (0-5) exibida em cards/perfil — independente do
+        // ReputationMetrics analítico acima, que é usado só pro ajuste de score.
+        updateStarRating(professional, allReviews);
     }
 
     public void recalculateForCompany(Long companyId) {
@@ -102,7 +122,13 @@ public class ReputationService {
 
         LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(RECENT_MONTHS);
 
-        List<Review> allReviews = reviewRepository.findByMatchProjectCompanyId(companyId);
+        // Só reviews escritas PELO profissional SOBRE essa empresa — mesmo raciocínio do
+        // lado do profissional: evita misturar a review que a empresa escreveu sobre o
+        // profissional (mesmo match) na conta de reputação da empresa.
+        List<Review> allReviews = reviewRepository.findByMatchProjectCompanyId(companyId)
+                .stream()
+                .filter(r -> r.getAuthorType() == AuthorType.PROFESSIONAL)
+                .toList();
         List<Review> recentReviews = allReviews.stream()
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();
@@ -117,6 +143,24 @@ public class ReputationService {
 
         metrics.setLastCalculatedAt(LocalDateTime.now());
         reputationMetricsRepository.save(metrics);
+
+        // Nota simples de estrelas (0-5) exibida em cards/perfil — independente do
+        // ReputationMetrics analítico acima, que é usado só pro ajuste de score.
+        updateStarRating(company, allReviews);
+    }
+
+    private void updateStarRating(Professional professional, List<Review> reviews) {
+        double average = reviews.isEmpty() ? 0.0
+                : reviews.stream().mapToInt(Review::getRating).average().orElse(0.0);
+        professional.setReputation(average);
+        professionalRepository.save(professional);
+    }
+
+    private void updateStarRating(Company company, List<Review> reviews) {
+        double average = reviews.isEmpty() ? 0.0
+                : reviews.stream().mapToInt(Review::getRating).average().orElse(0.0);
+        company.setReputation(average);
+        companyRepository.save(company);
     }
 
     // Helpers de leitura

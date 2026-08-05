@@ -43,12 +43,6 @@ public class CompanyService {
         return companyRepository.save(company);
     }
 
-    public void updateReputation(Long companyId, Double newAverage) {
-        Company company = findById(companyId);
-        company.setReputation(newAverage);
-        companyRepository.save(company);
-    }
-
     public List<Company> findPending() {
         return companyRepository.findByStatus(CompanyStatus.PENDING);
     }

@@ -128,9 +128,13 @@ public class MatchService {
                       + (availabilityScore * 0.10);
         }
 
+        //Calculo de reputacao, do projeto e do profissional. O score ele nao e recalculado, e sim multiplicado para baixo ou para cima, dependendo se a reputacao for positiva ou negativa
+        // um multiplicador global, limitado a ±20% (MAX_ADJUSTMENT = 0.20), centrado em 50 (NEUTRAL_SCORE) e ainda escalado pelo confidenceScore 
+        // ou seja, se o profissional tem pouco histórico (poucas reviews/recusas), o ajuste fica perto de 0 mesmo que o score bruto seja ótimo ou péssimo
         double professionalAdjustment = reputationService.getScoreAdjustment(professional.getId(), AuthorType.PROFESSIONAL);
         double companyAdjustment = reputationService.getScoreAdjustment(project.getCompany().getId(), AuthorType.COMPANY);
 
+        // Score final 
         return baseScore * (1 + professionalAdjustment + companyAdjustment);
     }
 
@@ -158,12 +162,12 @@ public class MatchService {
         Double experienceScore = considersExperience
                 ? calculateExperienceScore(professional, project) : null;
 
-        double baseScore = computeBaseScoreForBreakdown(
+        double baseScore = computeBaseScoreForBreakdown( //O sistema recalcula os componentes individuais agora. Sao os dados atuais
                 skillScore, budgetScore, historyScore, reputationScore,
                 availabilityScore, distanceScore, experienceScore,
                 considersDistance, considersExperience);
 
-        double reputationAdjustment = match.getMatchScore() - baseScore;
+        double reputationAdjustment = match.getMatchScore() - baseScore; //A diferença entre o score final antigo e o score base recalculado agora.
 
         return new ScoreBreakdownDTO(
                 roundToOneDecimal(skillScore),
@@ -174,7 +178,7 @@ public class MatchService {
                 distanceScore   != null ? roundToOneDecimal(distanceScore)   : null,
                 experienceScore != null ? roundToOneDecimal(experienceScore) : null,
                 roundToOneDecimal(reputationAdjustment),
-                roundToOneDecimal(match.getMatchScore())
+                roundToOneDecimal(match.getMatchScore()) // Score final oficial que foi persistido
         );
     }
 
@@ -233,70 +237,68 @@ public class MatchService {
         if (project.getOpportunityType() == OpportunityType.JOB && project.getContractType() != null) {
             return switch (project.getContractType()) {
                 case CLT, INTERNSHIP -> calculateSalaryScore(
-                        professional.getExpectedSalaryCLT(),
-                        project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
+                        professional.getExpectedSalaryCLT(), project.getMonthlySalaryMax());
                 case PJ -> calculateSalaryScore(
-                        professional.getExpectedSalaryPJ(),
-                        project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
+                        professional.getExpectedSalaryPJ(), project.getMonthlySalaryMax());
                 case TEMPORARY, FREELANCER -> calculateRangeScore(
-                        professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation(),
-                        project.getMonthlySalaryMin(), project.getMonthlySalaryMax());
+                        professional.getFreelanceMinExpectation(), project.getMonthlySalaryMax());
             };
         }
 
-        // PROJECT usa a pretensão freelance (faixa min/max)
+        // PROJECT usa a pretensão freelance (piso do profissional vs. teto do projeto)
         return calculateRangeScore(
-                professional.getFreelanceMinExpectation(), professional.getFreelanceMaxExpectation(),
-                project.getMinimumBudget(), project.getMaximumBudget());
+                professional.getFreelanceMinExpectation(), project.getMaximumBudget());
     }
 
-    // Compara um valor único de pretensão salarial (CLT/PJ) contra o range ofertado pela vaga.
-    // Se a pretensão cai dentro do range, diferença = 0%. Se estiver fora, calcula a diferença
-    // percentual até a borda mais próxima do range e aplica a tabela de penalidade.
-    private double calculateSalaryScore(Double expected, Double offeredMin, Double offeredMax) {
-        if (expected == null || offeredMin == null || offeredMax == null) return 50.0;
+    // Compara um valor único de pretensão salarial (CLT/PJ) contra o teto ofertado pela vaga.
+    // Só penaliza quando a pretensão ultrapassa o teto — a empresa genuinamente não pode/não
+    // quer pagar aquilo. Pedir dentro ou abaixo do teto não é penalizado
+    private double calculateSalaryScore(Double expected, Double offeredMax) {
+        if (expected == null || offeredMax == null) return 50.0;
 
-        double diffPercent;
-        if (expected >= offeredMin && expected <= offeredMax) {
-            diffPercent = 0.0;
-        } else if (expected < offeredMin) {
-            diffPercent = ((offeredMin - expected) / offeredMin) * 100.0;
-        } else {
-            diffPercent = ((expected - offeredMax) / offeredMax) * 100.0;
+        if (expected <= offeredMax) {
+            return 100.0;
         }
 
+        double diffPercent = ((expected - offeredMax) / offeredMax) * 100.0; // por exemplo, offeredMax = 10.000, expected = 12.000
+        // 12.000 - 10.000 = 2.000 ; 2.000 / 10.000 = 0.2 ; 0.2 * 100 = 20 ; diffPercent = 20.0
         return 100.0 - salaryPenaltyPercent(diffPercent);
     }
 
     // Tabela de abatimento no score conforme a diferença percentual entre esperado e ofertado
     private double salaryPenaltyPercent(double diffPercent) {
         if (diffPercent <= 15.0)  return 0.0;
-        if (diffPercent <= 20.0)  return 5.0;
-        if (diffPercent <= 30.0)  return 10.0;
-        if (diffPercent <= 40.0)  return 15.0;
-        if (diffPercent <= 50.0)  return 20.0;
-        if (diffPercent <= 60.0)  return 25.0;
-        if (diffPercent <= 75.0)  return 30.0;
+        if (diffPercent <= 20.0)  return 10.0;
+        if (diffPercent <= 30.0)  return 15.0;
+        if (diffPercent <= 40.0)  return 20.0;
+        if (diffPercent <= 50.0)  return 25.0;
+        if (diffPercent <= 60.0)  return 30.0;
+        if (diffPercent <= 75.0)  return 35.0;
         if (diffPercent <= 100.0) return 40.0;
         return 50.0;
     }
 
-    // Lógica de faixa (min/max) original — usada para freelance e temporário e para PROJECT
-    private double calculateRangeScore(Double profMin, Double profMax, Double projMin, Double projMax) {
+    //  Compara o piso da pretensão do profissional (profMin) contra o teto ofertado pelo projeto
+    // (projMax): existe negociação viável sempre que profMin <= projMax, já que o
+    // profissional aceita qualquer preço a partir do seu mínimo e a empresa paga
+    // qualquer preço até o seu teto — o profMax do profissional e o projMin do projeto
+    // não afetam essa viabilidade, por isso não entram na conta. Só penaliza quando o
+    // profissional pede acima do teto do projeto; pedir dentro ou abaixo não é
+    // penalizado (mais barato nunca é problema de fit para a empresa, e desalinhamento
+    // de perfil já é capturado por calculateExperienceScore/calculateSkillScore). Fora
+    // da faixa, aplica a mesma tabela de penalidade por diferença percentual usada em
+    // calculateSalaryScore, unificando o critério entre os dois modos de comparação
+    // salarial do sistema.
+    private double calculateRangeScore(Double profMin, Double projMax) {
         if (profMin == null || projMax == null) return 50.0;
 
-        double profExpectation = (profMax != null) ? (profMin + profMax) / 2.0 : profMin;
-
-        if (profExpectation <= projMax) {
-            if (projMin != null && projMin > 0) {
-                double ratio = profExpectation / projMax;
-                return Math.max(0, 100.0 - (ratio * 20));
-            }
+        if (profMin <= projMax) {
             return 100.0;
         }
-
-        double excesso = (profExpectation - projMax) / projMax;
-        return Math.max(0, 100.0 - (excesso * 100));
+        
+        double diffPercent = ((profMin - projMax) / projMax) * 100.0; // Por exemplo, profMin = 12k, projMax = 10k
+        //     12.000 - 10.000 = 2.00 ; 2.000 / 10.000 = 0.2 ; 0.2 * 100 = diffPercent = 20.0   
+        return 100.0 - salaryPenaltyPercent(diffPercent);
     }
 
     // Pretensão salarial única e relevante para o regime da vaga/projeto e usada fora do
@@ -319,18 +321,20 @@ public class MatchService {
         return (min + max) / 2.0;
     }
 
-    // historico e baseado na quantidade de projetos anteriores (máx 10 projetos = 100)
+    // historico e baseado na quantidade de projetos anteriores máx 5 projetos = 100
     public double calculateHistoryScore(Professional professional) {
         int count = professional.getProjects() != null
                 ? professional.getProjects().size()
                 : 0;
-        return Math.min(count * 10.0, 100.0);
+        return Math.min(count * 20.0, 100.0);
     }
 
-    // reputacao: média de estrelas (1-5) normalizada para 0-100
+    // reputação: nota consolidada (0-100) do ReputationMetrics — composto ponderado de
+    // competência técnica, comunicação, confiabilidade, pontualidade, profissionalismo e
+    // taxa de recomendação, calculado a partir das reviews reais recebidas pelo profissional
+    // (ver ReputationService). Não é mais lida do campo simples Professional.reputation.
     public double calculateReputationScore(Professional professional) {
-        double rep = professional.getReputation() != null ? professional.getReputation() : 0.0;
-        return (rep / 5.0) * 100.0;
+        return reputationService.getReputationScore(professional.getId(), AuthorType.PROFESSIONAL);
     }
 
     // Disponibilidade: disponível = 100, indisponível = 0
@@ -357,7 +361,7 @@ public class MatchService {
         return scoreFromDistance(distanceKm);
     }
 
-    private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+    private double haversineDistance(double lat1, double lon1, double lat2, double lon2) { //Calculo de distancia pela latitude
         final double EARTH_RADIUS_KM = 6371.0;
 
         double latRad1 = Math.toRadians(lat1);
@@ -373,11 +377,12 @@ public class MatchService {
 
         return EARTH_RADIUS_KM * c;
     }
-
+    
+    //até 5km = 100, até 10km = 90, até 20km = 75, até 50km = 50, até 100km = 25, acima disso = 10
     private double scoreFromDistance(double distanceKm) {
-        if (distanceKm <= 5)   return 100.0;
-        if (distanceKm <= 10)  return 90.0;
-        if (distanceKm <= 20)  return 75.0;
+        if (distanceKm <= 10)   return 100.0;
+        if (distanceKm <= 20)  return 90.0;
+        if (distanceKm <= 30)  return 75.0;
         if (distanceKm <= 50)  return 50.0;
         if (distanceKm <= 100) return 25.0;
         return 10.0;
@@ -390,10 +395,10 @@ public class MatchService {
         if (profLevel == null || projLevel == null) {
             return 50.0;
         }
-
+        //posição no enum: INTERNSHIP=0, TRAINEE=1, JUNIOR=2, PLENO=3, SENIOR=4
         int distance = profLevel.ordinal() - projLevel.ordinal();
 
-        if (distance == 0) return 100.0;
+        if (distance == 0) return 100.0; //Se for a experiencia exata, 100%
 
         if (distance > 0) {
             // Profissional acima do nível pedido,  penalidade leve
@@ -402,7 +407,7 @@ public class MatchService {
             return 45.0; // distance >= 3
         } else {
             // Profissional abaixo do nível pedido, penalidade mais forte
-            int absDistance = Math.abs(distance);
+            int absDistance = Math.abs(distance); //Tranforma o numero em positivo, caso seja negativo
             if (absDistance == 1) return 70.0;
             if (absDistance == 2) return 40.0;
             return 15.0; // absDistance >= 3
@@ -701,6 +706,33 @@ public class MatchService {
             match.getProject().getTitle()
         );
         return saved;
+    }
+
+    // Ao encerrar um projeto, matches que ainda estavam pendentes (nunca chegaram a ser
+    // confirmados) não têm mais como prosseguir. Viram REJECTED, mas sem marcar
+    // companyStatus/professionalStatus como REJECTED individualmente — isso é o que
+    // diferencia "cancelado por encerramento do projeto" de uma recusa ativa de qualquer
+    // lado na hora de exibir a aba de recusados no frontend.
+    public void cancelPendingMatchesForClosedProject(Project project) {
+        List<Match> pending = matchRepository.findByProjectId(project.getId())
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.WAITING
+                          || m.getStatus() == StatusMatch.COMPANY_INTERESTED
+                          || m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
+                .toList();
+
+        for (Match m : pending) {
+            String fromStatus = m.getStatus().name();
+            m.setStatus(StatusMatch.REJECTED);
+            matchHistoryService.record(m, fromStatus, m.getStatus().name(), "SYSTEM");
+            matchRepository.save(m);
+
+            notificationService.notifyProjectClosed(
+                    m.getProfessional().getUser(),
+                    project.getTitle(),
+                    project.getCompany().getCompanyName()
+            );
+        }
     }
 
     // validações de posse
