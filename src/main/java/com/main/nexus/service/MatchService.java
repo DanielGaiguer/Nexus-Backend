@@ -413,9 +413,7 @@ public class MatchService {
             return 15.0; // absDistance >= 3
         }
     }
-
     
-
     // RANKING geração e calculo
 
     public List<Match> generateRankingForProject(Project project) {
@@ -427,7 +425,7 @@ public class MatchService {
         List<Match> matches = new ArrayList<>();
 
         for (Professional professional : allProfessionals) {
-            
+            // Verifica se o profissional Tem o minimo indispensavel para o calculo do score
             if (!profileCompletionService.canParticipateInRanking(professional)) continue;
             
             if (!matchesProjectType(professional, project)) continue;
@@ -500,27 +498,37 @@ public class MatchService {
     }
 
     private boolean matchesProjectType(Professional professional, Project project) {
-        if (professional.getPreferredTypes() == null || professional.getPreferredTypes().isEmpty()) {
+        // Se o profissional nao tiver preferencia de projeto
+        if (professional.getPreferredTypes() == null || professional.getPreferredTypes().isEmpty()) { 
             return true;
         }
 
         if (project.getOpportunityType() == OpportunityType.PROJECT) {
-            return professional.getPreferredTypes().contains(ProjectType.FREELANCE)
-                || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
+            // project.getType() é o mesmo enum ProjectType usado nas preferências do
+            // profissional, então dá pra comparar direto — sem tabela de mapeamento.
+            return project.getType() == null
+                || professional.getPreferredTypes().contains(project.getType());
         }
 
         if (project.getOpportunityType() == OpportunityType.JOB) {
             if (project.getContractType() == null) return true;
             return switch (project.getContractType()) {
-                case CLT        -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME) 
+                case CLT -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME) 
+                        || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
+                    
+                // Poderia ser PJ -> true, mas nao fiz isso para facilitar a leitura e a distincao visual
+                case PJ -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME)
+                        || professional.getPreferredTypes().contains(ProjectType.PART_TIME) 
+                        || professional.getPreferredTypes().contains(ProjectType.FREELANCE);
+                    
+                case INTERNSHIP -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME) 
                     || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
-                case PJ         -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME)
-                                || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
-                case INTERNSHIP    -> professional.getPreferredTypes().contains(ProjectType.FULL_TIME) 
-                    || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
+                    
                 case TEMPORARY  -> professional.getPreferredTypes().contains(ProjectType.PART_TIME)
                                 || professional.getPreferredTypes().contains(ProjectType.FREELANCE);
-                case FREELANCER -> professional.getPreferredTypes().contains(ProjectType.FREELANCE);
+                    
+                case FREELANCER -> professional.getPreferredTypes().contains(ProjectType.FREELANCE) 
+                    || professional.getPreferredTypes().contains(ProjectType.PART_TIME);
             };
         }
 
