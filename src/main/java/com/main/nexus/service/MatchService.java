@@ -416,6 +416,13 @@ public class MatchService {
     
     // RANKING geração e calculo
 
+    // Esse e o metodo que gera  o ranking inicial de candidatos para um projeto, criando um Match (com score) para cada profissional
+    //elegível que ainda não tem match com aquele projeto
+    //varre a base de profissionais, filtra quem é elegível e ainda não tem match, 
+    //calcula o score de cada um, notifica os casos de match muito forte, e grava o ranking ordenado no banco. 
+    //É chamado na criação do projeto e, indiretamente, dentro de recalculateRankingForProject 
+    //(que primeiro recalcula os scores dos matches já existentes em WAITING, depois chama generateRankingForProject 
+    //de novo pra pegar profissionais novos que ainda não tinham match)
     public List<Match> generateRankingForProject(Project project) {
         if (project.getStatus() != ProjectStatus.OPEN) {
             return List.of(); //Se o projeto nao esta OPEN, retorna uma lista vazia
@@ -512,8 +519,13 @@ public class MatchService {
                 match.setMatchScore(newScore);
             }
         }
+        //Salva os matches atualizados
         matchRepository.saveAll(existingMatches);
 
+        
+        // graças à checagem alreadyExists, só vai efetivamente adicionar matches novos 
+        // (novos profissionais que se tornaram elegíveis desde a última geração, por exemplo por completarem o perfil), 
+        // sem duplicar os existentes
         generateRankingForProject(project);
     }
 
@@ -560,34 +572,48 @@ public class MatchService {
     @Transactional
     public Match companyShowsInterest(Long matchId, Long companyId) {
         Match match = findById(matchId);
+        // Valida se aquela empresa e dona
         validateCompanyOwnership(match, companyId);
 
+        
         if (match.getStatus() == StatusMatch.REJECTED) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "This match was rejected and cannot be reactivated.");
         }
 
+        // Verifica se o profisional ja demonstrou interesse no match
         boolean wasAlreadyProfessionalInterested = match.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED;
         String fromStatus = match.getStatus().name();
 
         if (wasAlreadyProfessionalInterested) {
+            // Verifica se o projeto tem posicoes disponiveis
             assertProjectHasOpenPositions(match.getProject());
+            // Atualiza o Status para empresa interessada
             match.setCompanyStatus(InterestStatus.INTERESTED);
+            // Atualiza o status do match para matched
             match.setStatus(StatusMatch.MATCHED);
+            // Incrementa uma unidade nas posicoes
             incrementFilledPositions(match.getProject());
         } else {
+            // Valida se o projeto esta aberto
             assertProjectIsOpen(match.getProject());
+            //Adiciona a empresa interessada no status
             match.setCompanyStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.COMPANY_INTERESTED);
+            // Adiciona a empresa como iniciadora do match
             match.setInitiatedBy(InitiatedBy.COMPANY);
         }
 
+        // Esse metodo salva o historico do match, para popular uma linha do tempo
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
+        // Salva o Match atualizado
         Match saved = matchRepository.save(match);
 
+        // Se ja tem um profissional interessado, manda notificacao para ambos
         if (wasAlreadyProfessionalInterested) {
             notifyMutualMatch(saved);
         } else {
+            // Se nao, envia notificacao e email de novo convite para o profissional
             notificationService.notifyNewInvite(
                 match.getProfessional().getUser(),
                 match.getProject().getCompany().getCompanyName(),
@@ -605,6 +631,7 @@ public class MatchService {
             );
         }
 
+        // Retorna o match salvo
         return saved;
     }
 
@@ -886,6 +913,8 @@ public class MatchService {
                 .toList();
     }
 
+    
+    // Mesmo fluxo de companyShowsInterest
     @Transactional
     public Match professionalShowsInterest(Long professionalId, Long projectId) {
         Professional professional = professionalRepository.findById(professionalId)
@@ -899,10 +928,13 @@ public class MatchService {
         Match match = matchRepository
                 .findByProjectIdAndProfessionalId(projectId, professionalId)
                 .orElseGet(() -> {
+                    // Caso ele nao exista, vai criar um match
                     Match newMatch = new Match();
                     newMatch.setProject(project);
                     newMatch.setProfessional(professional);
+                    // Gera o score do match
                     newMatch.setMatchScore(getScore(professional, project));
+                    // Por quem foi iniciado
                     newMatch.setInitiatedBy(InitiatedBy.PROFESSIONAL);
                     return newMatch;
                 });
@@ -912,20 +944,24 @@ public class MatchService {
                     "This match was rejected and cannot be reactivated.");
         }
 
+        // Checa se a empresa ja esta interessada
         boolean wasAlreadyCompanyInterested = match.getStatus() == StatusMatch.COMPANY_INTERESTED;
         String fromStatus = match.getStatus().name();
 
         if (wasAlreadyCompanyInterested) {
+            // Verifica se o projeto esta aberto e tem posicoes disponiveis
             assertProjectHasOpenPositions(match.getProject());
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.MATCHED);
             incrementFilledPositions(match.getProject());
         } else {
+            //Verifica se o projeto esta aberto, nao ve as posicoes por que nao gera um match completo
             assertProjectIsOpen(project);
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.PROFESSIONAL_INTERESTED);
         }
 
+        // Salva o historico do match
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
         Match saved = matchRepository.save(match);
 
