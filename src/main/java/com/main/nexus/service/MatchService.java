@@ -418,9 +418,11 @@ public class MatchService {
 
     public List<Match> generateRankingForProject(Project project) {
         if (project.getStatus() != ProjectStatus.OPEN) {
-            return List.of();
+            return List.of(); //Se o projeto nao esta OPEN, retorna uma lista vazia
         }
-
+        
+        //Essa busca ampla pode se tornar um gargalo de performance à medida que a base de profissionais cresce 
+        //uma otimização futura óbvia seria filtrar por available = true e/ou por região direto na query SQL
         List<Professional> allProfessionals = professionalRepository.findAll();
         List<Match> matches = new ArrayList<>();
 
@@ -428,21 +430,26 @@ public class MatchService {
             // Verifica se o profissional Tem o minimo indispensavel para o calculo do score
             if (!profileCompletionService.canParticipateInRanking(professional)) continue;
             
+            //Se nao for do mesmo tipo de oportunidade
             if (!matchesProjectType(professional, project)) continue;
 
+            // Verifica se ja existe
             boolean alreadyExists = matchRepository
                     .findByProjectIdAndProfessionalId(project.getId(), professional.getId())
-                    .isPresent();
-            if (alreadyExists) continue;
+                    .isPresent(); // Se esta presente, se nao esta vazio
+            if (alreadyExists) continue; // Se ja existe, nao gera o ranking
 
+            //Gera o score do profissional para tal projeto
             double score = getScore(professional, project);
 
             Match match = new Match();
             match.setProject(project);
             match.setProfessional(professional);
             match.setMatchScore(score);
+            //Adiciona a lista de matches
             matches.add(match);
 
+            // Alerta de alta compatibilidade - e-mail + notificação in-app para o profissional, e e-mail + notificação in-app para a empresa
             if (score >= 90.0) {
                 emailService.send(
                     professional.getUser().getEmail(),
@@ -477,18 +484,31 @@ public class MatchService {
                 );
             }
         }
-
+        
+        // .sort = Ordena os elementos da propria lista
+        // O Comparator é um objeto que diz como comparar dois elementos.
+        // Comparator.comparingDouble(...), Esse método cria um comparador baseado em um valor double
+        // Compare dois objetos Match usando o valor retornado por getMatchScore()
+        // Por padrão, Comparator.comparingDouble ordena do menor para o maior
+        // Reversed, faz ordenar as listas de maneira decrescente, o que faz sentido, primeiro vem os matches com maior score
         matches.sort(Comparator.comparingDouble(Match::getMatchScore).reversed());
+        //Salva Todos os matches
         return matchRepository.saveAll(matches);
     }
 
+    //Chamado quando uma oportunidade e editada ou reaberta
     @Transactional
     public void recalculateRankingForProject(Project project) {
+        //Pega todos os matches ja existentes daquele projeto
         List<Match> existingMatches = matchRepository.findByProjectId(project.getId());
 
+        //
         for (Match match : existingMatches) {
+            //Recalcula apenas matches que estao em WAITING, nao faz sentido recalcular matches ja feitos ou rejeitados
             if (match.getStatus() == StatusMatch.WAITING) {
+                //Vai calcular o novo score do profissional com o projeto
                 double newScore = getScore(match.getProfessional(), project);
+                //Atualiza o score daquele match
                 match.setMatchScore(newScore);
             }
         }
