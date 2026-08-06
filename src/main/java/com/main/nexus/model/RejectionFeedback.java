@@ -30,7 +30,8 @@ public class RejectionFeedback {
     @JoinColumn(name = "match_id", nullable = false)
     private Match match;
 
-    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private AuthorType rejectedBy;
 
     // Preenchido apenas quando rejectedBy == PROFESSIONAL
@@ -104,7 +105,7 @@ public class RejectionFeedback {
         this.createdAt = createdAt;
     }
 
-    // ── Atalhos para navegação ───────────────────────────────────────────────
+    // Atalhos para navegação 
 
     public Professional getProfessional() {
         return match != null ? match.getProfessional() : null;

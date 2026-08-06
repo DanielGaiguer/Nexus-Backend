@@ -1135,7 +1135,7 @@ public class MatchService {
     }
 
     // Verifica se empresa e profissional têm um match confirmado entre eles
-    // Usado para liberar dados de contat só depois do match.
+    // Usado para liberar dados de contato só depois do match.
     public boolean hasConfirmedMatchBetween(Long companyId, Long professionalId) {
         return matchRepository.findByProfessionalId(professionalId)
                 .stream()
