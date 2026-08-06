@@ -35,8 +35,12 @@ public class RejectionFeedback {
     private AuthorType rejectedBy;
 
     // Preenchido apenas quando rejectedBy == PROFESSIONAL
+    // Cria outra tabela de relacionamento, com ID e ENUM
+    // Uma lista de elementos
     @ElementCollection(targetClass = ProfessionalRejectionReason.class)
+    //Tipo do enum
     @Enumerated(EnumType.STRING)
+    // Cria uma tabela auxiliar
     @CollectionTable(
         name = "tb_professional_rejection_reasons",
         joinColumns = @JoinColumn(name = "rejection_id")
@@ -45,6 +49,7 @@ public class RejectionFeedback {
     private List<ProfessionalRejectionReason> professionalReasons;
 
     // Preenchido apenas quando rejectedBy == COMPANY
+    // Cria outra tabela de relacionamento, com ID e ENUM
     @ElementCollection(targetClass = CompanyRejectionReason.class)
     @Enumerated(EnumType.STRING)
     @CollectionTable(

@@ -673,6 +673,11 @@ public class MatchService {
         //Valida se empresa e realmente dona
         validateCompanyOwnership(match, companyId);
 
+        if (reasons == null || reasons.isEmpty()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "At least one rejection reason must be provided.");
+        }
+
         //Salva o historico e atualiza o status do match para rejeitado
         String fromStatus = match.getStatus().name();
         match.setCompanyStatus(InterestStatus.REJECTED);
@@ -733,6 +738,11 @@ public class MatchService {
     public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, List<ProfessionalRejectionReason> reasons) {
         Match match = findById(matchId);
         validateProfessionalOwnership(match, professionalId);
+
+        if (reasons == null || reasons.isEmpty()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "At least one rejection reason must be provided.");
+        }
 
         String fromStatus = match.getStatus().name();
         match.setProfessionalStatus(InterestStatus.REJECTED);
