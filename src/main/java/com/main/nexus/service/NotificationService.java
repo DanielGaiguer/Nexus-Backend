@@ -92,6 +92,17 @@ public class NotificationService {
         );
     }
     @Async
+    public void notifyInterestWithdrawn(User companyUser,
+                                        String professionalName, String projectTitle) {
+        notify(
+            companyUser,
+            NotificationType.INVITE_REJECTED,
+            "Interesse retirado",
+            professionalName + " retirou o interesse demonstrado no projeto \"" + projectTitle + "\".",
+            "/matches"
+        );
+    }
+    @Async
     public void notifyInviteRejected(User user,
                                      String otherPartyName, String projectTitle) {
         notify(

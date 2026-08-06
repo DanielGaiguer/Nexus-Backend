@@ -49,12 +49,20 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     @Query("SELECT COUNT(m) FROM Match m WHERE m.project.company.id = :companyId")
     long countByCompanyId(@Param("companyId") Long companyId);
 
-    // Projetos anteriores de uma empresa, matches que foram confirmados e já encerraram 
-    @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId " +
-           "AND m.status = :status AND m.active = false ORDER BY m.createdAt DESC")
-    List<Match> findByCompanyIdAndStatusAndActiveFalse(
-            @Param("companyId") Long companyId,
-            @Param("status") StatusMatch status);
+    // Projetos anteriores de uma empresa: matches que foram confirmados (MATCHED em algum
+    // momento) e já encerraram — seja porque expiraram naturalmente após 30 dias
+    // (MatchExpirationService só marca active=false, mantendo status=MATCHED) ou porque
+    // foram cancelados depois de confirmados (cancelMatchInternal também marca
+    // active=false, mas muda status para REJECTED). A exigência antiga de "status =
+    // MATCHED" só cobria o primeiro caso — nenhum match cancelado aparecia aqui, mesmo
+    // tendo sido um match real, porque cancelar sempre muda o status pra REJECTED. O EXISTS
+    // cobre o segundo caso consultando o histórico por uma passagem anterior por MATCHED.
+    @Query("SELECT DISTINCT m FROM Match m WHERE m.project.company.id = :companyId " +
+           "AND m.active = false " +
+           "AND (m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
+           "     OR EXISTS (SELECT 1 FROM MatchHistory h WHERE h.match = m AND h.toStatus = 'MATCHED')) " +
+           "ORDER BY m.createdAt DESC")
+    List<Match> findPreviousProjectsByCompanyId(@Param("companyId") Long companyId);
 
     // Matches por mês de uma empresa retorna [year, month, status, count]
     @Query("SELECT YEAR(m.createdAt), MONTH(m.createdAt), m.status, COUNT(m) " +

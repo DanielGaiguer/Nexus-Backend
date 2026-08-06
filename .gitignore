@@ -25,6 +25,12 @@ target/
 /dist/
 /nbdist/
 /.nb-gradle/
+# contém SUPABASE_URL/SUPABASE_SERVICE_KEY em texto puro — cada dev configura o seu localmente
+nbactions.xml
+
+### Env vars ###
+# segredos reais ficam só localmente; .env.example é o template versionado
+.env
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/

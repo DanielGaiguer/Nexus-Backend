@@ -694,48 +694,16 @@ public class MatchService {
     public Match companyCancelsMatch(Long matchId, Long companyId) {
         Match match = findById(matchId);
         validateCompanyOwnership(match, companyId);
+        return cancelMatchInternal(match, true, "COMPANY");
+    }
 
-        boolean wasMatched = match.getStatus() == StatusMatch.MATCHED;
-        boolean wasPendingInvite = match.getStatus() == StatusMatch.COMPANY_INTERESTED;
-
-        if (!wasMatched && !wasPendingInvite) {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
-                    "This match cannot be cancelled.");
-        }
-
-        String fromStatus = match.getStatus().name();
-        match.setCompanyStatus(InterestStatus.REJECTED);
-        match.setStatus(StatusMatch.REJECTED);
-        if (wasMatched) {
-            decrementFilledPositions(match.getProject());
-        }
-        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
-        Match saved = matchRepository.save(match);
-
-        String companyName = match.getProject().getCompany().getCompanyName();
-        String projectTitle = match.getProject().getTitle();
-
-        if (wasMatched) {
-            notificationService.notifyMatchCancelled(
-                match.getProfessional().getUser(), companyName, projectTitle);
-            emailService.send(
-                match.getProfessional().getUser().getEmail(),
-                "Match cancelado — Nexus",
-                "Olá " + match.getProfessional().getName() + ",\n\n" +
-                companyName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
-            );
-        } else {
-            notificationService.notifyInviteCancelled(
-                match.getProfessional().getUser(), companyName, projectTitle);
-            emailService.send(
-                match.getProfessional().getUser().getEmail(),
-                "Convite cancelado — Nexus",
-                "Olá " + match.getProfessional().getName() + ",\n\n" +
-                companyName + " cancelou o convite enviado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
-            );
-        }
-
-        return saved;
+    // Espelho de companyCancelsMatch: profissional retira um interesse pendente
+    // (PROFESSIONAL_INTERESTED, ainda não respondido pela empresa) ou cancela um match já confirmado (MATCHED).
+    @Transactional
+    public Match professionalCancelsMatch(Long matchId, Long professionalId) {
+        Match match = findById(matchId);
+        validateProfessionalOwnership(match, professionalId);
+        return cancelMatchInternal(match, false, "PROFESSIONAL");
     }
 
     //Espelho exato do companyAccepts
@@ -824,58 +792,115 @@ public class MatchService {
         }
     }
 
-    // cancelamento genérico (empresa ou profissional) marca active = fals
-
+    // Cancelamento genérico (empresa ou profissional, decidido por qual id foi passado) —
+    // agora só um roteador fino para cancelMatchInternal, o mesmo núcleo usado por
+    // companyCancelsMatch/professionalCancelsMatch. Antes essa era uma implementação própria
+    // que só marcava `active=false` (sem tocar em companyStatus/professionalStatus) e só
+    // aceitava status MATCHED — divergia de companyCancelsMatch, que marcava
+    // companyStatus=REJECTED (sem tocar em `active`) e também aceitava convites pendentes
+    // (COMPANY_INTERESTED). O mesmo cancelamento produzia resultados diferentes no banco
+    // dependendo de qual endpoint fosse chamado. Delegar para cancelMatchInternal elimina
+    // essa divergência.
     @Transactional
     public Match cancelMatch(Long matchId, Long companyId, Long professionalId, String changedBy) {
         Match match = findById(matchId);
 
         if (companyId != null) {
             validateCompanyOwnership(match, companyId);
+            return cancelMatchInternal(match, true, changedBy);
         } else if (professionalId != null) {
             validateProfessionalOwnership(match, professionalId);
-        } else {
-            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
-                    "You are not authorized to cancel this match.");
+            return cancelMatchInternal(match, false, changedBy);
         }
 
-        if (match.getStatus() != StatusMatch.MATCHED || Boolean.FALSE.equals(match.getActive())) {
+        throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                "You are not authorized to cancel this match.");
+    }
+
+    // Núcleo único de cancelamento, compartilhado por companyCancelsMatch,
+    // professionalCancelsMatch e pelo cancelMatch genérico. Permite cancelar um match já
+    // confirmado (MATCHED, de qualquer lado) ou retirar um convite/interesse pendente do
+    // próprio lado que está cancelando (COMPANY_INTERESTED para empresa,
+    // PROFESSIONAL_INTERESTED para profissional). Sempre marca `active=false` e o
+    // status de interesse (companyStatus/professionalStatus) do lado que cancelou como REJECTED juntos 
+    private Match cancelMatchInternal(Match match, boolean isCompanySide, String changedBy) {
+        boolean wasMatched = match.getStatus() == StatusMatch.MATCHED;
+        boolean wasPendingOnThisSide = isCompanySide
+                ? match.getStatus() == StatusMatch.COMPANY_INTERESTED
+                : match.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED;
+
+        if (!wasMatched && !wasPendingOnThisSide) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "This match cannot be cancelled.");
         }
 
         String fromStatus = match.getStatus().name();
-        match.setActive(false);
+        if (isCompanySide) {
+            match.setCompanyStatus(InterestStatus.REJECTED);
+        } else {
+            match.setProfessionalStatus(InterestStatus.REJECTED);
+        }
         match.setStatus(StatusMatch.REJECTED);
-        decrementFilledPositions(match.getProject());
+        match.setActive(false);
+        if (wasMatched) {
+            //Limpa a posicao para outra oportunidade
+            decrementFilledPositions(match.getProject());
+        }
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), changedBy);
         Match saved = matchRepository.save(match);
 
+        notifyCancellation(saved, isCompanySide, wasMatched);
+        return saved;
+    }
+
+    // Avisa o outro lado do cancelamento — texto varia conforme o match já estava
+    // confirmado (MATCHED) ou ainda era só um convite/interesse pendente.
+    private void notifyCancellation(Match match, boolean isCompanySide, boolean wasMatched) {
         String companyName = match.getProject().getCompany().getCompanyName();
         String professionalName = match.getProfessional().getName();
         String projectTitle = match.getProject().getTitle();
 
-        if ("COMPANY".equals(changedBy)) {
-            notificationService.notifyMatchCancelled(
-                match.getProfessional().getUser(), companyName, projectTitle);
-            emailService.send(
-                match.getProfessional().getUser().getEmail(),
-                "Match cancelado — Nexus",
-                "Olá " + professionalName + ",\n\n" +
-                companyName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
-            );
+        if (isCompanySide) {
+            if (wasMatched) {
+                notificationService.notifyMatchCancelled(
+                    match.getProfessional().getUser(), companyName, projectTitle);
+                emailService.send(
+                    match.getProfessional().getUser().getEmail(),
+                    "Match cancelado — Nexus",
+                    "Olá " + professionalName + ",\n\n" +
+                    companyName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+                );
+            } else {
+                notificationService.notifyInviteCancelled(
+                    match.getProfessional().getUser(), companyName, projectTitle);
+                emailService.send(
+                    match.getProfessional().getUser().getEmail(),
+                    "Convite cancelado — Nexus",
+                    "Olá " + professionalName + ",\n\n" +
+                    companyName + " cancelou o convite enviado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+                );
+            }
         } else {
-            notificationService.notifyMatchCancelled(
-                match.getProject().getCompany().getUser(), professionalName, projectTitle);
-            emailService.send(
-                match.getProject().getCompany().getUser().getEmail(),
-                "Match cancelado — Nexus",
-                "Olá " + companyName + ",\n\n" +
-                professionalName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
-            );
+            if (wasMatched) {
+                notificationService.notifyMatchCancelled(
+                    match.getProject().getCompany().getUser(), professionalName, projectTitle);
+                emailService.send(
+                    match.getProject().getCompany().getUser().getEmail(),
+                    "Match cancelado — Nexus",
+                    "Olá " + companyName + ",\n\n" +
+                    professionalName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+                );
+            } else {
+                notificationService.notifyInterestWithdrawn(
+                    match.getProject().getCompany().getUser(), professionalName, projectTitle);
+                emailService.send(
+                    match.getProject().getCompany().getUser().getEmail(),
+                    "Interesse retirado — Nexus",
+                    "Olá " + companyName + ",\n\n" +
+                    professionalName + " retirou o interesse demonstrado no projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+                );
+            }
         }
-
-        return saved;
     }
 
     // prersistência de feedback de rejeicao, separado por quem rejeita 
@@ -1130,7 +1155,7 @@ public class MatchService {
     }
 
     public List<Match> getPreviousProjectsByCompany(Long companyId) {
-        return matchRepository.findByCompanyIdAndStatusAndActiveFalse(companyId, StatusMatch.MATCHED);
+        return matchRepository.findPreviousProjectsByCompanyId(companyId);
     }
 
     // NOTIFICAÇÕES

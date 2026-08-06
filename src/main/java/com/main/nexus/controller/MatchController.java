@@ -165,6 +165,15 @@ public class MatchController {
         return ResponseEntity.ok("Invite rejected.");
     }
 
+    // Espelho de company-cancel: profissional cancela um match confirmado ou retira um
+    // interesse pendente que ele mesmo demonstrou.
+    @PostMapping("/{matchId}/professional-cancel")
+    public ResponseEntity<String> professionalCancels(@PathVariable Long matchId) {
+        Long professionalId = getLoggedProfessionalId();
+        matchService.professionalCancelsMatch(matchId, professionalId);
+        return ResponseEntity.ok("Match cancelled.");
+    }
+
     // Conversão pra DTO
 
     private MatchResponseDTO toMatchResponseDTO(Match m) {
