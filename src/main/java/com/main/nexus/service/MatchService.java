@@ -635,40 +635,55 @@ public class MatchService {
         return saved;
     }
 
+    // E a confirmacao explicita de convite
     @Transactional
     public Match companyAccepts(Long matchId, Long companyId) {
         Match match = findById(matchId);
+        // valida se a empresa e dona do projeto e do match
         validateCompanyOwnership(match, companyId);
 
         if (match.getStatus() != StatusMatch.PROFESSIONAL_INTERESTED) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "This match is not awaiting a company response.");
         }
+        // Verifica se o projeto esta aberto e se te, posicoes disponiveis
         assertProjectHasOpenPositions(match.getProject());
 
+        // Pega o status anterior
         String fromStatus = match.getStatus().name();
+        //Marca a empresa como interessada
         match.setCompanyStatus(InterestStatus.INTERESTED);
+        // Marca o status como matched
         match.setStatus(StatusMatch.MATCHED);
+        //Adiciona uma unidade nas posicoes disponiveis
         incrementFilledPositions(match.getProject());
+        // Salva o historico do match
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
+        //Salva o match atualizado
         Match saved = matchRepository.save(match);
+        // Notifica ambos os lados que o match foi aceito
         notifyMutualMatch(saved);
+        // Retorna o match atualizado
         return saved;
     }
 
+    @Transactional
     public Match companyRejectsWithFeedback(Long matchId, Long companyId, List<CompanyRejectionReason> reasons) {
         Match match = findById(matchId);
+        //Valida se empresa e realmente dona
         validateCompanyOwnership(match, companyId);
 
+        //Salva o historico e atualiza o status do match para rejeitado
         String fromStatus = match.getStatus().name();
         match.setCompanyStatus(InterestStatus.REJECTED);
         match.setStatus(StatusMatch.REJECTED);
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
         Match saved = matchRepository.save(match);
 
+        // Salva a rejeicao, com os devidos motivos dela, e notifica o profissional da rejeicao
         saveCompanyRejection(match, reasons);
-        notificationService.notifyInviteRejected(
-            match.getProfessional().getUser(),
+        notificationService.notifyInviteRejected( 
+            match.getProfessional().getUser(), 
             match.getProject().getCompany().getCompanyName(),
             match.getProject().getTitle()
         );
@@ -723,6 +738,7 @@ public class MatchService {
         return saved;
     }
 
+    //Espelho exato do companyAccepts
     @Transactional
     public Match professionalAccepts(Long matchId, Long professionalId) {
         Match match = findById(matchId);
@@ -744,6 +760,8 @@ public class MatchService {
         return saved;
     }
 
+    @Transactional
+    //Exatamente o mesmo fluxo de rejeicao por parte de company
     public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, List<ProfessionalRejectionReason> reasons) {
         Match match = findById(matchId);
         validateProfessionalOwnership(match, professionalId);
@@ -867,6 +885,7 @@ public class MatchService {
         feedback.setMatch(match);
         feedback.setRejectedBy(AuthorType.PROFESSIONAL);
         feedback.setProfessionalReasons(reasons);
+        //Recalcula a reputacao depois de rejeitado
         rejectionFeedbackRepository.save(feedback);
         reputationService.recalculateForCompany(match.getProject().getCompany().getId());
     }
@@ -876,6 +895,7 @@ public class MatchService {
         feedback.setMatch(match);
         feedback.setRejectedBy(AuthorType.COMPANY);
         feedback.setCompanyReasons(reasons);
+        //Recalcula a reputacao depois de rejeitado
         rejectionFeedbackRepository.save(feedback);
         reputationService.recalculateForProfessional(match.getProfessional().getId());
     }
@@ -1163,12 +1183,16 @@ public class MatchService {
         }
     }
 
+    // Efeito cascata de pausar projeto
     private void incrementFilledPositions(Project project) {
+        // UPDATE atomico no banco
         projectRepository.incrementFilledPositions(project.getId());
         // a query acima é um bulk update — sincroniza o objeto em memória pra que a checagem
         // de limite logo abaixo (e qualquer leitura subsequente na mesma transação) veja o valor atual
         project.setFilledPositions(project.getFilledPositions() + 1);
+        // Verifica se esta cheio, e pausa se for o caso
         pauseIfPositionsFull(project);
+        
     }
 
     private void decrementFilledPositions(Project project) {
@@ -1181,18 +1205,22 @@ public class MatchService {
     // Público também porque ProjectService.reopenProject reusa essa checagem: reabrir um projeto
     // fechado sem aumentar o limite de vagas não pode deixá-lo "OPEN" com 0 vagas reais.
     public void pauseIfPositionsFull(Project project) {
+        //Verifica se o projeto esta em aberto
         if (project.getStatus() != ProjectStatus.OPEN) {
             return;
         }
+        // Verifica se realmente acabaram as posicoes disponiveis
         if (project.getFilledPositions() < project.getMaxPositions()) {
             return;
         }
 
+        // Pausa o projeto
         project.setStatus(ProjectStatus.PAUSED);
         projectRepository.save(project);
 
+        // Notifica e manda um email para empresa, falando que o porjeto foi pausado
         Company company = project.getCompany();
-        notificationService.notifyProjectPositionsFull(
+        notificationService.notifyProjectPositionsFull( 
                 company.getUser(), project.getTitle(), project.getId());
 
         emailService.send(
