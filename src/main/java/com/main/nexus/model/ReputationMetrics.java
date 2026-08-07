@@ -26,7 +26,8 @@ public class ReputationMetrics {
     @JoinColumn(name = "company_id", unique = true)
     private Company company;
 
-    @Column(nullable = false)
+    // Nao e nulo por que empresas nao tem esse campo
+    @Column
     private Double technicalCompetence;
     
     @Column(nullable = false)

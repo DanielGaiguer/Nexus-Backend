@@ -25,9 +25,6 @@ public class ReviewService {
     @Autowired
     private ReputationService reputationService;
 
-    @Autowired
-    private NotificationService notificationService;
-
     public Review save(Review review) {
         Match match = review.getMatch();
 
@@ -35,18 +32,20 @@ public class ReviewService {
         boolean matchConfirmed = match.getStatus() == StatusMatch.MATCHED;
         boolean matchRejected = match.getStatus() == StatusMatch.REJECTED;
 
+        //So consegue fazer avaliacao sobre um match ja confirmado ou rejeitado
         if (!matchExpired && !matchConfirmed && !matchRejected) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "Reviews are only allowed after a confirmed or rejected match.");
         }
 
+        // Nao e possivel fazer mais de uma avaliacao por match
         if (reviewRepository.existsByMatchIdAndAuthorType(match.getId(), review.getAuthorType())) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(409),
                     "A review from this author type already exists for this match.");
         }
 
         // Rejeitados nunca chegaram a ser confirmados, então não há status check
-        // (contato real) a responder — não faz sentido exigi-lo aqui.
+        // E necessario ter respondido o StatusCheck, caso nao tenha da erro
         if (review.getAuthorType() == AuthorType.COMPANY && !matchRejected
                 && !matchStatusCheckRepository.existsByMatchId(match.getId())) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
@@ -54,27 +53,19 @@ public class ReviewService {
         }
 
         MatchStatusCheck statusCheck = matchStatusCheckRepository.findByMatchId(match.getId()).orElse(null);
+        // Se ter statusCheck, e esse status for SEM CONTATO
         if (statusCheck != null && statusCheck.getOutcome() == MatchOutcome.NO_CONTACT_YET) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "Reviews are not available when there was no contact.");
         }
 
         Review saved = reviewRepository.save(review);
-        
-        if (review.getAuthorType() == AuthorType.COMPANY) {
-            notificationService.notifyNewReviewReceived(
-                review.getMatch().getProfessional().getUser(),
-                review.getMatch().getProject().getCompany().getCompanyName(),
-                review.getRating()
-            );
-        } else {
-            notificationService.notifyNewReviewReceived(
-                review.getMatch().getProject().getCompany().getUser(),
-                review.getMatch().getProfessional().getName(),
-                review.getRating()
-            );
-        }
 
+        // Nao notifica quem foi avaliado: autor, nota e existencia da avaliacao ficam
+        // ocultos para evitar retaliacao. O avaliado so ve o reflexo agregado na sua
+        // reputacao (ReputationMetrics / nota media), nunca a avaliacao individual.
+
+        // Recalcula a reputacao pos avaliacao
         if (review.getAuthorType() == AuthorType.COMPANY) {
             reputationService.recalculateForProfessional(match.getProfessional().getId());
         } else {

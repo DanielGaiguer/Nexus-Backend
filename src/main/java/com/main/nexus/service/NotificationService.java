@@ -114,18 +114,6 @@ public class NotificationService {
         );
     }
     @Async
-    public void notifyNewReviewReceived(User user,
-                                        String reviewerName, int rating) {
-        String stars = "★".repeat(rating) + "☆".repeat(5 - rating);
-        notify(
-            user,
-            NotificationType.NEW_REVIEW_RECEIVED,
-            "Nova avaliação recebida",
-            reviewerName + " avaliou você com " + stars + " (" + rating + "/5).",
-            "/profile"
-        );
-    }
-    @Async
     public void notifyHighScoreOpportunity(User professional,
                                            String projectTitle, String companyName,
                                            double score, Long projectId) {
