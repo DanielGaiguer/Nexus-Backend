@@ -45,8 +45,9 @@ public class Company {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
-    private Double reputation = 0.0;
+    // Nula ate a primeira avaliacao recebida — nao confundir "sem nota" com "nota 0"
+    @Column
+    private Double reputation;
 
     private Double latitude;
     private Double longitude;

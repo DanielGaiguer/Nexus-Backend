@@ -25,18 +25,28 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ReputationService {
 
-    @Autowired private ReviewRepository reviewRepository;
-    @Autowired private RejectionFeedbackRepository rejectionFeedbackRepository;
-    @Autowired private ReputationMetricsRepository reputationMetricsRepository;
-    @Autowired private ProfessionalRepository professionalRepository;
-    @Autowired private CompanyRepository companyRepository;
+    @Autowired 
+    private ReviewRepository reviewRepository;
+    
+    @Autowired 
+    private RejectionFeedbackRepository rejectionFeedbackRepository;
+    
+    @Autowired 
+    private ReputationMetricsRepository reputationMetricsRepository;
+    
+    @Autowired 
+    private ProfessionalRepository professionalRepository;
+    
+    @Autowired 
+    private CompanyRepository companyRepository;
+    
 
     // Constantes de configuração
     private static final double RECENT_WEIGHT = 0.70;
     private static final double HISTORICAL_WEIGHT = 0.30;
     private static final double MAX_ADJUSTMENT = 0.20;
     private static final double CONFIDENCE_THRESHOLD = 50.0;
-    private static final double NEUTRAL_SCORE = 50.0;
+    private static final double NEUTRAL_SCORE = 10.0;
     private static final int RECENT_MONTHS = 6;
 
     private static final double BAYESIAN_CONFIDENCE_CONSTANT = 5.0; // C — peso de "avaliações neutras" na média bayesiana
@@ -55,6 +65,17 @@ public class ReputationService {
 
         double rawAdjustment = (metrics.getReputationScore() - NEUTRAL_SCORE) / NEUTRAL_SCORE * MAX_ADJUSTMENT;
         return rawAdjustment * metrics.getConfidenceScore();
+    }
+
+    // ReputationMetrics completo, sempre com os priors neutros já calculados (nunca
+    // retorna vazio) — usado pelas telas de analytics pra não mostrar "reputação zerada"
+    // pra quem simplesmente ainda não tem avaliação.
+    public ReputationMetrics getMetricsForProfessional(Long professionalId) {
+        return getOrCalculateForProfessional(professionalId);
+    }
+
+    public ReputationMetrics getMetricsForCompany(Long companyId) {
+        return getOrCalculateForCompany(companyId);
     }
 
     // Nota consolidada (0-100) do ReputationMetrics, usada como componente aditivo do
@@ -93,8 +114,10 @@ public class ReputationService {
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();
 
+        //Todas as rejeicoes 
         List<RejectionFeedback> allRejections = rejectionFeedbackRepository.findByMatchProfessionalAndRejectedBy(
-                professionalId, AuthorType.COMPANY, LocalDateTime.now().minusYears(50));
+                professionalId, AuthorType.COMPANY);
+        // De 6 meses atras
         List<RejectionFeedback> recentRejections = allRejections.stream()
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();
@@ -109,6 +132,7 @@ public class ReputationService {
         updateStarRating(professional, allReviews);
     }
 
+    // Espelho do metodo para profissionais
     public void recalculateForCompany(Long companyId) {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatusCode.valueOf(404), "Company not found"));
@@ -134,7 +158,7 @@ public class ReputationService {
                 .toList();
 
         List<RejectionFeedback> allRejections = rejectionFeedbackRepository.findByMatchProjectCompanyAndRejectedBy(
-                companyId, AuthorType.PROFESSIONAL, LocalDateTime.now().minusYears(50));
+                companyId, AuthorType.PROFESSIONAL);
         List<RejectionFeedback> recentRejections = allRejections.stream()
                 .filter(r -> r.getCreatedAt().isAfter(sixMonthsAgo))
                 .toList();
@@ -149,19 +173,30 @@ public class ReputationService {
         updateStarRating(company, allReviews);
     }
 
+    // - Professional.reputation/Company.reputation (média crua 0–5, exibida em cards de UI, e usada como componente aditivo ponderado dentro de getScore);
+    // - ReputationMetrics.reputationScore (composto ponderado 0–100 com suavização bayesiana, usado apenas no multiplicador getScoreAdjustment).
+
+    
+    // Nulo enquanto nao houver nenhuma avaliacao — o front distingue "sem nota" de "nota 0"
     private void updateStarRating(Professional professional, List<Review> reviews) {
-        double average = reviews.isEmpty() ? 0.0
+        Double average = reviews.isEmpty() ? null
                 : reviews.stream().mapToInt(Review::getRating).average().orElse(0.0);
+        // Calcula a media das avaliacoess
         professional.setReputation(average);
         professionalRepository.save(professional);
     }
 
     private void updateStarRating(Company company, List<Review> reviews) {
-        double average = reviews.isEmpty() ? 0.0
+        Double average = reviews.isEmpty() ? null
                 : reviews.stream().mapToInt(Review::getRating).average().orElse(0.0);
         company.setReputation(average);
         companyRepository.save(company);
     }
+    
+    //Um recém-cadastrado com uma única review de 5 estrelas teria Professional.reputation = 5.0 (nota "crua" máxima, sem suavização), 
+    //mas seu ReputationMetrics.reputationScore ainda estaria fortemente puxado para o prior neutro (por causa da suavização bayesiana com poucos dados) 
+    // e seu confidenceScore seria quase zero — nesse caso, o efeito líquido sobre o score de match seria: componente aditivo alto (pela nota crua), 
+    // mas multiplicador quase neutro (pela baixa confiança).
 
     // Helpers de leitura
 
@@ -248,12 +283,22 @@ public class ReputationService {
               + (metrics.getPunctuality()            * 0.15)
               + (metrics.getProfessionalism()        * 0.15)
               + (metrics.getRecommendationRate()     * 0.10);
+        
+        // Os pesos exatos, somando 1.00: técnica 25%, confiabilidade 20%, comunicação 15%, pontualidade 15%, profissionalismo 15%, taxa de recomendação 10%. 
+        // Cada indicador é primeiro calculado via indicatorFromReviews (com o par de motivos positivos/negativos específico — ex.: technicalCompetence 
+        // usa HIGH_TECHNICAL_SKILL/HIGH_CODE_QUALITY/GOOD_PROBLEM_SOLVING como positivos e LOW_CODE_QUALITY/POOR_PROBLEM_SOLVING como negativos), 
+        // depois blendado 70/30 entre recente e histórico, e technicalCompetence e reliability ainda sofrem a subtração da penalidade de rejeição correspondente antes do blend.
 
         metrics.setReputationScore(reputationScore);
         metrics.setTotalReviews(allReviews.size());
         metrics.setTotalReviewsRecent(recentReviews.size());
         metrics.setTotalRejectionsReceived(allRejections.size());
         metrics.setConfidenceScore(Math.min(1.0, (double) allReviews.size() / CONFIDENCE_THRESHOLD));
+        
+        // CONFIDENCE_THRESHOLD = 50.0 — ou seja, a confiança atinge o máximo (1.0) a partir de 50 reviews recebidas (allReviews.size(), o total histórico, não o recente),
+        // crescendo linearmente até lá. Com 0 reviews, confiança = 0; com 25 reviews, confiança = 0.5; com 50+ reviews, confiança = 1.0 (o Math.min trava o teto). 
+        // É esse valor que, como vimos em getScoreAdjustment, multiplica o rawAdjustment — é a peça final que impede que um profissional/empresa com 
+        // uma única review de 1 estrela receba imediatamente o ajuste completo de -20% no score de match.
     }
     
     // CÁLCULO  EMPRESA igual ao profissional motivos diferentes
@@ -322,6 +367,9 @@ public class ReputationService {
     }
 
     // Indicador 0-100 a partir da contagem de motivos positivos e negativos nas reviews, via Bayesian 
+    // A ideia central é:
+    //Se existem poucas menções, não confiar cegamente nelas.
+    // Se existem muitas menções, confiar cada vez mais no resultado real.
     private double indicatorFromReviews(List<Review> reviews, List<PositiveReason> positives, List<NegativeReason> negatives) {
         if (reviews.isEmpty()) return BAYESIAN_GLOBAL_PRIOR;
 
@@ -338,22 +386,45 @@ public class ReputationService {
                 .count();
 
         long totalMentions = positiveCount + negativeCount;
-        if (totalMentions == 0) return BAYESIAN_GLOBAL_PRIOR;
+        if (totalMentions == 0) return BAYESIAN_GLOBAL_PRIOR; // positiveCount = 0 negativeCount = 0 ; não existe informação suficiente para calcular o indicador.
 
-        double rawRatio = ((double) positiveCount / totalMentions) * 100.0;
+        double rawRatio = ((double) positiveCount / totalMentions) * 100.0; // calcula a proporção de menções positivas.
 
-        // Bayesian: puxa para o prior global quando há poucas menções
+        // Média Bayesiana: combina o resultado real das avaliações com um valor global de referência (prior),
+        // evitando que poucas avaliações gerem resultados extremos ou pouco confiáveis. O BAYESIAN_GLOBAL_PRIOR representa o valor inicial de referência,
+        // neste caso 50, que funciona como uma avaliação neutra. O BAYESIAN_CONFIDENCE_CONSTANT representa o peso dado a esse valor inicial; como seu valor é 5,
+        // é como se o sistema considerasse que o prior possui o peso equivalente a 5 menções. O rawRatio representa a porcentagem real de 
+        // menções positivas entre todas as menções positivas  e negativas, enquanto totalMentions representa a quantidade de evidências reais disponíveis. 
+        // Dessa forma, quando existem poucas menções, o resultado é mais influenciado pelo prior global, evitando notas muito altas ou baixas com pouca informação. Conforme o número de 
+        // menções aumenta, as avaliações reais passam a ter mais peso e o resultado se aproxima cada vez mais da proporção observada. 
+        //Assim, a média Bayesiana permite obter um indicador mais confiável e justo mesmo quando algumas empresas possuem poucas avaliações.
+        
+        // puxa para o prior global quando há poucas menções
+        //              5.0                           50
         return ((BAYESIAN_CONFIDENCE_CONSTANT * BAYESIAN_GLOBAL_PRIOR) + (rawRatio * totalMentions))
                 / (BAYESIAN_CONFIDENCE_CONSTANT + totalMentions);
+        // BAYESIAN_GLOBAL_PRIOR = O prior funciona como uma "âncora" para evitar resultados extremos quando existe pouca informação.
+        // BAYESIAN_CONFIDENCE_CONSTANT = Antes de analisar as avaliações dessa empresa, vou considerar que tenho uma confiança equivalente a 5 observações no valor global de 50.
+        // O sistema diz: "Eu já parto de uma opinião neutra de 50, com uma confiança equivalente a 5 avaliações."
+        
+        // A formula pode ser entendida como: 
+//                     PRIOR + DADOS REAIS
+//        Resultado = -----------------------
+//                        PESOS TOTAIS
+
+    // O efeito prático: com poucas menções (n pequeno), o resultado fica puxado para perto de 50 (o prior domina); 
+    // com muitas menções (n grande, n >> C), o resultado converge para o rawRatio real observado (os dados dominam sobre o prior). 
+    // Isso evita que um único review muito positivo ou muito negativo distorça um indicador para 0 ou 100 de forma extrema — 
+    // é uma proteção estatística contra ruído de amostra pequena, com o mesmo espírito por trás do confidenceScore visto em getScoreAdjustment.
     }
 
     // Nota média bayesiana, 0-5
     private double bayesianRating(List<Review> reviews) {
-        if (reviews.isEmpty()) return 3.5; // prior neutro de 5 estrelas
+        if (reviews.isEmpty()) return 3.5; // é o prior, ou seja, a nota inicial que o sistema assume quando não possui informações suficientes.
 
-        double sum = reviews.stream().mapToInt(Review::getRating).sum();
-        int n = reviews.size();
-        double priorMean = 3.5;
+        double sum = reviews.stream().mapToInt(Review::getRating).sum(); // Conta a nota de cada avaliacao
+        int n = reviews.size(); // Quantidade de avaliacoes
+        double priorMean = 3.5; //considero uma nota neutra de 3,5 estrelas
         double C = BAYESIAN_CONFIDENCE_CONSTANT;
 
         return ((C * priorMean) + sum) / (C + n);
@@ -365,16 +436,22 @@ public class ReputationService {
         return ((double) recommended / reviews.size()) * 100.0;
     }
 
+    // A lógica: dentre todas as rejeições que o profissional recebeu (de um período — recente ou histórico, dependendo de qual lista é passada), 
+    // quantas tiveram um motivo especificamente relacionado ao indicador que está sendo calculado (ex.: para technicalCompetence, 
+    // os motivos-alvo são MISSING_REQUIRED_SKILLS/INSUFFICIENT_EXPERIENCE). Essa proporção (ratio, de 0.0 a 1.0) é multiplicada por 30.0, gerando uma penalidade de 0 a 30 pontos 
+    // Essa penalidade é então subtraída do valor do indicador correspondente (indicatorFromReviews(...) - rejectionRatioForXxx(...)), tanto na versão "recente" quanto "histórica",
+    // antes de aplicar o blend 70/30
+    
     // proporcao de rejeições recebidas pelo profissional com um motivo específico convertida em penalidade 0-30
     private double rejectionRatioForProfessional(List<RejectionFeedback> rejections, List<CompanyRejectionReason> targetReasons) {
         if (rejections.isEmpty()) return 0.0;
 
         long matching = rejections.stream()
                 .filter(r -> r.getCompanyReasons() != null)
-                .filter(r -> r.getCompanyReasons().stream().anyMatch(targetReasons::contains))
+                .filter(r -> r.getCompanyReasons().stream().anyMatch(targetReasons::contains)) // Existe pelo menos um motivo dessa rejeição que está dentro dos motivos que estou procurando?
                 .count();
 
-        double ratio = (double) matching / rejections.size();
+        double ratio = (double) matching / rejections.size(); // Calcula a proporcao
         return ratio * 30.0; // até 30 pontos de penalidade no indicador, proporcional
     }
 

@@ -12,7 +12,6 @@ import com.main.nexus.model.Match;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
-import com.main.nexus.repository.ReputationMetricsRepository;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.format.TextStyle;
@@ -21,7 +20,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +30,7 @@ public class ProfessionalAnalyticsService {
     private MatchRepository matchRepository;
 
     @Autowired
-    private ReputationMetricsRepository reputationMetricsRepository;
+    private ReputationService reputationService;
 
     // Ponto de entrada principal
 
@@ -216,15 +214,9 @@ public class ProfessionalAnalyticsService {
     //  Resumo de reputação do profissional 
 
     private ReputationSummaryDTO buildReputationSummary(Long professionalId) {
-        Optional<ReputationMetrics> metricsOpt =
-                reputationMetricsRepository.findByProfessionalId(professionalId);
-
-        if (metricsOpt.isEmpty()) {
-            return new ReputationSummaryDTO(
-                    0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-        }
-
-        ReputationMetrics m = metricsOpt.get();
+        // Sempre calculado (nunca vazio) — com os priors neutros quando ainda não há
+        // avaliação, em vez de zerar tudo e parecer reputação péssima.
+        ReputationMetrics m = reputationService.getMetricsForProfessional(professionalId);
 
         return new ReputationSummaryDTO(
                 m.getReputationScore(),

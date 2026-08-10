@@ -61,10 +61,6 @@ public class ReviewService {
 
         Review saved = reviewRepository.save(review);
 
-        // Nao notifica quem foi avaliado: autor, nota e existencia da avaliacao ficam
-        // ocultos para evitar retaliacao. O avaliado so ve o reflexo agregado na sua
-        // reputacao (ReputationMetrics / nota media), nunca a avaliacao individual.
-
         // Recalcula a reputacao pos avaliacao
         if (review.getAuthorType() == AuthorType.COMPANY) {
             reputationService.recalculateForProfessional(match.getProfessional().getId());

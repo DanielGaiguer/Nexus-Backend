@@ -2,7 +2,6 @@ package com.main.nexus.repository;
 
 import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.enums.AuthorType;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,11 +12,10 @@ import org.springframework.stereotype.Repository;
 public interface RejectionFeedbackRepository extends JpaRepository<RejectionFeedback, Long> {
 
     @Query("SELECT r FROM RejectionFeedback r WHERE r.match.professional.id = :professionalId " +
-           "AND r.rejectedBy = :rejectedBy AND r.createdAt >= :since")
+           "AND r.rejectedBy = :rejectedBy")
     List<RejectionFeedback> findByMatchProfessionalAndRejectedBy(
             @Param("professionalId") Long professionalId,
-            @Param("rejectedBy") AuthorType rejectedBy,
-            @Param("since") LocalDateTime since);
+            @Param("rejectedBy") AuthorType rejectedBy);
 
     @Query("SELECT COUNT(r) FROM RejectionFeedback r WHERE r.match.professional.id = :professionalId " +
            "AND r.rejectedBy = :rejectedBy")
@@ -26,9 +24,8 @@ public interface RejectionFeedbackRepository extends JpaRepository<RejectionFeed
             @Param("rejectedBy") AuthorType rejectedBy);
 
     @Query("SELECT r FROM RejectionFeedback r WHERE r.match.project.company.id = :companyId " +
-           "AND r.rejectedBy = :rejectedBy AND r.createdAt >= :since")
+           "AND r.rejectedBy = :rejectedBy")
     List<RejectionFeedback> findByMatchProjectCompanyAndRejectedBy(
             @Param("companyId") Long companyId,
-            @Param("rejectedBy") AuthorType rejectedBy,
-            @Param("since") LocalDateTime since);
+            @Param("rejectedBy") AuthorType rejectedBy);
 }
