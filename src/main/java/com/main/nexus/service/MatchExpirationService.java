@@ -16,8 +16,9 @@ import org.springframework.stereotype.Service;
 public class MatchExpirationService {
 
     private static final int EXPIRATION_DAYS = 30;
-    private static final int APPROACHING_WINDOW_START_DAYS = 16;
-    private static final int APPROACHING_WINDOW_END_DAYS = 14;
+    // Público: também usado por MatchStatusCheckService pra achar matches pendentes de
+    // resposta a serem exibidos automaticamente no dashboard da empresa.
+    public static final int APPROACHING_THRESHOLD_DAYS = 14;
 
     @Autowired
     private MatchRepository matchRepository;
@@ -27,6 +28,9 @@ public class MatchExpirationService {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private EmailService emailService;
 
     @Transactional
     public void checkAndExpireMatches() {
@@ -53,15 +57,17 @@ public class MatchExpirationService {
         matchRepository.saveAll(expiredMatches);
     }
 
+    // Sem teto superior de propósito: se o job não rodar num dia específico (deploy,
+    // servidor fora do ar), o match não pode "passar batido" e ficar sem ser notificado
+    // pra sempre
     @Transactional
     public void checkAndNotifyApproaching() {
-        LocalDateTime windowStart = LocalDateTime.now().minusDays(APPROACHING_WINDOW_START_DAYS);
-        LocalDateTime windowEnd = LocalDateTime.now().minusDays(APPROACHING_WINDOW_END_DAYS);
+        LocalDateTime threshold = LocalDateTime.now().minusDays(APPROACHING_THRESHOLD_DAYS);
 
         List<Match> approachingMatches = matchRepository.findByStatus(StatusMatch.MATCHED)
                 .stream()
                 .filter(m -> !Boolean.FALSE.equals(m.getActive()))
-                .filter(m -> m.getCreatedAt().isAfter(windowStart) && m.getCreatedAt().isBefore(windowEnd))
+                .filter(m -> m.getCreatedAt().isBefore(threshold))
                 .toList();
 
         for (Match match : approachingMatches) {
@@ -72,11 +78,20 @@ public class MatchExpirationService {
                     companyUser.getId(), NotificationType.MATCH_STATUS_CHECK, actionUrl);
 
             if (!alreadyNotified) {
+                String professionalName = match.getProfessional().getName();
+                String projectTitle = match.getProject().getTitle();
+
                 notificationService.notifyMatchStatusCheck(
-                        companyUser,
-                        match.getProfessional().getName(),
-                        match.getProject().getTitle(),
-                        match.getId());
+                        companyUser, professionalName, projectTitle, match.getId());
+
+                emailService.send(
+                        companyUser.getEmail(),
+                        "Como está indo o match? — Nexus",
+                        "Olá,\n\n" +
+                        "Seu match com " + professionalName + " no projeto \"" + projectTitle + "\" completa 30 dias em breve. " +
+                        "Que tal nos contar como está sendo?\n\n" +
+                        "Acesse o Nexus e responda em poucos cliques.\n\nEquipe Nexus"
+                );
             }
         }
     }

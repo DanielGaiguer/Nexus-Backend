@@ -105,4 +105,17 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
            "GROUP BY s.name, s.category " +
            "ORDER BY COUNT(DISTINCT m.project) DESC")
     List<Object[]> findMostRequiredSkillsByProfessional(@Param("professionalId") Long professionalId);
+
+    // Matches confirmados há tempo suficiente cujo status check ainda não foi respondido
+    // pela empresa — usado tanto pelo lembrete automático quanto pra exibir a pergunta
+    // direto no dashboard, sem a empresa precisar abrir a notificação.
+    @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId " +
+           "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
+           "AND (m.active = true OR m.active IS NULL) " +
+           "AND m.createdAt < :threshold " +
+           "AND NOT EXISTS (SELECT 1 FROM MatchStatusCheck c WHERE c.match = m) " +
+           "ORDER BY m.createdAt ASC")
+    List<Match> findPendingStatusChecksByCompanyId(
+            @Param("companyId") Long companyId,
+            @Param("threshold") java.time.LocalDateTime threshold);
 }

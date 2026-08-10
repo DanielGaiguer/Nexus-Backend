@@ -295,8 +295,8 @@ public class ReputationService {
         metrics.setTotalRejectionsReceived(allRejections.size());
         metrics.setConfidenceScore(Math.min(1.0, (double) allReviews.size() / CONFIDENCE_THRESHOLD));
         
-        // CONFIDENCE_THRESHOLD = 50.0 — ou seja, a confiança atinge o máximo (1.0) a partir de 50 reviews recebidas (allReviews.size(), o total histórico, não o recente),
-        // crescendo linearmente até lá. Com 0 reviews, confiança = 0; com 25 reviews, confiança = 0.5; com 50+ reviews, confiança = 1.0 (o Math.min trava o teto). 
+        // CONFIDENCE_THRESHOLD = 10.0 — ou seja, a confiança atinge o máximo (1.0) a partir de 10 reviews recebidas (allReviews.size(), o total histórico, não o recente),
+        // crescendo linearmente até lá. Com 0 reviews, confiança = 0; com 5 reviews, confiança = 0.5; com 10+ reviews, confiança = 1.0 (o Math.min trava o teto). 
         // É esse valor que, como vimos em getScoreAdjustment, multiplica o rawAdjustment — é a peça final que impede que um profissional/empresa com 
         // uma única review de 1 estrela receba imediatamente o ajuste completo de -20% no score de match.
     }

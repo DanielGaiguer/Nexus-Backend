@@ -228,6 +228,22 @@ public class NotificationService {
         );
     }
     @Async
+    public void notifyProjectAddedToPortfolio(User professionalUser,
+                                              String companyName, String projectTitle,
+                                              boolean completed) {
+        String situacao = completed
+                ? "que o projeto \"" + projectTitle + "\" foi concluído"
+                : "que vocês estão trabalhando juntos no projeto \"" + projectTitle + "\"";
+        notify(
+            professionalUser,
+            NotificationType.PROJECT_ADDED_TO_PORTFOLIO,
+            "Projeto adicionado ao seu portfólio",
+            companyName + " enviou um relatório confirmando " + situacao +
+            ". Ele foi adicionado automaticamente ao seu portfólio.",
+            "/pro/portfolio"
+        );
+    }
+    @Async
     public void notifyProjectClosedByAdmin(User companyUser, String projectTitle) {
         notify(
             companyUser,

@@ -14,7 +14,7 @@ import java.util.List;
 @Service
 public class PreviousProjectService {
 
-    private static final int MAX_TECHNOLOGIES = 15;
+    private static final int MAX_TECHNOLOGIES = 40;
     private static final int MAX_TECHNOLOGY_LENGTH = 100;
 
     @Autowired
