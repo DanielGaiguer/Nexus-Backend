@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationService {
 
+    private static final int OLD_NOTIFICATION_DAYS = 30;
+
     @Autowired
     private NotificationRepository notificationRepository;
 
@@ -299,6 +301,9 @@ public class NotificationService {
     public long getUnreadCount(Long userId) {
         return notificationRepository.countByUserIdAndReadFalse(userId);
     }
+    
+    // Precisam de @Transactional porque delegam a queries @Modifying — o Spring Data JPA exige uma transação ativa para executar UPDATE/DELETE via
+    // JPQL (diferente de um save() normal via JpaRepository, que gerencia sua própria transação implicitamente através do proxy do repositório).
 
     @Transactional
     public void markAllAsRead(Long userId) {
@@ -310,11 +315,11 @@ public class NotificationService {
         notificationRepository.markAsReadByIdAndUserId(notificationId, userId);
     }
 
+    // chamado pelo job noturno
     @Transactional
-    public void deleteOldNotifications(Long userId) {
-        notificationRepository.deleteOldReadNotifications(
-                userId,
-                java.time.LocalDateTime.now().minusDays(30)
+    public void deleteAllOldNotifications() {
+        notificationRepository.deleteAllOldReadNotifications(
+                java.time.LocalDateTime.now().minusDays(OLD_NOTIFICATION_DAYS)
         );
     }
 

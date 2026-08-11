@@ -1,6 +1,7 @@
 package com.main.nexus.scheduler;
 
 import com.main.nexus.service.MatchExpirationService;
+import com.main.nexus.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,9 @@ public class NexusScheduler {
     @Autowired
     private MatchExpirationService matchExpirationService;
 
+    @Autowired
+    private NotificationService notificationService;
+
     // segundo minuto hora dia-do-mês mês dia-da-semana
     @Scheduled(cron = "0 0 0 * * *") //meia-noite, todo dia. Roda checkAndExpireMatches (a checagem de expiração de 30 dias)   
     public void runMatchExpirationCheck() { // Nao precisa de atencao imediata da empresa, por isso a escolha do horario
@@ -22,5 +26,14 @@ public class NexusScheduler {
     @Scheduled(cron = "0 0 8 * * *")// 8h da manhã, todo dia. Roda checkAndNotifyApproaching (o aviso de status check de ~15 dias)
     public void runMatchApproachingCheck() {
         matchExpirationService.checkAndNotifyApproaching();
+    }
+
+    // 3h da manhã, todo dia — horário de baixo tráfego. Remove notificações lidas com
+    // mais de 30 dias, de todos os usuários. Antes disso, nada disparava essa limpeza:
+    // o endpoint existia (DELETE /api/notifications/old) mas nenhum lugar do frontend
+    // chamava, então tb_notification só crescia.
+    @Scheduled(cron = "0 0 3 * * *")
+    public void runOldNotificationsCleanup() {
+        notificationService.deleteAllOldNotifications();
     }
 }

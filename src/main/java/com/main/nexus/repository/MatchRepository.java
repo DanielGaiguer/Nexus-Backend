@@ -115,4 +115,22 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findPendingStatusChecksByCompanyId(
             @Param("companyId") Long companyId,
             @Param("threshold") java.time.LocalDateTime threshold);
+
+    // Matches que expiraram (30 dias, active=false) e ainda não têm avaliação desse lado —
+    // usado pra abrir a avaliação automaticamente no dashboard, igual ao status check.
+    @Query("SELECT m FROM Match m WHERE m.professional.id = :professionalId " +
+           "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
+           "AND m.active = false " +
+           "AND NOT EXISTS (SELECT 1 FROM Review r WHERE r.match = m " +
+           "                AND r.authorType = com.main.nexus.model.enums.AuthorType.PROFESSIONAL) " +
+           "ORDER BY m.createdAt ASC")
+    List<Match> findPendingReviewsForProfessional(@Param("professionalId") Long professionalId);
+
+    @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId " +
+           "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
+           "AND m.active = false " +
+           "AND NOT EXISTS (SELECT 1 FROM Review r WHERE r.match = m " +
+           "                AND r.authorType = com.main.nexus.model.enums.AuthorType.COMPANY) " +
+           "ORDER BY m.createdAt ASC")
+    List<Match> findPendingReviewsForCompany(@Param("companyId") Long companyId);
 }
