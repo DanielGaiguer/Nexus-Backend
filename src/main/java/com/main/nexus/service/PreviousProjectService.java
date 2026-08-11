@@ -1,8 +1,7 @@
 package com.main.nexus.service;
 
-import com.main.nexus.dto.PreviousProjectRequestDTO;
+import com.main.nexus.dto.PreviousProjectDTO;
 import com.main.nexus.model.PreviousProject;
-import com.main.nexus.model.Professional;
 import com.main.nexus.repository.PreviousProjectRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -20,10 +19,10 @@ public class PreviousProjectService {
     @Autowired
     private PreviousProjectRepository previousProjectRepository;
 
-    public List<PreviousProjectRequestDTO> findByProfessional(Long professionalId) {
+    public List<PreviousProjectDTO> findByProfessional(Long professionalId) {
         return previousProjectRepository.findByProfessionalId(professionalId)
                 .stream()
-                .map(p -> new PreviousProjectRequestDTO(
+                .map(p -> new PreviousProjectDTO(
                         p.getId(),
                         p.getTitle(),
                         p.getDescription(),
@@ -44,9 +43,9 @@ public class PreviousProjectService {
         }
 
         List<String> normalized = technologies.stream()
-                .filter(tech -> tech != null && !tech.isBlank())
-                .map(String::trim)
-                .toList();
+                .filter(tech -> tech != null && !tech.isBlank()) // Remove nulos e vazios
+                .map(String::trim) // Remove espacos do inicio e final de cada texto
+                .toList(); // Transforma o Stream novamente em uma lista
 
         if (normalized.size() > MAX_TECHNOLOGIES) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
@@ -61,6 +60,25 @@ public class PreviousProjectService {
         }
 
         return normalized;
+    }
+
+    public PreviousProject update(Long id, Long professionalId, PreviousProjectDTO request) {
+        PreviousProject project = previousProjectRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Project not found: " + id));
+
+        // profissional só edita o próprio projeto
+        if (!project.getProfessional().getId().equals(professionalId)) {
+            throw new ResponseStatusException(
+                    HttpStatusCode.valueOf(403), "Not authorized.");
+        }
+
+        project.setTitle(request.title());
+        project.setDescription(request.description());
+        project.setTechnologies(normalizeTechnologies(request.technologies()));
+        project.setYearOfCompletion(request.yearOfCompletion());
+
+        return previousProjectRepository.save(project);
     }
 
     public void delete(Long id, Long professionalId) {

@@ -4,7 +4,7 @@ import com.main.nexus.dto.AdminDashboardDTO;
 import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.MatchResponseDTO;
-import com.main.nexus.dto.PreviousProjectRequestDTO;
+import com.main.nexus.dto.PreviousProjectDTO;
 import com.main.nexus.dto.ProfessionalDashboardDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
@@ -208,7 +208,7 @@ public class AdminController {
     }
 
     @GetMapping("/professionals/{id}/projects")
-    public ResponseEntity<List<PreviousProjectRequestDTO>> getProfessionalProjects(@PathVariable Long id) {
+    public ResponseEntity<List<PreviousProjectDTO>> getProfessionalProjects(@PathVariable Long id) {
         return ResponseEntity.ok(previousProjectService.findByProfessional(id));
     }
 

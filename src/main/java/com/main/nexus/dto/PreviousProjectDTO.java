@@ -3,7 +3,7 @@ package com.main.nexus.dto;
 
 import java.util.List;
 
-public record PreviousProjectRequestDTO(
+public record PreviousProjectDTO(
         Long id,
         String title,
         String description,

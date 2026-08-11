@@ -2,7 +2,7 @@ package com.main.nexus.controller;
 
 import com.main.nexus.dto.ContactInfoDTO;
 import com.main.nexus.dto.MatchResponseDTO;
-import com.main.nexus.dto.PreviousProjectRequestDTO;
+import com.main.nexus.dto.PreviousProjectDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.ProfessionalStatsDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
@@ -105,7 +105,7 @@ public class ProfessionalController {
 
     @PostMapping("/projects")
     public ResponseEntity<String> addPreviousProject(
-            @RequestBody PreviousProjectRequestDTO request) {
+            @RequestBody PreviousProjectDTO request) {
         UserDTO logged = getLoggedUser();
         Professional professional = professionalService.findByUserId(logged.id())
                 .orElseThrow(() -> new ResponseStatusException(
@@ -120,6 +120,18 @@ public class ProfessionalController {
         previousProjectService.save(project);
 
         return ResponseEntity.ok("Previous project added.");
+    }
+
+    @PutMapping("/projects/{projectId}")
+    public ResponseEntity<String> updatePreviousProject(
+            @PathVariable Long projectId,
+            @RequestBody PreviousProjectDTO request) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+        previousProjectService.update(projectId, professional.getId(), request);
+        return ResponseEntity.ok("Previous project updated.");
     }
 
     @DeleteMapping("/projects/{projectId}")
