@@ -16,8 +16,6 @@ import org.springframework.stereotype.Service;
 public class MatchExpirationService {
 
     private static final int EXPIRATION_DAYS = 30;
-    // Público: também usado por MatchStatusCheckService pra achar matches pendentes de
-    // resposta a serem exibidos automaticamente no dashboard da empresa.
     public static final int APPROACHING_THRESHOLD_DAYS = 14;
 
     @Autowired
@@ -58,25 +56,26 @@ public class MatchExpirationService {
     }
 
     // Sem teto superior de propósito: se o job não rodar num dia específico (deploy,
-    // servidor fora do ar), o match não pode "passar batido" e ficar sem ser notificado
-    // pra sempre
+    // servidor fora do ar), o match não pode "passar batido" e ficar sem ser notificado pra sempre
     @Transactional
     public void checkAndNotifyApproaching() {
         LocalDateTime threshold = LocalDateTime.now().minusDays(APPROACHING_THRESHOLD_DAYS);
 
         List<Match> approachingMatches = matchRepository.findByStatus(StatusMatch.MATCHED)
                 .stream()
-                .filter(m -> !Boolean.FALSE.equals(m.getActive()))
-                .filter(m -> m.getCreatedAt().isBefore(threshold))
-                .toList();
+                .filter(m -> !Boolean.FALSE.equals(m.getActive())) // Se estiver ativo
+                .filter(m -> m.getCreatedAt().isBefore(threshold)) // Se foi criado a 14 dias atras
+                .toList(); // Lista eles
 
         for (Match match : approachingMatches) {
             User companyUser = match.getProject().getCompany().getUser();
             String actionUrl = "/matches/" + match.getId() + "/status-check";
 
+            // Verifica se ja existe uma notifcacao no sistema com mesmo id da empresa, mesmo tipo de notificacao e mesmo URL de acao
             boolean alreadyNotified = notificationRepository.existsByUserIdAndTypeAndActionUrl(
                     companyUser.getId(), NotificationType.MATCH_STATUS_CHECK, actionUrl);
 
+            // Caso nao foi notificado, notifica a empresa
             if (!alreadyNotified) {
                 String professionalName = match.getProfessional().getName();
                 String projectTitle = match.getProject().getTitle();
