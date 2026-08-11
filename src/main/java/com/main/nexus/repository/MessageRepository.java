@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
+    // Busca as mensagens pelo id do match e ordena em ordem cronologica
     List<Message> findByMatchIdOrderBySentAtAsc(Long matchId);
 
     // uma mensagem só conta como "não lida por mim" se eu não fui quem a enviou, porque sem esse filtro contariam/marcariam as próprias 
