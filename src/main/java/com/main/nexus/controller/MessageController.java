@@ -63,15 +63,7 @@ public class MessageController {
     @GetMapping("/unread-total")
     public ResponseEntity<Long> getUnreadTotal() {
         UserDTO logged = getLoggedUser();
-
-        // so soma chats ainda ativos nao conta nao lidas
-        // de um match encerrado no badge de notificação.
-        long total = getMatchedMatches(logged.id()).stream()
-                .filter(m -> Boolean.TRUE.equals(m.getActive()))
-                .mapToLong(m -> messageRepository.countByMatchIdAndReadFalseAndSenderIdNot(m.getId(), logged.id()))
-                .sum();
-
-        return ResponseEntity.ok(total);
+        return ResponseEntity.ok(chatService.countUnreadTotalForUser(logged.id()));
     }
 
     // Matches confirmados do usuário logado
