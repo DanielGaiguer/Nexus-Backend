@@ -1144,12 +1144,14 @@ public class MatchService {
                 .toList();
     }
 
-    // Verifica se empresa e profissional têm um match confirmado entre eles
-    // Usado para liberar dados de contato só depois do match.
+    // Verifica se empresa e profissional têm um match confirmado E ATIVO entre eles
+    // Usado para liberar dados de contato e download de currículo — um match
+    // desativado (expirado/encerrado) não deve manter esse acesso liberado.
     public boolean hasConfirmedMatchBetween(Long companyId, Long professionalId) {
         return matchRepository.findByProfessionalId(professionalId)
                 .stream()
                 .anyMatch(m -> m.getStatus() == StatusMatch.MATCHED
+                        && !Boolean.FALSE.equals(m.getActive())
                         && m.getProject().getCompany().getId().equals(companyId));
     }
 
