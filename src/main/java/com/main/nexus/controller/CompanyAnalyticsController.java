@@ -42,6 +42,7 @@ public class CompanyAnalyticsController {
     @GetMapping("/company/{companyId}/dashboard")
     public ResponseEntity<CompanyDashboardAnalyticsDTO> getDashboardByAdmin(
             @PathVariable Long companyId) {
+        companyService.findById(companyId); // 404 se a empresa não existir
         return ResponseEntity.ok(analyticsService.buildDashboard(companyId));
     }
 

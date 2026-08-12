@@ -62,10 +62,13 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findPreviousProjectsByCompanyId(@Param("companyId") Long companyId);
 
     // Matches por mês de uma empresa retorna [year, month, status, count]
+    // WAITING fora: é só o candidato pontuado automaticamente pelo ranking, nunca virou
+    // convite/interesse real (mesmo critério de buildMatchSummary), não deve inflar o total.
     @Query("SELECT YEAR(m.createdAt), MONTH(m.createdAt), m.status, COUNT(m) " +
            "FROM Match m " +
            "WHERE m.project.company.id = :companyId " +
            "AND m.createdAt >= :since " +
+           "AND m.status != com.main.nexus.model.enums.StatusMatch.WAITING " +
            "GROUP BY YEAR(m.createdAt), MONTH(m.createdAt), m.status " +
            "ORDER BY YEAR(m.createdAt) ASC, MONTH(m.createdAt) ASC")
     List<Object[]> findMonthlyMatchStatsByCompany(
@@ -81,10 +84,13 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByProjectIdOrderByScore(@Param("projectId") Long projectId);
 
     // Matches por mês de um profissional retorna [year, month, status, count]
+    // WAITING fora: é só o candidato pontuado automaticamente pelo ranking, nunca virou
+    // convite/interesse real (mesmo critério de buildMatchSummary), não deve inflar o total.
     @Query("SELECT YEAR(m.createdAt), MONTH(m.createdAt), m.status, COUNT(m) " +
            "FROM Match m " +
            "WHERE m.professional.id = :professionalId " +
            "AND m.createdAt >= :since " +
+           "AND m.status != com.main.nexus.model.enums.StatusMatch.WAITING " +
            "GROUP BY YEAR(m.createdAt), MONTH(m.createdAt), m.status " +
            "ORDER BY YEAR(m.createdAt) ASC, MONTH(m.createdAt) ASC")
     List<Object[]> findMonthlyMatchStatsByProfessional(

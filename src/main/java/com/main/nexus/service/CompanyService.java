@@ -7,7 +7,9 @@ import com.main.nexus.repository.CompanyRepository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class CompanyService {
@@ -27,7 +29,8 @@ public class CompanyService {
 
     public Company findById(Long id) {
         return companyRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Company not found: " + id));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Company not found: " + id));
     }
 
     public Company findByUser(User user) {

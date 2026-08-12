@@ -42,6 +42,7 @@ public class ProfessionalAnalyticsController {
     @GetMapping("/professional/{professionalId}/dashboard")
     public ResponseEntity<ProfessionalDashboardAnalyticsDTO> getDashboardByAdmin(
             @PathVariable Long professionalId) {
+        professionalService.findById(professionalId); // 404 se o profissional não existir, em vez de montar um dashboard vazio
         return ResponseEntity.ok(analyticsService.buildDashboard(professionalId));
     }
 

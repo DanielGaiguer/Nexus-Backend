@@ -37,7 +37,7 @@ public class CompanyAnalyticsService {
     private ReputationService reputationService;
 
     // Ponto de entrada principal
-
+    // E o orquestrador do Dashboard, cada metodo construindo uma secao no dashboard
     public CompanyDashboardAnalyticsDTO buildDashboard(Long companyId) {
         return new CompanyDashboardAnalyticsDTO(
                 buildMatchSummary(companyId),
