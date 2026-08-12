@@ -25,6 +25,13 @@ public class Skill {
     @Column(length = 80)
     private String category;
 
+    // Soft delete: skills em uso (Professional.skills, Project.requiredSkills) não podem
+    // ser removidas fisicamente sem quebrar essas associações @ManyToMany. Skills inativas
+    // somem do catálogo (criação de projeto/perfil), mas continuam resolvendo por id para
+    // quem já as tinha associado.
+    @Column(nullable = false)
+    private Boolean active = true;
+
     public Long getId() {
         return id;
     }
@@ -47,5 +54,13 @@ public class Skill {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
     }
 }

@@ -15,10 +15,15 @@ public class SkillService {
     @Autowired
     private SkillRepository skillRepository;
 
+    // Só skills ativas entram no catálogo (seleção em perfil/projeto). Uma skill
+    // deletada continua no banco, mas some daqui.
     public List<Skill> findAll() {
-        return skillRepository.findAll();
+        return skillRepository.findAllByActiveTrue();
     }
 
+    // Resolve por id independente de active — precisa continuar funcionando para
+    // associações já existentes (Professional.skills / Project.requiredSkills)
+    // mesmo depois que a skill for removida do catálogo.
     public Skill findById(Long id) {
         return skillRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -47,11 +52,21 @@ public class SkillService {
         return skillRepository.save(skill);
     }
 
+    // Soft delete: nunca remove a linha fisicamente, só desativa. Uma remoção real
+    // quebraria as tabelas de junção tb_professional_skill/tb_job_skill para quem
+    // já tem essa skill associada (cascade silenciosa ou violação de FK, dependendo
+    // de como o ddl-auto=update gerou as constraints).
     public void delete(Long id) {
-        if (!skillRepository.existsById(id)) {
+        Skill skill = skillRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Skill not found: " + id));
+
+        if (!Boolean.TRUE.equals(skill.getActive())) {
             throw new ResponseStatusException(
-                    HttpStatusCode.valueOf(404), "Skill not found: " + id);
+                    HttpStatusCode.valueOf(409), "Skill already deleted: " + id);
         }
-        skillRepository.deleteById(id);
+
+        skill.setActive(false);
+        skillRepository.save(skill);
     }
 }
