@@ -143,13 +143,15 @@ public class PublicProfessionalController {
         return ResponseEntity.ok(dto);
     }
 
-    // Diretório de empresas — paginado, com busca por nome, disponível para qualquer role logada
+    // Diretório de empresas paginado, com busca por nome, disponível para qualquer role logada
     @GetMapping("/companies")
     public ResponseEntity<CompanyDirectoryPageDTO> listCompanies(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
+        // Pageable representa as informações de paginação
+        // Sort.by("companyName").ascending(), Define a ordenação pelo campo companyName em ordem crescente.
         Pageable pageable = PageRequest.of(page, size, Sort.by("companyName").ascending());
         Page<Company> result = companyRepository.findByStatusAndCompanyNameContainingIgnoreCase(
                 CompanyStatus.APPROVED, search != null ? search : "", pageable);
@@ -223,7 +225,7 @@ public class PublicProfessionalController {
 
         // Fora do OPEN (pausado ou encerrado), só quem tem relação direta com o projeto
         // continua enxergando o detalhe: a própria empresa dona, o admin, ou um profissional
-        // que já tem algum match com ele — pra conseguir acompanhar o que aconteceu com a
+        // que já tem algum match com ele, pra conseguir acompanhar o que aconteceu com a
         // oportunidade (aguardando aprovação, confirmada, recusada ou cancelada).
         if (p.getStatus() != ProjectStatus.OPEN && !canViewNonOpenProject(p, viewer)) {
             return ResponseEntity.notFound().build();
@@ -246,12 +248,16 @@ public class PublicProfessionalController {
         );
 
         // Se outra empresa acessar diretamente uma oportunidade marcada como não visível
-        // para empresas, tratamos como não encontrada — o link direto não pode burlar a regra.
+        // para empresas, tratamos como não encontrada, o link direto não pode burlar a regra.
         return projectResponseAssembler.toVisibleDTO(p, viewer, companyDTO)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    // por padrão, uma oportunidade fora de OPEN (ou seja, PAUSED ou CLOSED) fica invisível ao público geral — mas existem três exceções, cada uma checada por tipo de "espectador"
+    // - ADMIN: sempre pode ver, independente do status.
+    // - A própria empresa dona: pode ver seus próprios projetos mesmo pausados/encerrados (viewer.companyId().equals(project.getCompany().getId())).
+    // - Um profissional com match no projeto: se o profissional já tem qualquer registro de Match para aquele projeto 
     private boolean canViewNonOpenProject(Project project, ProjectResponseAssembler.Viewer viewer) {
         if (viewer.type() == UserType.ADMIN) {
             return true;

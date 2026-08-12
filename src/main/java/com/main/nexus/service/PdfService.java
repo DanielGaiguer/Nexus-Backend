@@ -21,7 +21,9 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.ExperienceLevel;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
@@ -202,7 +204,12 @@ public class PdfService {
                     .setTextAlignment(TextAlignment.CENTER));
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to generate PDF", e);
+            // Mantém o padrão ResponseStatusException do resto da aplicação, em vez de deixar
+            // a exceção não tratada da iText estourar como 500 genérico sem mensagem amigável.
+            throw new ResponseStatusException(
+                    HttpStatusCode.valueOf(500),
+                    "Não foi possível gerar o PDF do perfil no momento. Tente novamente mais tarde.",
+                    e);
         } finally {
             doc.close();
         }

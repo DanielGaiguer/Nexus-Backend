@@ -7,7 +7,6 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.enums.UserType;
 import java.util.Optional;
-import org.hibernate.type.descriptor.java.CoercionHelper;
 import org.springframework.stereotype.Component;
 
 // Centraliza as regras de visibilidade de oportunidades entre empresas e de mascaramento

@@ -4,7 +4,6 @@ import com.main.nexus.dto.ContactInfoDTO;
 import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.PreviousProjectDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
-import com.main.nexus.dto.ProfessionalStatsDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
@@ -244,21 +243,6 @@ public class ProfessionalController {
         return ResponseEntity.ok(
                 matchService.getPendingInvitesForProfessional(professional.getId())
                         .stream().map(this::toMatchResponseDTO).toList());
-    }
-
-    @GetMapping("/stats")
-    public ResponseEntity<ProfessionalStatsDTO> getStats(
-            @RequestParam(required = false) Long professionalId) {
-        Professional professional;
-        if (professionalId != null) {
-            professional = professionalService.findById(professionalId);
-        } else {
-            UserDTO logged = getLoggedUser();
-            professional = professionalService.findByUserId(logged.id())
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatusCode.valueOf(404), "Profile not found"));
-        }
-        return ResponseEntity.ok(professionalService.getStats(professional.getId()));
     }
 
     @GetMapping("/profile/export")
