@@ -30,4 +30,10 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
            "GROUP BY s.name, s.category " +
            "ORDER BY COUNT(p) DESC")
     List<Object[]> findMostRequiredSkillsByCompany(@Param("companyId") Long companyId);
+
+    // Contagem de vagas OPEN por empresa, em uma única query agregada (evita N+1 ao montar o mapa)
+    @Query("SELECT p.company.id, COUNT(p) FROM Project p " +
+           "WHERE p.status = :status " +
+           "GROUP BY p.company.id")
+    List<Object[]> countByStatusGroupedByCompany(@Param("status") ProjectStatus status);
 }
