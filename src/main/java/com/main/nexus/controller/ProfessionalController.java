@@ -390,10 +390,26 @@ public class ProfessionalController {
         return ResponseEntity.ok("Resume uploaded successfully.");
     }
 
-    // dowload do curcciulo  acessivel por company e professional autenticados
+    // download do curriculo - acessivel pelo proprio profissional, ou por empresa
+    // com match confirmado com ele (mesma regra do getContact, logo abaixo)
     @GetMapping("/{professionalId}/resume")
     public ResponseEntity<byte[]> downloadResume(@PathVariable Long professionalId) {
         Professional professional = professionalService.findById(professionalId);
+
+        UserDTO logged = getLoggedUser();
+        boolean isOwner = professional.getUser().getId().equals(logged.id());
+
+        if (!isOwner) {
+            Company company = companyService.findByUserId(logged.id())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatusCode.valueOf(403),
+                            "Resume is only available to the professional or a company with a confirmed match."));
+
+            if (!matchService.hasConfirmedMatchBetween(company.getId(), professionalId)) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                        "Resume is only available after a confirmed match.");
+            }
+        }
 
         if (professional.getResume() == null) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(404),

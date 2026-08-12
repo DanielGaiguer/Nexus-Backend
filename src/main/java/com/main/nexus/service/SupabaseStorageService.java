@@ -15,6 +15,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class SupabaseStorageService {
 
+    // O sistema usa dois buckets do Supabase Storage, configurados no application.properties , profile-images-nexus (fotos de perfil, compartilhado entre profissionais e empresas)
+    // e resume-professional-nexus (currículos, exclusivo de profissionais). O serviceKey a chave de serviço do Supabase
     @Value("${supabase.url}")
     private String supabaseUrl;
 
@@ -106,6 +108,10 @@ public class SupabaseStorageService {
             // Falha silenciosa na deleção, arquivo pode já ter sido removido
         }
     }
+    
+    // se o Supabase estiver temporariamente indisponível, ou a exclusão falhar por qualquer motivo, o fluxo continua normalmente para o upload do novo arquivo 
+    // a operação do usuário  sempre é priorizada sobre a garantia de limpeza do arquivo antigo. ao longo do tempo, 
+    // o bucket pode acumular arquivos órfãos (fotos/currículos antigos que nunca foram efetivamente removidos do Supabase)
 
     private void validateImageFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
