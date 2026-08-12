@@ -10,6 +10,7 @@ import com.main.nexus.dto.PublicCompanyDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
+import com.main.nexus.dto.SkillRequestDTO;
 import com.main.nexus.dto.UserSummaryDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
@@ -23,6 +24,7 @@ import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.UserRepository;
 import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.EmailService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.ProfessionalService;
@@ -38,8 +40,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -85,6 +87,9 @@ public class AdminController {
     @Autowired
     private ProjectResponseAssembler projectResponseAssembler;
 
+    @Autowired
+    private EmailService emailService;
+
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardDTO> dashboard() {
         long totalProfessionals = professionalRepository.count();
@@ -126,8 +131,12 @@ public class AdminController {
     }
 
     @GetMapping("/companies/pending")
-    public ResponseEntity<?> pendingCompanies() {
-        return ResponseEntity.ok(companyService.findPending());
+    public ResponseEntity<List<CompanyProfileDTO>> pendingCompanies() {
+        List<CompanyProfileDTO> companies = companyService.findPending()
+                .stream()
+                .map(this::toCompanyProfileDTO)
+                .toList();
+        return ResponseEntity.ok(companies);
     }
 
     @GetMapping("/companies")
@@ -157,10 +166,8 @@ public class AdminController {
     }
 
     @PostMapping("/skills")
-    public ResponseEntity<String> createSkill(
-            @RequestParam String name,
-            @RequestParam(required = false) String category) {
-        skillService.create(name, category);
+    public ResponseEntity<String> createSkill(@RequestBody SkillRequestDTO request) {
+        skillService.create(request.name(), request.category());
         return ResponseEntity.ok("Skill created.");
     }
 
@@ -186,8 +193,28 @@ public class AdminController {
     @PostMapping("/users/{id}/toggle")
     public ResponseEntity<String> toggleUser(@PathVariable Long id) {
         userRepository.findById(id).ifPresent(user -> {
-            user.setActive(!user.getActive());
+            boolean wasActive = Boolean.TRUE.equals(user.getActive());
+            user.setActive(!wasActive);
             userRepository.save(user);
+
+            // Sem isso, o usuário só descobriria que a conta foi desativada na
+            // próxima tentativa de login (403 "Account is inactive." em AuthService.login)
+            if (wasActive) {
+                emailService.send(
+                        user.getEmail(),
+                        "Sua conta foi desativada — Nexus",
+                        "Olá,\n\nSua conta na plataforma Nexus foi desativada por um administrador. " +
+                        "A partir de agora, você não conseguirá mais fazer login até que ela seja reativada.\n\n" +
+                        "Se você acredita que isso foi um engano, entre em contato com o suporte.\n\nEquipe Nexus"
+                );
+            } else {
+                emailService.send(
+                        user.getEmail(),
+                        "Sua conta foi reativada — Nexus",
+                        "Olá,\n\nSua conta na plataforma Nexus foi reativada por um administrador. " +
+                        "Você já pode fazer login normalmente novamente.\n\nEquipe Nexus"
+                );
+            }
         });
         return ResponseEntity.ok("User status updated.");
     }

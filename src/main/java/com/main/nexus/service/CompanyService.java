@@ -35,7 +35,8 @@ public class CompanyService {
 
     public Company findByUser(User user) {
         return companyRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Company profile not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Company profile not found"));
     }
 
     public List<Company> findAll() {
@@ -54,7 +55,8 @@ public class CompanyService {
         Company company = findById(companyId);
 
         if (company.getStatus() != CompanyStatus.PENDING) {
-            throw new RuntimeException("Company is not pending approval");
+            throw new ResponseStatusException(
+                    HttpStatusCode.valueOf(409), "Company is not pending approval");
         }
 
         company.setStatus(CompanyStatus.APPROVED);
@@ -79,7 +81,8 @@ public class CompanyService {
         Company company = findById(companyId);
 
         if (company.getStatus() != CompanyStatus.PENDING) {
-            throw new RuntimeException("Company is not pending approval");
+            throw new ResponseStatusException(
+                    HttpStatusCode.valueOf(409), "Company is not pending approval");
         }
 
         company.setStatus(CompanyStatus.REJECTED);
