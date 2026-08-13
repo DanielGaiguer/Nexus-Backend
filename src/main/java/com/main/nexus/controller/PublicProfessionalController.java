@@ -137,10 +137,21 @@ public class PublicProfessionalController {
                 p.getProfilePhotoUrl(),
                 p.getFreelanceMinExpectation(),
                 p.getFreelanceMaxExpectation(),
-                preferredTypeNames
+                preferredTypeNames,
+                p.getGithubUrl(),
+                extractGithubLogin(p.getGithubUrl()),
+                p.getGithubUrl() != null
         );
 
         return ResponseEntity.ok(dto);
+    }
+
+    // "https://github.com/daniel-dev" -> "daniel-dev"
+    private String extractGithubLogin(String githubUrl) {
+        if (githubUrl == null || githubUrl.isBlank()) {
+            return null;
+        }
+        return githubUrl.substring(githubUrl.lastIndexOf("/") + 1);
     }
 
     // Diretório de empresas paginado, com busca por nome, disponível para qualquer role logada

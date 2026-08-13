@@ -53,7 +53,7 @@ public class Professional {
     @Column(nullable = false)
     private Boolean available = true;
 
-    // Nula ate a primeira avaliacao recebida — nao confundir "sem nota" com "nota 0"
+    // Nula ate a primeira avaliacao recebida nao confundir "sem nota" com "nota 0"
     @Column
     private Double reputation;
 
@@ -114,6 +114,12 @@ public class Professional {
 
     @Column(length = 255)
     private String linkedinUrl;
+
+    @Column(name = "github_url", length = 200)
+    private String githubUrl;
+
+    @Column(name = "github_id", unique = true, length = 100)
+    private String githubId;
 
     public Long getId() {
         return id;
@@ -307,5 +313,21 @@ public class Professional {
 
     public void setLinkedinUrl(String linkedinUrl) {
         this.linkedinUrl = linkedinUrl;
+    }
+
+    public String getGithubUrl() {
+        return githubUrl;
+    }
+
+    public void setGithubUrl(String githubUrl) {
+        this.githubUrl = githubUrl;
+    }
+
+    public String getGithubId() {
+        return githubId;
+    }
+
+    public void setGithubId(String githubId) {
+        this.githubId = githubId;
     }
 }

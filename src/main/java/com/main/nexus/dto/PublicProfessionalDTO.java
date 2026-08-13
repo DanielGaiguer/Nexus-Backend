@@ -17,5 +17,9 @@ public record PublicProfessionalDTO(
         String profilePhotoUrl,
         Double minimumSalary,
         Double maximumSalary,
-        List<String> preferredTypes
+        List<String> preferredTypes,
+
+        String githubUrl,
+        String githubLogin,
+        boolean hasGitHub
 ) {}

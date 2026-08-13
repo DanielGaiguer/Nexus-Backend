@@ -381,7 +381,18 @@ public class AdminController {
                 missing.isEmpty(),
                 missing,
                 p.getLinkedinUrl(),
-                p.getResume()
+                p.getResume(),
+                p.getGithubUrl(),
+                extractGithubLogin(p.getGithubUrl()),
+                p.getGithubUrl() != null
         );
+    }
+
+    // tranforma "https://github.com/user" -> "user"
+    private String extractGithubLogin(String githubUrl) {
+        if (githubUrl == null || githubUrl.isBlank()) {
+            return null;
+        }
+        return githubUrl.substring(githubUrl.lastIndexOf("/") + 1);
     }
 }

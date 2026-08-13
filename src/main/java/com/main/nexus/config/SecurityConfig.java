@@ -33,6 +33,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/auth/linkedin/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/register/company/linkedin").permitAll()
 
+                // login/link/callback são redirects OAuth públicos (mesmo padrão do LinkedIn acima);
+                // só o unlink exige um profissional autenticado, tratado abaixo.
+                .requestMatchers(HttpMethod.GET, "/api/auth/github/login", "/api/auth/github/register", "/api/auth/github/link", "/api/auth/github/callback").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/api/auth/github/unlink").hasRole("PROFESSIONAL")
+
                 .requestMatchers("/api/public/**").permitAll()
 
                 .requestMatchers("/ws/**").permitAll()

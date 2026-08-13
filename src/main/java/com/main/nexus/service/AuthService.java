@@ -1,5 +1,6 @@
 package com.main.nexus.service;
 
+import com.main.nexus.dto.GitHubUserDTO;
 import com.main.nexus.dto.LoginRequestDTO;
 import com.main.nexus.dto.LoginResponseDTO;
 import com.main.nexus.dto.RegisterCompanyLinkedInRequestDTO;
@@ -61,6 +62,9 @@ public class AuthService {
 
     @Autowired
     private LinkedInService linkedInService;
+
+    @Autowired
+    private GitHubService gitHubService;
 
     @Value("${nexus.frontend.base-url}")
     private String frontendBaseUrl;
@@ -637,6 +641,258 @@ public class AuthService {
         backfillProfilePhoto(user, info.picture());
 
         return frontendBaseUrl + profilePath + "?linkedinLinked=true";
+    }
+
+    // ── Sign In with GitHub (OAuth Apps) ──────────────────────
+    // Mesmo desenho do LinkedIn: o "state" carrega o modo (login/link) através de todo o
+    // ciclo OAuth. Diferente do LinkedIn, o GitHub é exclusivo de profissionais e a própria
+    // API do GitHub já fornece a URL pública do perfil (html_url) — não precisa de ticket
+    // de finalização nem de um segundo cadastro tipo empresa.
+
+    public String getGitHubLoginUrl(String redirect) {
+        return gitHubService.buildAuthorizationUrl(withRedirect("login", redirect));
+    }
+
+    // Sem parâmetro de role — diferente do LinkedIn (PROFESSIONAL ou COMPANY), o GitHub só
+    // registra profissional. Sem parâmetro de redirect também: mesmo desenho do LinkedIn,
+    // onde /linkedin/register não aceita "redirect" (só faz sentido voltar para uma página
+    // específica depois de um login, não de um primeiro cadastro).
+    public String getGitHubRegisterUrl() {
+        return gitHubService.buildAuthorizationUrl("register");
+    }
+
+    public String getGitHubLinkUrl(String currentUserToken) {
+        if (!tokenService.validToken(currentUserToken)) {
+            return frontendBaseUrl + "/auth/login?githubError=session_expired";
+        }
+        return gitHubService.buildAuthorizationUrl("link:" + currentUserToken);
+    }
+
+    public String handleGitHubCallback(String code, String state, String error) {
+        if (error != null || code == null || state == null) {
+            return frontendBaseUrl + "/auth/login?githubError=denied";
+        }
+
+        String redirect = extractRedirect(state);
+        String mode = stripRedirect(state);
+
+        try {
+            if (mode.startsWith("link:")) {
+                return handleGitHubLink(code, mode.substring("link:".length()));
+            }
+            if (mode.equals("register")) {
+                return handleGitHubRegister(code);
+            }
+            return handleGitHubLogin(code, redirect);
+        } catch (ResponseStatusException e) {
+            return frontendBaseUrl + "/auth/login?githubError=failed";
+        }
+    }
+
+    // Sinaliza "e-mail já pertence a uma conta que não é PROFESSIONAL" sem passar pelo catch
+    // genérico de ResponseStatusException em handleGitHubCallback (que mapearia para o
+    // githubError=failed genérico e perderia essa mensagem específica).
+    private static class GitHubNotProfessionalException extends RuntimeException {}
+
+    // Só loga quem já tem conta , mesmo padrão do Linkedin.
+    private String handleGitHubLogin(String code, String redirect) {
+        GitHubUserDTO gitHubUser = gitHubService.exchangeCodeForUser(code);
+
+        Professional professional;
+        try {
+            professional = findGitHubProfessional(gitHubUser);
+        } catch (GitHubNotProfessionalException e) {
+            return frontendBaseUrl + "/auth/login?githubError=not_professional";
+        }
+        if (professional == null) {
+            return frontendBaseUrl + "/auth/login?githubError=no_account";
+        }
+        return loginExistingGitHubProfessional(professional, gitHubUser, redirect);
+    }
+
+    // Cria conta se ninguém tiver essa identidade ainda mas, se já existir (por githubId ou
+    // por e-mail), apenas loga, exatamente como handleLinkedInRegister faz para quem repete o
+    // clique em "Cadastre-se" já tendo conta.
+    private String handleGitHubRegister(String code) {
+        GitHubUserDTO gitHubUser = gitHubService.exchangeCodeForUser(code);
+
+        Professional professional;
+        try {
+            professional = findGitHubProfessional(gitHubUser);
+        } catch (GitHubNotProfessionalException e) {
+            return frontendBaseUrl + "/auth/login?githubError=not_professional";
+        }
+        if (professional != null) {
+            return loginExistingGitHubProfessional(professional, gitHubUser, null);
+        }
+        return registerProfessionalViaGitHub(gitHubUser, null);
+    }
+
+    // Resolve a identidade do GitHub para um Professional já existente, por githubId ou,
+    // na primeira vez que o e-mail bater, por e-mail (vínculo automático, mesmo padrão RN31
+    // do LinkedIn em User) — usado tanto por login quanto por register. Retorna null quando
+    // nenhuma conta existe ainda com essa identidade (aí cada chamador decide o que fazer:
+    // login erra com "no_account", register cria a conta).
+    private Professional findGitHubProfessional(GitHubUserDTO gitHubUser) {
+        Professional byGithubId = professionalService.findByGithubId(gitHubUser.id()).orElse(null);
+        if (byGithubId != null) {
+            return byGithubId;
+        }
+
+        if (gitHubUser.email() == null || gitHubUser.email().isBlank()) {
+            return null;
+        }
+
+        User existingUser = userRepository.findByEmail(gitHubUser.email()).orElse(null);
+        if (existingUser == null) {
+            return null;
+        }
+        if (existingUser.getType() != UserType.PROFESSIONAL) {
+            throw new GitHubNotProfessionalException();
+        }
+
+        Professional matchedByEmail = professionalService.findByUserId(existingUser.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Professional profile missing for this user."));
+        matchedByEmail.setGithubId(gitHubUser.id());
+        matchedByEmail.setGithubUrl(gitHubUser.htmlUrl());
+        professionalService.update(matchedByEmail);
+        return matchedByEmail;
+    }
+
+    private String loginExistingGitHubProfessional(Professional professional, GitHubUserDTO gitHubUser, String redirect) {
+        User user = professional.getUser();
+        if (!user.getActive()) {
+            return frontendBaseUrl + "/auth/login?githubError=inactive";
+        }
+
+        if (backfillProfilePhotoFromGithub(professional, gitHubUser.avatarUrl())) {
+            professionalService.update(professional);
+        }
+
+        UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), UserType.PROFESSIONAL.name());
+        String jwt = tokenService.generateToken(userDTO);
+
+        String url = frontendBaseUrl + "/auth/github/complete"
+                + "?token=" + urlEncode(jwt)
+                + "&userId=" + user.getId()
+                + "&email=" + urlEncode(user.getEmail())
+                + "&name=" + urlEncode(professional.getName())
+                + "&role=" + UserType.PROFESSIONAL.name();
+        if (redirect != null && !redirect.isBlank()) {
+            url += "&redirect=" + urlEncode(redirect);
+        }
+        return url;
+    }
+
+    // Cadastro via GitHub o GitHub fornece nome/login + e-mail (a menos que o e-mail
+    // esteja privado), suficiente para criar a conta de imediato, sem ticket intermediário.
+    private String registerProfessionalViaGitHub(GitHubUserDTO gitHubUser, String redirect) {
+        if (gitHubUser.email() == null || gitHubUser.email().isBlank()) {
+            return frontendBaseUrl + "/auth/login?githubError=no_email";
+        }
+        if (userRepository.existsByEmail(gitHubUser.email())) {
+            return frontendBaseUrl + "/auth/login?githubError=email_in_use";
+        }
+
+        String name = (gitHubUser.name() != null && !gitHubUser.name().isBlank())
+                ? gitHubUser.name() : gitHubUser.login();
+
+        User user = new User();
+        user.setEmail(gitHubUser.email());
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        user.setType(UserType.PROFESSIONAL);
+        User savedUser = userRepository.save(user);
+
+        Professional professional = new Professional();
+        professional.setUser(savedUser);
+        professional.setName(name);
+        professional.setGithubId(gitHubUser.id());
+        professional.setGithubUrl(gitHubUser.htmlUrl());
+        if (gitHubUser.avatarUrl() != null && !gitHubUser.avatarUrl().isBlank()) {
+            professional.setProfilePhotoUrl(gitHubUser.avatarUrl());
+        }
+        professionalService.save(professional);
+
+        List<String> missing = profileCompletionService.getMissingFields(professional);
+        String emailBody = "Olá " + name + ",\n\nSua conta foi criada com sucesso via GitHub!\n\n"
+                + "Para começar a receber oportunidades compatíveis, complete seu perfil preenchendo: "
+                + String.join(", ", missing) + ".\n\nAcesse o Nexus e finalize seu cadastro.\n\nEquipe Nexus";
+        emailService.send(savedUser.getEmail(), "Bem-vindo ao Nexus!", emailBody);
+        if (!missing.isEmpty()) {
+            notificationService.notifyIncompleteProfile(savedUser, missing);
+        }
+
+        UserDTO userDTO = new UserDTO(savedUser.getId(), savedUser.getEmail(), UserType.PROFESSIONAL.name());
+        String jwt = tokenService.generateToken(userDTO);
+
+        String url = frontendBaseUrl + "/auth/github/complete"
+                + "?token=" + urlEncode(jwt)
+                + "&userId=" + savedUser.getId()
+                + "&email=" + urlEncode(savedUser.getEmail())
+                + "&name=" + urlEncode(name)
+                + "&role=" + UserType.PROFESSIONAL.name();
+        if (redirect != null && !redirect.isBlank()) {
+            url += "&redirect=" + urlEncode(redirect);
+        }
+        return url;
+    }
+
+    private String handleGitHubLink(String code, String existingJwt) {
+        if (!tokenService.validToken(existingJwt)) {
+            return frontendBaseUrl + "/auth/login?githubError=session_expired";
+        }
+
+        UserDTO claims = tokenService.extractClaims(existingJwt);
+        User user = userRepository.findById(claims.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User not found."));
+
+        if (user.getType() != UserType.PROFESSIONAL) {
+            return frontendBaseUrl + "/auth/login?githubError=not_professional";
+        }
+
+        Professional professional = professionalService.findByUserId(user.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Professional profile not found."));
+
+        GitHubUserDTO gitHubUser = gitHubService.exchangeCodeForUser(code);
+
+        Optional<Professional> owner = professionalService.findByGithubId(gitHubUser.id());
+        if (owner.isPresent() && !owner.get().getId().equals(professional.getId())) {
+            return frontendBaseUrl + "/pro/profile?githubError=already_linked";
+        }
+
+        professional.setGithubId(gitHubUser.id());
+        professional.setGithubUrl(gitHubUser.htmlUrl());
+        backfillProfilePhotoFromGithub(professional, gitHubUser.avatarUrl());
+        professionalService.update(professional);
+
+        return frontendBaseUrl + "/pro/profile?githubLinked=true";
+    }
+
+    // Remove o vínculo com o GitHub do profissional logado (chamado por um endpoint
+    // autenticado comum, sem envolver o ciclo OAuth não há "code" para trocar aqui).
+    public void unlinkGitHub(Long userId) {
+        Professional professional = professionalService.findByUserId(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Professional profile not found."));
+        professional.setGithubId(null);
+        professional.setGithubUrl(null);
+        professionalService.update(professional);
+    }
+
+    // usa o avatar do GitHub como foto de perfil apenas se o profissional ainda não tiver
+    // uma e  nunca sobrescreve uma foto que a pessoa já escolheu
+    private boolean backfillProfilePhotoFromGithub(Professional professional, String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            return false;
+        }
+        if (professional.getProfilePhotoUrl() != null && !professional.getProfilePhotoUrl().isBlank()) {
+            return false;
+        }
+        professional.setProfilePhotoUrl(avatarUrl);
+        return true;
     }
 
     private String urlEncode(String value) {

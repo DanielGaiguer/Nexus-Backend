@@ -43,4 +43,8 @@ public class ProfessionalService {
     public Optional<Professional> findByUserId(Long userId) {
         return professionalRepository.findByUserId(userId);
     }
+
+    public Optional<Professional> findByGithubId(String githubId) {
+        return professionalRepository.findByGithubId(githubId);
+    }
 }

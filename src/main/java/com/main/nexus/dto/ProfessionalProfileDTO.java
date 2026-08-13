@@ -33,5 +33,11 @@ public record ProfessionalProfileDTO(
         List<String> missingFields,
 
         String linkedinUrl,
-        String resume
+        String resume,
+
+        // Conexão com o GitHub (via OAuth — ver GitHubController) — apenas leitura,
+        // githubLogin é derivado de githubUrl no momento da montagem do DTO.
+        String githubUrl,
+        String githubLogin,
+        boolean hasGitHub
 ) {}

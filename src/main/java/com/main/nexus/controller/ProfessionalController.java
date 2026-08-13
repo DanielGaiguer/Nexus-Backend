@@ -174,6 +174,7 @@ public class ProfessionalController {
         existing.setFreelanceMinExpectation(request.freelanceMinExpectation());
         existing.setFreelanceMaxExpectation(request.freelanceMaxExpectation());
         existing.setLinkedinUrl(request.linkedinUrl());
+        existing.setGithubUrl(request.githubUrl());
 
         if (request.cep() != null && !request.cep().isBlank()) {
             GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
@@ -344,8 +345,19 @@ public class ProfessionalController {
                 missing.isEmpty(),
                 missing,
                 p.getLinkedinUrl(),
-                p.getResume()
+                p.getResume(),
+                p.getGithubUrl(),
+                extractGithubLogin(p.getGithubUrl()),
+                p.getGithubUrl() != null
         );
+    }
+
+    // "https://github.com/daniel-dev" -> "daniel-dev"
+    private String extractGithubLogin(String githubUrl) {
+        if (githubUrl == null || githubUrl.isBlank()) {
+            return null;
+        }
+        return githubUrl.substring(githubUrl.lastIndexOf("/") + 1);
     }
 
     // Lista oportunidades compatíveis , projetos vistos por mim

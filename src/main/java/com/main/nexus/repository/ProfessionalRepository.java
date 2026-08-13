@@ -11,4 +11,5 @@ import org.springframework.stereotype.Repository;
 public interface ProfessionalRepository extends JpaRepository<Professional, Long> {
     Optional<Professional> findByUserId(Long userId);
     Page<Professional> findByNameContainingIgnoreCase(String name, Pageable pageable);
+    Optional<Professional> findByGithubId(String githubId);
 }

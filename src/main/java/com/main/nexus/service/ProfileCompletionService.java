@@ -37,6 +37,10 @@ public class ProfileCompletionService {
             missing.add("Skills");
         }
 
+        if (professional.getGithubUrl() == null || professional.getGithubUrl().isBlank()) {
+            missing.add("GitHub");
+        }
+
         if (professional.getPreferredOpportunityTypes() == null
                 || professional.getPreferredOpportunityTypes().isEmpty()) {
             missing.add("Tipos de oportunidade desejados (Freelance, PJ ou CLT)");
