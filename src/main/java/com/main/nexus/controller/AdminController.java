@@ -4,6 +4,7 @@ import com.main.nexus.dto.AdminDashboardDTO;
 import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
 import com.main.nexus.dto.MatchResponseDTO;
+import com.main.nexus.dto.MonthlyMatchCountDTO;
 import com.main.nexus.dto.PreviousProjectDTO;
 import com.main.nexus.dto.ProfessionalDashboardDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
@@ -17,6 +18,7 @@ import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.Skill;
+import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.MatchRepository;
@@ -32,7 +34,14 @@ import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SkillService;
+import java.time.LocalDateTime;
+import java.time.Month;
+import java.time.format.TextStyle;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -99,7 +108,9 @@ public class AdminController {
         long totalOpenProjects = projectRepository.findByStatus(ProjectStatus.OPEN).size();
         long totalMatches      = matchRepository.count();
         long confirmedMatches  = matchService.countConfirmedMatches();
-        Double avgScore        = matchRepository.findAverageMatchScore();
+        double conversionRate  = totalMatches > 0
+                ? Math.round((double) confirmedMatches / totalMatches * 1000.0) / 10.0
+                : 0.0;
         int pendingCompanies   = companyService.findPending().size();
 
         return ResponseEntity.ok(new AdminDashboardDTO(
@@ -110,9 +121,35 @@ public class AdminController {
                 totalOpenProjects,
                 totalMatches,
                 confirmedMatches,
-                avgScore != null ? Math.round(avgScore * 10.0) / 10.0 : 0.0,
-                pendingCompanies
+                conversionRate,
+                pendingCompanies,
+                buildMonthlyMatchCounts()
         ));
+    }
+
+    // Matches por mês dos últimos 12 meses, todo o sistema — alimenta o gráfico de evolução
+    // do painel admin (antes vinha com dado fixo: tudo jogado em "Jun").
+    private List<MonthlyMatchCountDTO> buildMonthlyMatchCounts() {
+        LocalDateTime since = LocalDateTime.now().minusMonths(12);
+        List<Object[]> raw = matchRepository.findMonthlyMatchCounts(since);
+
+        Map<String, long[]> aggregated = new LinkedHashMap<>();
+        for (Object[] row : raw) {
+            int year  = ((Number) row[0]).intValue();
+            int month = ((Number) row[1]).intValue();
+            long count = ((Number) row[2]).longValue();
+            aggregated.put(year + "-" + String.format("%02d", month), new long[]{year, month, count});
+        }
+
+        List<MonthlyMatchCountDTO> result = new ArrayList<>();
+        for (long[] data : aggregated.values()) {
+            int year  = (int) data[0];
+            int month = (int) data[1];
+            String label = Month.of(month).getDisplayName(TextStyle.SHORT, new Locale("pt", "BR")) + "/" + year;
+            result.add(new MonthlyMatchCountDTO(label, data[2]));
+        }
+
+        return result;
     }
 
     @GetMapping("/projects")
@@ -133,6 +170,17 @@ public class AdminController {
     @GetMapping("/companies/pending")
     public ResponseEntity<List<CompanyProfileDTO>> pendingCompanies() {
         List<CompanyProfileDTO> companies = companyService.findPending()
+                .stream()
+                .map(this::toCompanyProfileDTO)
+                .toList();
+        return ResponseEntity.ok(companies);
+    }
+
+  
+    @GetMapping("/companies/latest")
+    public ResponseEntity<List<CompanyProfileDTO>> latestCompanies() {
+        List<CompanyProfileDTO> companies = companyRepository
+                .findTop5ByStatusNotOrderByUserCreatedAtDesc(CompanyStatus.REJECTED)
                 .stream()
                 .map(this::toCompanyProfileDTO)
                 .toList();
@@ -183,11 +231,25 @@ public class AdminController {
                 .stream()
                 .map(u -> new UserSummaryDTO(
                         u.getId(),
+                        resolveUserName(u),
                         u.getEmail(),
                         u.getType().name(),
                         u.getActive()))
                 .toList();
         return ResponseEntity.ok(users);
+    }
+
+    // Nome de exibição por tipo de usuário — mesmo critério do resolveName() em AuthService.
+    private String resolveUserName(com.main.nexus.model.User u) {
+        return switch (u.getType()) {
+            case PROFESSIONAL -> professionalRepository.findByUserId(u.getId())
+                    .map(com.main.nexus.model.Professional::getName)
+                    .orElse(u.getEmail());
+            case COMPANY -> companyRepository.findByUserId(u.getId())
+                    .map(com.main.nexus.model.Company::getCompanyName)
+                    .orElse(u.getEmail());
+            case ADMIN -> "Admin";
+        };
     }
 
     @PostMapping("/users/{id}/toggle")

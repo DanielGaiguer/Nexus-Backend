@@ -14,6 +14,8 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     Optional<Company> findByUserId(Long userId);
     boolean existsByTaxId(String taxId);
     List<Company> findByStatus(CompanyStatus status);
+
+    List<Company> findTop5ByStatusNotOrderByUserCreatedAtDesc(CompanyStatus status);
     Page<Company> findByStatusAndCompanyNameContainingIgnoreCase(
             CompanyStatus status, String companyName, Pageable pageable);
 }

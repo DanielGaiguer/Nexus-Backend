@@ -4,7 +4,10 @@
  */
 package com.main.nexus.service;
 
+import com.main.nexus.dto.ProfessionalStatsDTO;
 import com.main.nexus.model.Professional;
+import com.main.nexus.model.enums.StatusMatch;
+import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +20,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class ProfessionalService {
     @Autowired
     private ProfessionalRepository professionalRepository;
+
+    @Autowired
+    private MatchRepository matchRepository;
 
     public Professional save(Professional professional){
         return professionalRepository.save(professional);
@@ -46,5 +52,11 @@ public class ProfessionalService {
 
     public Optional<Professional> findByGithubId(String githubId) {
         return professionalRepository.findByGithubId(githubId);
+    }
+
+    // Estatísticas rápidas do dashboard do profissional.
+    public ProfessionalStatsDTO getStats(Long professionalId) {
+        long availableOpportunitiesCount = matchRepository.countByProfessionalIdAndStatus(professionalId, StatusMatch.WAITING);
+        return new ProfessionalStatsDTO(availableOpportunitiesCount);
     }
 }

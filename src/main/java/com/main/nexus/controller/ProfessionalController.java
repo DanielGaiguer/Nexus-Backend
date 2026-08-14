@@ -4,6 +4,7 @@ import com.main.nexus.dto.ContactInfoDTO;
 import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.PreviousProjectDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
+import com.main.nexus.dto.ProfessionalStatsDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
@@ -150,6 +151,16 @@ public class ProfessionalController {
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
 
         return ResponseEntity.ok(toProfileDTO(professional));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<ProfessionalStatsDTO> getStats() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        return ResponseEntity.ok(professionalService.getStats(professional.getId()));
     }
 
     @PutMapping("/profile")

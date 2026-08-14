@@ -16,11 +16,13 @@ import com.main.nexus.repository.ProjectRepository;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -45,8 +47,41 @@ public class CompanyAnalyticsService {
                 buildScoreDistribution(companyId),
                 buildAcceptanceRatePerProject(companyId),
                 buildMostRequiredSkills(companyId),
-                buildReputationSummary(companyId)
+                buildReputationSummary(companyId),
+                buildAvgDaysToFirstMatch(companyId)
         );
+    }
+
+    // Tempo médio (em dias) entre a publicação de uma oportunidade e o primeiro match
+    // MATCHED daquela oportunidade — só considera oportunidades que já tiveram pelo menos
+    // um match confirmado. Retorna null (não zero) quando a empresa ainda não tem nenhum,
+    // pra o frontend exibir "—" em vez de um enganoso "0 dias".
+    private Double buildAvgDaysToFirstMatch(Long companyId) {
+        List<Object[]> firstMatchPerProject = matchRepository.findFirstMatchDatePerProject(companyId);
+        if (firstMatchPerProject.isEmpty()) {
+            return null;
+        }
+
+        Map<Long, LocalDateTime> createdAtByProject = projectRepository.findByCompanyId(companyId).stream()
+                .collect(Collectors.toMap(Project::getId, Project::getCreatedAt));
+
+        List<Long> daysUntilFirstMatch = new ArrayList<>();
+        for (Object[] row : firstMatchPerProject) {
+            Long projectId = ((Number) row[0]).longValue();
+            LocalDateTime firstMatchDate = (LocalDateTime) row[1];
+            LocalDateTime projectCreatedAt = createdAtByProject.get(projectId);
+            if (projectCreatedAt == null || firstMatchDate == null) {
+                continue;
+            }
+            daysUntilFirstMatch.add(ChronoUnit.DAYS.between(projectCreatedAt, firstMatchDate));
+        }
+
+        if (daysUntilFirstMatch.isEmpty()) {
+            return null;
+        }
+
+        double avg = daysUntilFirstMatch.stream().mapToLong(Long::longValue).average().orElse(0.0);
+        return Math.round(avg * 10.0) / 10.0;
     }
 
     // Resumo geral de matches
