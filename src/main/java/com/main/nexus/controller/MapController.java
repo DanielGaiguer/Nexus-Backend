@@ -171,7 +171,15 @@ public class MapController {
                         p.getEffectiveLatitude(),
                         p.getEffectiveLongitude(),
                         p.getWorkMode() != null ? p.getWorkMode().name() : null,
-                        p.getRequiredSkills().stream().map(Skill::getName).toList()
+                        p.getRequiredSkills().stream().map(Skill::getName).toList(),
+                        p.getExperienceLevel() != null ? p.getExperienceLevel().name() : null,
+                        p.getType() != null ? p.getType().name() : null,
+                        p.getContractType() != null ? p.getContractType().name() : null,
+                        p.getMonthlySalaryMin(),
+                        p.getMonthlySalaryMax(),
+                        p.getMinimumBudget(),
+                        p.getMaximumBudget(),
+                        p.getCreatedAt()
                 ))
                 .toList();
 

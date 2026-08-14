@@ -45,7 +45,7 @@ public class ReputationService {
     private static final double RECENT_WEIGHT = 0.70;
     private static final double HISTORICAL_WEIGHT = 0.30;
     private static final double MAX_ADJUSTMENT = 0.20;
-    private static final double CONFIDENCE_THRESHOLD = 50.0;
+    private static final double CONFIDENCE_THRESHOLD = 10.0;
     private static final double NEUTRAL_SCORE = 10.0;
     private static final int RECENT_MONTHS = 6;
 
