@@ -52,6 +52,16 @@ public class ReputationService {
     private static final double BAYESIAN_CONFIDENCE_CONSTANT = 5.0; // C — peso de "avaliações neutras" na média bayesiana
     private static final double BAYESIAN_GLOBAL_PRIOR = 50.0;       // m — média global assumida para um indicador 0-100
 
+    // Reescala de EXIBIÇÃO aplicada depois do cálculo bayesiano acima, que continua com prior
+    // simétrico (50 no meio de 0-100, 3.5 perto do meio de 1-5) e portanto reage na MESMA
+    // proporção pra evidência positiva e negativa. A reescala só remapeia o resultado final pra
+    // uma faixa com "chão" mais alto uma variação de X% do valor bruto vira X% da faixa nova,
+    // preservando a simetria da reação em vez de simplesmente mover o prior (que quebraria essa
+    // proporção — ver rescaleIndicator/rescaleSatisfaction).
+    private static final double INDICATOR_DISPLAY_FLOOR = 70.0;          // indicadores 0-100 -> faixa [70,100], média neutra vira 85
+    private static final double SATISFACTION_DISPLAY_FLOOR = 11.0 / 3.0; // nota 1-5 -> faixa [3.667,5], média neutra vira 4.5
+    private static final double SATISFACTION_CONFIDENCE_CONSTANT = 1.0;  // C próprio da nota de satisfação — bem mais reativo que o C=5 dos indicadores, pra cada avaliação pesar mais rápido no valor exibido
+
     // API PÚBLICA — consumida pelo MatchService
 
     public double getScoreAdjustment(Long entityId, AuthorType type) {
@@ -236,15 +246,15 @@ public class ReputationService {
         double techRejectionPenaltyRecent = rejectionRatioForProfessional(recentRejections,
                 List.of(CompanyRejectionReason.MISSING_REQUIRED_SKILLS, CompanyRejectionReason.INSUFFICIENT_EXPERIENCE));
 
-        metrics.setTechnicalCompetence(
-                blend(techRecent - techRejectionPenaltyRecent, techHist - techRejectionPenaltyHist));
+        metrics.setTechnicalCompetence(rescaleIndicator(
+                blend(techRecent - techRejectionPenaltyRecent, techHist - techRejectionPenaltyHist)));
 
         // Communication
         double commHist = indicatorFromReviews(allReviews,
                 List.of(PositiveReason.EXCELLENT_COMMUNICATION), List.of(NegativeReason.POOR_COMMUNICATION));
         double commRecent = indicatorFromReviews(recentReviews,
                 List.of(PositiveReason.EXCELLENT_COMMUNICATION), List.of(NegativeReason.POOR_COMMUNICATION));
-        metrics.setCommunication(blend(commRecent, commHist));
+        metrics.setCommunication(rescaleIndicator(blend(commRecent, commHist)));
 
         // Reliability
         double relHist = indicatorFromReviews(allReviews,
@@ -253,14 +263,14 @@ public class ReputationService {
         double relRecent = indicatorFromReviews(recentReviews,
                 List.of(PositiveReason.RELIABLE, PositiveReason.DELIVERED_ON_TIME),
                 List.of(NegativeReason.MISSED_DEADLINES, NegativeReason.UNRELIABLE, NegativeReason.ABSENT));
-        metrics.setReliability(blend(relRecent, relHist));
-        
-        // Punctuality 
+        metrics.setReliability(rescaleIndicator(blend(relRecent, relHist)));
+
+        // Punctuality
         double punHist = indicatorFromReviews(allReviews,
                 List.of(PositiveReason.PUNCTUAL, PositiveReason.DELIVERED_ON_TIME), List.of(NegativeReason.MISSED_DEADLINES));
         double punRecent = indicatorFromReviews(recentReviews,
                 List.of(PositiveReason.PUNCTUAL, PositiveReason.DELIVERED_ON_TIME), List.of(NegativeReason.MISSED_DEADLINES));
-        metrics.setPunctuality(blend(punRecent, punHist));
+        metrics.setPunctuality(rescaleIndicator(blend(punRecent, punHist)));
 
         // Professionalism
         double profHist = indicatorFromReviews(allReviews,
@@ -269,10 +279,12 @@ public class ReputationService {
         double profRecent = indicatorFromReviews(recentReviews,
                 List.of(PositiveReason.TEAM_PLAYER, PositiveReason.PROACTIVE, PositiveReason.EXCEEDED_EXPECTATIONS),
                 List.of(NegativeReason.UNPROFESSIONAL, NegativeReason.DID_NOT_MEET_EXPECTATIONS, NegativeReason.OTHER));
-        metrics.setProfessionalism(blend(profRecent, profHist));
+        metrics.setProfessionalism(rescaleIndicator(blend(profRecent, profHist)));
 
-        // Satisfaction e Recommendation rate
-        metrics.setSatisfactionAverage(bayesianRating(allReviews));
+        // Satisfaction e Recommendation rate recommendationRate fica de fora da reescala de
+        // propósito (é % direto de reviews com nota >= 4, sem suavização bayesiana; reescalar
+        // junto misturaria uma métrica "crua" com métricas já compostas).
+        metrics.setSatisfactionAverage(rescaleSatisfaction(bayesianRating(allReviews)));
         metrics.setRecommendationRate(recommendationRate(allReviews));
 
         // Consolidação
@@ -312,7 +324,7 @@ public class ReputationService {
                 List.of(PositiveReason.EXCELLENT_COMMUNICATION), List.of(NegativeReason.POOR_COMMUNICATION));
         double commRecent = indicatorFromReviews(recentReviews,
                 List.of(PositiveReason.EXCELLENT_COMMUNICATION), List.of(NegativeReason.POOR_COMMUNICATION));
-        metrics.setCommunication(blend(commRecent, commHist));
+        metrics.setCommunication(rescaleIndicator(blend(commRecent, commHist)));
 
         double relHist = indicatorFromReviews(allReviews,
                 List.of(PositiveReason.RELIABLE), List.of(NegativeReason.UNRELIABLE, NegativeReason.ABSENT));
@@ -322,13 +334,13 @@ public class ReputationService {
                 List.of(ProfessionalRejectionReason.HIRING_FROZEN, ProfessionalRejectionReason.PROJECT_CANCELLED));
         double relRejectionPenaltyRecent = rejectionRatioForCompany(recentRejections,
                 List.of(ProfessionalRejectionReason.HIRING_FROZEN, ProfessionalRejectionReason.PROJECT_CANCELLED));
-        metrics.setReliability(blend(relRecent - relRejectionPenaltyRecent, relHist - relRejectionPenaltyHist));
+        metrics.setReliability(rescaleIndicator(blend(relRecent - relRejectionPenaltyRecent, relHist - relRejectionPenaltyHist)));
 
         double punHist = indicatorFromReviews(allReviews,
                 List.of(PositiveReason.PUNCTUAL), List.of(NegativeReason.MISSED_DEADLINES));
         double punRecent = indicatorFromReviews(recentReviews,
                 List.of(PositiveReason.PUNCTUAL), List.of(NegativeReason.MISSED_DEADLINES));
-        metrics.setPunctuality(blend(punRecent, punHist));
+        metrics.setPunctuality(rescaleIndicator(blend(punRecent, punHist)));
 
         double profHist = indicatorFromReviews(allReviews,
                 List.of(PositiveReason.PROACTIVE, PositiveReason.EXCEEDED_EXPECTATIONS),
@@ -336,13 +348,13 @@ public class ReputationService {
         double profRecent = indicatorFromReviews(recentReviews,
                 List.of(PositiveReason.PROACTIVE, PositiveReason.EXCEEDED_EXPECTATIONS),
                 List.of(NegativeReason.UNPROFESSIONAL, NegativeReason.OTHER));
-        metrics.setProfessionalism(blend(profRecent, profHist));
+        metrics.setProfessionalism(rescaleIndicator(blend(profRecent, profHist)));
 
         // Empresa não tem "competência técnica" própria, e usado o mesmo peso redistribuído
         // entre os 4 indicadores restantes (sem technicalCompetence)
         metrics.setTechnicalCompetence(null); // não se aplica a empresas
 
-        metrics.setSatisfactionAverage(bayesianRating(allReviews));
+        metrics.setSatisfactionAverage(rescaleSatisfaction(bayesianRating(allReviews)));
         metrics.setRecommendationRate(recommendationRate(allReviews));
 
         double reputationScore =
@@ -364,6 +376,22 @@ public class ReputationService {
     // Combina recente (70%) e histórico (30%)
     private double blend(double recent, double historical) {
         return (RECENT_WEIGHT * recent) + (HISTORICAL_WEIGHT * historical);
+    }
+
+    // Remapeia um indicador bruto 0-100 (já bayesiano/blendado) pra [INDICATOR_DISPLAY_FLOOR,100].
+    // reputationScore herda essa compressão automaticamente, porque é somado a partir dos
+    // getters dos indicadores (já reescalados), não dos valores brutos de blend(...).
+    
+    
+    // Ou seja, o valor original de 0–100 é comprimido para uma escala de 60–100.
+    // e usado quando quer que um indicador nunca seja visualmente menor que determinado valor, mesmo quando o valor real é baixo
+    private double rescaleIndicator(double raw) {
+        return INDICATOR_DISPLAY_FLOOR + (raw / 100.0) * (100.0 - INDICATOR_DISPLAY_FLOOR);
+    }
+
+    // Mesma ideia pra nota de satisfação, só que na escala 1-5 em vez de 0-100.
+    private double rescaleSatisfaction(double raw) {
+        return SATISFACTION_DISPLAY_FLOOR + ((raw - 1.0) / 4.0) * (5.0 - SATISFACTION_DISPLAY_FLOOR);
     }
 
     // Indicador 0-100 a partir da contagem de motivos positivos e negativos nas reviews, via Bayesian 
@@ -425,7 +453,7 @@ public class ReputationService {
         double sum = reviews.stream().mapToInt(Review::getRating).sum(); // Conta a nota de cada avaliacao
         int n = reviews.size(); // Quantidade de avaliacoes
         double priorMean = 3.5; //considero uma nota neutra de 3,5 estrelas
-        double C = BAYESIAN_CONFIDENCE_CONSTANT;
+        double C = SATISFACTION_CONFIDENCE_CONSTANT; // C próprio da satisfação — mais baixo que o dos indicadores, reage mais rápido por avaliação
 
         return ((C * priorMean) + sum) / (C + n);
     }
