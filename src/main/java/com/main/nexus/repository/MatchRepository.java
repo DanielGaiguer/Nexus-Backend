@@ -26,13 +26,6 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     long countByProfessionalId(Long professionalId);
     long countByProfessionalIdAndStatus(Long professionalId, StatusMatch status);
 
-    @Query("SELECT AVG(m.matchScore) FROM Match m WHERE m.professional.id = :professionalId")
-    Double findAverageScoreByProfessionalId(Long professionalId);
-
-    // Média de score dos matches de uma empresa
-    @Query("SELECT AVG(m.matchScore) FROM Match m WHERE m.project.company.id = :companyId")
-    Double findAverageMatchScoreByCompany(@Param("companyId") Long companyId);
-
     // Contagem por status de uma empresa
     @Query("SELECT COUNT(m) FROM Match m WHERE m.project.company.id = :companyId AND m.status = :status")
     long countByCompanyIdAndStatus(
@@ -54,13 +47,6 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
            "ORDER BY YEAR(m.createdAt) ASC, MONTH(m.createdAt) ASC")
     List<Object[]> findMonthlyMatchCounts(@Param("since") java.time.LocalDateTime since);
 
-    // Data do primeiro match MATCHED de cada projeto da empresa — usado para calcular o
-    // tempo médio até o primeiro match confirmado (ver CompanyAnalyticsService).
-    @Query("SELECT m.project.id, MIN(m.createdAt) FROM Match m " +
-           "WHERE m.project.company.id = :companyId AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
-           "GROUP BY m.project.id")
-    List<Object[]> findFirstMatchDatePerProject(@Param("companyId") Long companyId);
-
     // Projetos anteriores de uma empresa: matches que foram confirmados (MATCHED em algum
     // momento) e já encerraram — seja porque expiraram naturalmente após 30 dias
     // (MatchExpirationService só marca active=false, mantendo status=MATCHED) ou porque
@@ -72,6 +58,16 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
            "     OR EXISTS (SELECT 1 FROM MatchHistory h WHERE h.match = m AND h.toStatus = 'MATCHED')) " +
            "ORDER BY m.createdAt DESC")
     List<Match> findPreviousProjectsByCompanyId(@Param("companyId") Long companyId);
+
+    // Espelho de findPreviousProjectsByCompanyId, do lado do profissional: matches que
+    // foram confirmados (MATCHED em algum momento) e já encerraram (expiraram após 30 dias
+    // ou foram cancelados depois de confirmados).
+    @Query("SELECT DISTINCT m FROM Match m WHERE m.professional.id = :professionalId " +
+           "AND m.active = false " +
+           "AND (m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
+           "     OR EXISTS (SELECT 1 FROM MatchHistory h WHERE h.match = m AND h.toStatus = 'MATCHED')) " +
+           "ORDER BY m.createdAt DESC")
+    List<Match> findPreviousProjectsByProfessionalId(@Param("professionalId") Long professionalId);
 
     // Matches por mês de uma empresa retorna [year, month, status, count]
     // WAITING fora: é só o candidato pontuado automaticamente pelo ranking, nunca virou

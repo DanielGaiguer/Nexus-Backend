@@ -281,10 +281,20 @@ public class AuthService {
 
         String name = resolveName(user);
 
+        touchLastLogin(user);
+
         UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), user.getType().name());
         String token = tokenService.generateToken(userDTO);
 
         return new LoginResponseDTO(user.getId(), user.getEmail(), name, user.getType().name(), token);
+    }
+
+    // Usado pelo job de inatividade (ProfessionalInactivityService) pra saber há quanto
+    // tempo o profissional não acessa a plataforma — chamado em todo fluxo que gera um
+    // token novo (login por senha, LinkedIn e GitHub, tanto login quanto registro).
+    private void touchLastLogin(User user) {
+        user.setLastLoginAt(java.time.LocalDateTime.now());
+        userRepository.save(user);
     }
 
     private String resolveName(User user) {
@@ -400,6 +410,7 @@ public class AuthService {
         backfillProfilePhoto(user, info.picture());
 
         String name = resolveName(user);
+        touchLastLogin(user);
         UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), user.getType().name());
         String jwt = tokenService.generateToken(userDTO);
 
@@ -770,6 +781,7 @@ public class AuthService {
             professionalService.update(professional);
         }
 
+        touchLastLogin(user);
         UserDTO userDTO = new UserDTO(user.getId(), user.getEmail(), UserType.PROFESSIONAL.name());
         String jwt = tokenService.generateToken(userDTO);
 

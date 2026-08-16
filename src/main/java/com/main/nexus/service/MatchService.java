@@ -72,6 +72,11 @@ public class MatchService {
     // ScoreMatch = (Skills*0.30) + (Budget*0.20) + (History*0.17) + (Reputation*0.09) + (Availability*0.09) + (Distance*0.15)
     public double getScore(Professional professional, Project project) {
 
+        // Indisponível anula o score
+        if (!Boolean.TRUE.equals(professional.getAvailable())) {
+            return 0.0;
+        }
+
         double skillScore        = calculateSkillScore(professional, project);
         double budgetScore       = calculateBudgetScore(professional, project);
         double historyScore      = calculateHistoryScore(professional);
@@ -434,9 +439,14 @@ public class MatchService {
         List<Match> matches = new ArrayList<>();
 
         for (Professional professional : allProfessionals) {
+            // Profissional indisponível não entra no ranking — nem como candidato gerado
+            // automaticamente. Ver getScore(), que também zera o score caso esse match já
+            // exista de antes (ex: ficou indisponível depois de já ter sido rankeado).
+            if (!Boolean.TRUE.equals(professional.getAvailable())) continue;
+
             // Verifica se o profissional Tem o minimo indispensavel para o calculo do score
             if (!profileCompletionService.canParticipateInRanking(professional)) continue;
-            
+
             //Se nao for do mesmo tipo de oportunidade
             if (!matchesProjectType(professional, project)) continue;
 
@@ -937,16 +947,20 @@ public class MatchService {
 
     // PROFISSIONAL — OPORTUNIDADES E INICIATIVA
 
-    public List<Match> getOpportunitiesForProfessional(Long professionalId) {
-        Professional professional = professionalRepository.findById(professionalId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Professional not found"));
+    // Gera os matches (status WAITING) que faltam pro profissional em toda vaga OPEN
+    // elegível — mesma lógica usada tanto na navegação lazy (getOpportunitiesForProfessional)
+    // quanto no recálculo imediato disparado ao marcar disponível de novo
+    // (recalculateForNewlyAvailableProfessional). Indisponível nunca gera nada aqui.
+    private void generateMissingMatchesForProfessional(Professional professional) {
+        if (!Boolean.TRUE.equals(professional.getAvailable())) {
+            return;
+        }
 
         List<Project> openProjects = projectRepository.findByStatus(ProjectStatus.OPEN);
 
         for (Project project : openProjects) {
             boolean alreadyExists = matchRepository
-                    .findByProjectIdAndProfessionalId(project.getId(), professionalId)
+                    .findByProjectIdAndProfessionalId(project.getId(), professional.getId())
                     .isPresent();
 
             if (!alreadyExists && matchesProjectType(professional, project)) {
@@ -957,15 +971,62 @@ public class MatchService {
                 matchRepository.save(match);
             }
         }
+    }
 
-        return matchRepository.findByProfessionalId(professionalId)
+    // Chamado pelo endpoint de atualização de perfil assim que o profissional volta a
+    // ficar disponível (false -> true): gera na hora os matches em todas as vagas abertas
+    // elegíveis, em vez de esperar ele visitar /pro/opportunities pra isso acontecer.
+    // Também recalcula os matches que já existiam de antes (ficaram com score 0 zerado
+    // enquanto ele estava indisponível — ver getScore) pra já saírem com o score certo.
+    @Transactional
+    public void recalculateForNewlyAvailableProfessional(Long professionalId) {
+        Professional professional = professionalRepository.findById(professionalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Professional not found"));
+
+        generateMissingMatchesForProfessional(professional);
+
+        matchRepository.findByProfessionalId(professionalId)
+                .stream()
+                .filter(m -> !Boolean.FALSE.equals(m.getActive()))
+                .filter(m -> m.getProject().getStatus() == ProjectStatus.OPEN)
+                .forEach(this::refreshMatchScore);
+    }
+
+    public List<Match> getOpportunitiesForProfessional(Long professionalId) {
+        Professional professional = professionalRepository.findById(professionalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Professional not found"));
+
+        generateMissingMatchesForProfessional(professional);
+
+        List<Match> matches = matchRepository.findByProfessionalId(professionalId)
                 .stream()
                 .filter(m -> !Boolean.FALSE.equals(m.getActive()))
                 .filter(m -> m.getProject().getStatus() == ProjectStatus.OPEN)
                 .filter(m -> m.getStatus() == StatusMatch.WAITING
                           || m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
+                .toList();
+
+        matches.forEach(this::refreshMatchScore);
+
+        return matches.stream()
                 .sorted(Comparator.comparingDouble(Match::getMatchScore).reversed())
                 .toList();
+    }
+
+    // Recalcula o score do match com os dados atuais do profissional/projeto e persiste
+    // se tiver mudado — mantém match.getMatchScore() em sincronia com o breakdown ao vivo
+    // (getScoreBreakdown), que é sempre recalculado na hora de exibir.
+    // Package-private (não private) porque ScorePreviewService e CandidateComparisonService,
+    // no mesmo pacote, têm o mesmo problema de reaproveitar um Match já persistido sem
+    // atualizar o score antes de montar o breakdown.
+    void refreshMatchScore(Match match) {
+        double freshScore = getScore(match.getProfessional(), match.getProject());
+        if (match.getMatchScore() == null || Math.abs(match.getMatchScore() - freshScore) > 0.01) {
+            match.setMatchScore(freshScore);
+            matchRepository.save(match);
+        }
     }
 
     
@@ -1016,9 +1077,11 @@ public class MatchService {
             match.setStatus(StatusMatch.PROFESSIONAL_INTERESTED);
         }
 
-        // Salva o historico do match
-        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
+        // Salva o Match primeiro — diferente dos outros fluxos de interesse, aqui o match
+        // pode ser recém-criado (orElseGet acima), ainda sem id; gravar o histórico antes
+        // do save falha (MatchHistory referenciando um Match transiente, não persistido).
         Match saved = matchRepository.save(match);
+        matchHistoryService.record(saved, fromStatus, saved.getStatus().name(), "PROFESSIONAL");
 
         if (!wasAlreadyCompanyInterested) {
             notificationService.notifyNewInterestReceived(
@@ -1039,9 +1102,14 @@ public class MatchService {
     // CONSULTAS
 
     public List<Match> getRankingByProject(Long projectId) {
-        return matchRepository.findByProjectId(projectId)
+        List<Match> ranking = matchRepository.findByProjectId(projectId)
                 .stream()
                 .filter(m -> !Boolean.FALSE.equals(m.getActive()))
+                .toList();
+
+        ranking.forEach(this::refreshMatchScore);
+
+        return ranking.stream()
                 .sorted(Comparator.comparingDouble(Match::getMatchScore).reversed())
                 .toList();
     }
@@ -1117,7 +1185,11 @@ public class MatchService {
     }
 
     public List<Match> getMatchesByProfessional(Long professionalId) {
-        return matchRepository.findByProfessionalId(professionalId);
+        List<Match> matches = matchRepository.findByProfessionalId(professionalId);
+        // Base de várias telas (dashboard, "Matches Confirmados"/"Recusados" filtrados no
+        // controller, admin) — atualiza aqui pra nenhuma delas herdar score congelado.
+        matches.forEach(this::refreshMatchScore);
+        return matches;
     }
 
     public long countConfirmedMatches() {
@@ -1131,17 +1203,52 @@ public class MatchService {
     }
 
     public List<Match> getPendingInvitesForProfessional(Long professionalId) {
-        return matchRepository.findByProfessionalId(professionalId)
+        List<Match> invites = matchRepository.findByProfessionalId(professionalId)
                 .stream()
                 .filter(m -> m.getStatus() == StatusMatch.COMPANY_INTERESTED)
+                .filter(this::isActionablePending)
                 .toList();
+
+        invites.forEach(this::refreshMatchScore);
+
+        return invites;
+    }
+
+    // Um convite/interesse só continua "pendente" (exigindo resposta) se a vaga ainda
+    // estiver aberta e o match não tiver sido desativado por algum outro motivo — vaga
+    // pausada/encerrada ou match inativo tornam a ação (aceitar/recusar) sem sentido, e
+    // o convite não deveria continuar aparecendo como se estivesse esperando resposta.
+    private boolean isActionablePending(Match m) {
+        return !Boolean.FALSE.equals(m.getActive())
+                && m.getProject() != null
+                && m.getProject().getStatus() == ProjectStatus.OPEN;
+    }
+
+    // Espelho de getPendingInvitesForProfessional: interesses que o próprio profissional
+    // enviou (professionalShowsInterest) e que ainda aguardam resposta da empresa.
+    // Equivalente ao "Convites Enviados" (sentInvites/COMPANY_INTERESTED) que já existe
+    // do lado da empresa em getMatchesByCompany + filtro no frontend.
+    public List<Match> getSentInterestsForProfessional(Long professionalId) {
+        List<Match> sent = matchRepository.findByProfessionalId(professionalId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
+                .filter(this::isActionablePending)
+                .toList();
+
+        sent.forEach(this::refreshMatchScore);
+
+        return sent;
     }
 
     public List<Match> getConfirmedMatchesForProfessional(Long professionalId) {
-        return matchRepository.findByProfessionalId(professionalId)
+        List<Match> confirmed = matchRepository.findByProfessionalId(professionalId)
                 .stream()
                 .filter(m -> m.getStatus() == StatusMatch.MATCHED)
                 .toList();
+
+        confirmed.forEach(this::refreshMatchScore);
+
+        return confirmed;
     }
 
     // Verifica se empresa e profissional têm um match confirmado E ATIVO entre eles
@@ -1163,11 +1270,66 @@ public class MatchService {
     }
 
     public List<Match> getMatchesByCompany(Long companyId) {
-        return matchRepository.findByProjectCompanyId(companyId);
+        List<Match> matches = matchRepository.findByProjectCompanyId(companyId);
+        matches.forEach(this::refreshMatchScore);
+        return matches;
+    }
+
+    // Espelho de getPendingInvitesForProfessional: interesses que profissionais enviaram
+    // pra vagas da empresa (professionalShowsInterest) e que ainda aguardam resposta dela.
+    public List<Match> getReceivedInterestsForCompany(Long companyId) {
+        List<Match> received = matchRepository.findByProjectCompanyId(companyId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
+                .filter(this::isActionablePending)
+                .toList();
+
+        received.forEach(this::refreshMatchScore);
+
+        return received;
+    }
+
+    // Espelho de getSentInterestsForProfessional: convites que a empresa enviou (a partir
+    // do ranking) e que ainda aguardam resposta do profissional.
+    public List<Match> getSentInvitesForCompany(Long companyId) {
+        List<Match> sent = matchRepository.findByProjectCompanyId(companyId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.COMPANY_INTERESTED)
+                .filter(this::isActionablePending)
+                .toList();
+
+        sent.forEach(this::refreshMatchScore);
+
+        return sent;
+    }
+
+    public List<Match> getConfirmedMatchesForCompany(Long companyId) {
+        List<Match> confirmed = matchRepository.findByProjectCompanyId(companyId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.MATCHED)
+                .toList();
+
+        confirmed.forEach(this::refreshMatchScore);
+
+        return confirmed;
+    }
+
+    // Matches recusados (por qualquer um dos dois lados) — sem filtro de vaga aberta, já
+    // que a recusa é definitiva independente do que aconteça com a vaga depois.
+    public List<Match> getRejectedMatchesForCompany(Long companyId) {
+        return matchRepository.findByProjectCompanyId(companyId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.REJECTED)
+                .toList();
     }
 
     public List<Match> getPreviousProjectsByCompany(Long companyId) {
         return matchRepository.findPreviousProjectsByCompanyId(companyId);
+    }
+
+    // Espelho de getPreviousProjectsByCompany, do lado do profissional.
+    public List<Match> getPreviousProjectsByProfessional(Long professionalId) {
+        return matchRepository.findPreviousProjectsByProfessionalId(professionalId);
     }
 
     // NOTIFICAÇÕES

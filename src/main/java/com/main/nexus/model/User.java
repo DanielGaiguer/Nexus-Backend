@@ -43,6 +43,12 @@ public class User {
     @Column(unique = true, length = 64)
     private String linkedinId;
 
+    // Atualizado a cada login bem-sucedido — usado pelo job de inatividade
+    // (ProfessionalInactivityService) pra marcar profissional como indisponível
+    // depois de 1 mês sem acesso.
+    @Column
+    private LocalDateTime lastLoginAt;
+
     public Long getId() {
         return id;
     }
@@ -97,5 +103,13 @@ public class User {
 
     public void setLinkedinId(String linkedinId) {
         this.linkedinId = linkedinId;
+    }
+
+    public LocalDateTime getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(LocalDateTime lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
     }
 }

@@ -7,19 +7,30 @@ import com.main.nexus.dto.ProfessionalDashboardAnalyticsDTO;
 import com.main.nexus.dto.ReputationSummaryDTO;
 import com.main.nexus.dto.ScoreDistributionDTO;
 import com.main.nexus.dto.SkillDemandDTO;
+import com.main.nexus.dto.SkillGapDTO;
+import com.main.nexus.dto.SoftSkillFeedbackDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
+import com.main.nexus.model.Professional;
 import com.main.nexus.model.ReputationMetrics;
+import com.main.nexus.model.Review;
+import com.main.nexus.model.Skill;
+import com.main.nexus.model.enums.NegativeReason;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
+import com.main.nexus.repository.ProfessionalRepository;
+import com.main.nexus.repository.ReviewRepository;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +39,12 @@ public class ProfessionalAnalyticsService {
 
     @Autowired
     private MatchRepository matchRepository;
+
+    @Autowired
+    private ReviewRepository reviewRepository;
+
+    @Autowired
+    private ProfessionalRepository professionalRepository;
 
     @Autowired
     private ReputationService reputationService;
@@ -41,8 +58,63 @@ public class ProfessionalAnalyticsService {
                 buildScoreDistribution(professionalId),
                 buildAcceptanceRatePerCompany(professionalId),
                 buildMostRequiredSkills(professionalId),
-                buildReputationSummary(professionalId)
+                buildReputationSummary(professionalId),
+                buildSkillGaps(professionalId),
+                buildSoftSkillFeedback(professionalId)
         );
+    }
+
+    // Skills que aparecem como requisito nos projetos/vagas em que o profissional teve
+    // algum match real (WAITING puro fora, mesmo critério do buildAcceptanceRatePerCompany)
+    // mas que não estão no perfil dele — indicação de aprendizado pro card "HardSkills".
+    private List<SkillGapDTO> buildSkillGaps(Long professionalId) {
+        Professional professional = professionalRepository.findById(professionalId).orElse(null);
+        if (professional == null) return List.of();
+
+        Set<String> mySkills = professional.getSkills().stream()
+                .map(s -> s.getName().toLowerCase())
+                .collect(Collectors.toSet());
+
+        List<Match> matches = matchRepository.findByProfessionalId(professionalId).stream()
+                .filter(m -> m.getStatus() != StatusMatch.WAITING)
+                .toList();
+
+        Map<String, Long> countByName = new LinkedHashMap<>();
+        Map<String, String> categoryByName = new LinkedHashMap<>();
+
+        for (Match m : matches) {
+            for (Skill skill : m.getProject().getRequiredSkills()) {
+                if (mySkills.contains(skill.getName().toLowerCase())) continue;
+                countByName.merge(skill.getName(), 1L, Long::sum);
+                categoryByName.putIfAbsent(skill.getName(), skill.getCategory());
+            }
+        }
+
+        return countByName.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(8)
+                .map(e -> new SkillGapDTO(e.getKey(), categoryByName.get(e.getKey()), e.getValue()))
+                .toList();
+    }
+
+    // Motivos negativos mais frequentes nas avaliações que o profissional recebeu das
+    // empresas — indicação de aprimoramento pro card "SoftSkills".
+    private List<SoftSkillFeedbackDTO> buildSoftSkillFeedback(Long professionalId) {
+        List<Review> reviews = reviewRepository.findCompanyReviewsForProfessional(professionalId);
+
+        Map<NegativeReason, Long> counts = new EnumMap<>(NegativeReason.class);
+        for (Review review : reviews) {
+            if (review.getNegativeReasons() == null) continue;
+            for (NegativeReason reason : review.getNegativeReasons()) {
+                counts.merge(reason, 1L, Long::sum);
+            }
+        }
+
+        return counts.entrySet().stream()
+                .sorted(Map.Entry.<NegativeReason, Long>comparingByValue().reversed())
+                .limit(5)
+                .map(e -> SoftSkillFeedbackDTO.of(e.getKey(), e.getValue()))
+                .toList();
     }
 
     // Resumo geral de matches
@@ -62,18 +134,12 @@ public class ProfessionalAnalyticsService {
                 ? Math.round((double) confirmed / total * 1000.0) / 10.0
                 : 0.0;
 
-        Double avgScore = matchRepository.findAverageScoreByProfessionalId(professionalId);
-        double roundedAvg = avgScore != null
-                ? Math.round(avgScore * 10.0) / 10.0
-                : 0.0;
-
         return new MatchSummaryDTO(
                 total,
                 confirmed,
                 pending,
                 rejected,
-                acceptanceRate,
-                roundedAvg
+                acceptanceRate
         );
     }
 
@@ -175,20 +241,13 @@ public class ProfessionalAnalyticsService {
                     ? Math.round((double) confirmed / companyMatches.size() * 1000.0) / 10.0
                     : 0.0;
 
-            double avgScore = companyMatches.stream()
-                    .mapToDouble(Match::getMatchScore)
-                    .average()
-                    .orElse(0.0);
-            avgScore = Math.round(avgScore * 10.0) / 10.0;
-
             result.add(new CompanyAcceptanceRateDTO(
                     entry.getKey(),
                     companyNames.get(entry.getKey()),
                     companyMatches.size(),
                     confirmed,
                     rejected,
-                    acceptanceRate,
-                    avgScore
+                    acceptanceRate
             ));
         }
 

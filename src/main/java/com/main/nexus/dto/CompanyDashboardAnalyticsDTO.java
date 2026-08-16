@@ -10,8 +10,6 @@ public record CompanyDashboardAnalyticsDTO(
         List<ProjectAcceptanceRateDTO> acceptanceRatePerProject,
         List<SkillDemandDTO> mostRequiredSkills,
         ReputationSummaryDTO reputationSummary,
-
-        // Média de dias entre a publicação da oportunidade e o 1º match confirmado —
-        // null se a empresa ainda não teve nenhum match MATCHED.
-        Double avgDaysToFirstMatch
+        List<SoftSkillFeedbackDTO> softSkillFeedback,
+        List<ProjectStatusDistributionDTO> projectStatusDistribution
 ) {}

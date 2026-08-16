@@ -126,6 +126,10 @@ public class CandidateComparisonService {
                 .findByProfessionalId(professional.getId())
                 .orElse(null);
 
+        // Mesmo motivo de ScorePreviewService: atualiza o score antes de montar o
+        // breakdown, senão a comparação usa um match.getMatchScore() congelado desde a
+        // criação do match em vez do que os dados atuais realmente calculam.
+        matchService.refreshMatchScore(match);
         ScoreBreakdownDTO breakdown = matchService.getScoreBreakdown(professional, project, match);
         SalaryRange salaryRange = resolveSalaryRange(professional, project);
 

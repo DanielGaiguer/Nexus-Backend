@@ -28,4 +28,16 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("SELECT r.match.id FROM Review r WHERE r.match.project.company.id = :companyId " +
            "AND r.authorType = com.main.nexus.model.enums.AuthorType.COMPANY")
     List<Long> findReviewedMatchIdsByCompany(@Param("companyId") Long companyId);
+
+    // Avaliações recebidas pelo profissional (escritas pela empresa) — usado no card
+    // SoftSkills do dashboard do profissional.
+    @Query("SELECT r FROM Review r WHERE r.match.professional.id = :professionalId " +
+           "AND r.authorType = com.main.nexus.model.enums.AuthorType.COMPANY")
+    List<Review> findCompanyReviewsForProfessional(@Param("professionalId") Long professionalId);
+
+    // Avaliações recebidas pela empresa (escritas pelo profissional) — usado no card
+    // SoftSkills do dashboard da empresa.
+    @Query("SELECT r FROM Review r WHERE r.match.project.company.id = :companyId " +
+           "AND r.authorType = com.main.nexus.model.enums.AuthorType.PROFESSIONAL")
+    List<Review> findProfessionalReviewsForCompany(@Param("companyId") Long companyId);
 }

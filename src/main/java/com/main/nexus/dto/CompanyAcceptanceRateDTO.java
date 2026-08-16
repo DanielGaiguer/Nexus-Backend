@@ -6,6 +6,5 @@ public record CompanyAcceptanceRateDTO(
         long totalMatches,
         long confirmedMatches,
         long rejectedMatches,
-        double acceptanceRate,
-        double averageScore
+        double acceptanceRate
 ) {}

@@ -367,7 +367,8 @@ public class AdminController {
                         professional.getName(),
                         professional.getPhone(),
                         professional.getReputation(),
-                        professional.getProfilePhotoUrl()
+                        professional.getProfilePhotoUrl(),
+                        professional.getSkills().stream().map(Skill::getName).toList()
                 ),
                 null,
                 m.getActive()

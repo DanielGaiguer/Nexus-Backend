@@ -17,5 +17,6 @@ public enum NotificationType {
     MATCH_STATUS_CHECK,      // match completa 30 dias em 15 dias, pede feedback de status à empresa
     MATCH_EXPIRED_REVIEW_REQUEST, // match completou 30 dias e expirou, pede avaliação a ambos os lados
     PROJECT_POSITIONS_FULL,  // projeto atingiu o limite de vagas e foi pausado automaticamente
-    PROJECT_ADDED_TO_PORTFOLIO // empresa confirmou o status do match como "trabalhando juntos" e o projeto foi adicionado ao portfólio do profissional
+    PROJECT_ADDED_TO_PORTFOLIO, // empresa confirmou o status do match como "trabalhando juntos" e o projeto foi adicionado ao portfólio do profissional
+    ACCOUNT_MARKED_UNAVAILABLE // profissional ficou 1 mês sem logar e foi marcado indisponível automaticamente
 }

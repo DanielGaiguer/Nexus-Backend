@@ -9,6 +9,7 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
@@ -65,6 +66,36 @@ public class ProjectController {
     public ResponseEntity<List<MatchResponseDTO>> getPreviousProjects() {
         Company company = getLoggedCompany();
         List<Match> matches = matchService.getPreviousProjectsByCompany(company.getId());
+        return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
+    }
+
+    // Interesses que profissionais enviaram pras vagas da empresa, ainda aguardando resposta.
+    @GetMapping("/matches/received")
+    public ResponseEntity<List<MatchResponseDTO>> getReceivedInterests() {
+        Company company = getLoggedCompany();
+        List<Match> matches = matchService.getReceivedInterestsForCompany(company.getId());
+        return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
+    }
+
+    // Convites que a empresa enviou (a partir do ranking), ainda aguardando resposta do profissional.
+    @GetMapping("/matches/sent")
+    public ResponseEntity<List<MatchResponseDTO>> getSentInvites() {
+        Company company = getLoggedCompany();
+        List<Match> matches = matchService.getSentInvitesForCompany(company.getId());
+        return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
+    }
+
+    @GetMapping("/matches/confirmed")
+    public ResponseEntity<List<MatchResponseDTO>> getConfirmedMatches() {
+        Company company = getLoggedCompany();
+        List<Match> matches = matchService.getConfirmedMatchesForCompany(company.getId());
+        return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
+    }
+
+    @GetMapping("/matches/rejected")
+    public ResponseEntity<List<MatchResponseDTO>> getRejectedMatches() {
+        Company company = getLoggedCompany();
+        List<Match> matches = matchService.getRejectedMatchesForCompany(company.getId());
         return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
     }
 
@@ -270,7 +301,8 @@ public class ProjectController {
                         professional.getName(),
                         professional.getPhone(),
                         professional.getReputation(),
-                        professional.getProfilePhotoUrl()
+                        professional.getProfilePhotoUrl(),
+                        professional.getSkills().stream().map(Skill::getName).toList()
                 ),
                 matchService.getScoreBreakdown(professional, m.getProject(), m),
                 m.getActive()

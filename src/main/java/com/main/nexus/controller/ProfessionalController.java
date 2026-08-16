@@ -173,6 +173,7 @@ public class ProfessionalController {
                         HttpStatusCode.valueOf(404), "Profile not found"));
 
         boolean wasIncomplete = !profileCompletionService.isProfileComplete(existing);
+        boolean wasAvailable = Boolean.TRUE.equals(existing.getAvailable());
 
         existing.setName(request.name());
         existing.setPhone(request.phone());
@@ -196,6 +197,13 @@ public class ProfessionalController {
         }
 
         professionalService.update(existing);
+
+        // Voltou a ficar disponível (false -> true): gera/recalcula os matches na hora,
+        // em vez de esperar ele visitar /pro/opportunities pra isso acontecer.
+        boolean isAvailableNow = Boolean.TRUE.equals(existing.getAvailable());
+        if (!wasAvailable && isAvailableNow) {
+            matchService.recalculateForNewlyAvailableProfessional(existing.getId());
+        }
 
         // Se o perfil estava incompleto e agora está completo, notifica
         boolean nowComplete = profileCompletionService.isProfileComplete(existing);
@@ -257,6 +265,32 @@ public class ProfessionalController {
                         .stream().map(this::toMatchResponseDTO).toList());
     }
 
+    // Interesses que o profissional enviou (professionalShowsInterest) e que ainda
+    // aguardam resposta da empresa — espelho de getPendingInvites do lado do profissional.
+    @GetMapping("/matches/sent")
+    public ResponseEntity<List<MatchResponseDTO>> getSentInterests() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new RuntimeException("Profile not found"));
+
+        return ResponseEntity.ok(
+                matchService.getSentInterestsForProfessional(professional.getId())
+                        .stream().map(this::toMatchResponseDTO).toList());
+    }
+
+    // Matches que foram confirmados e já encerraram (expiraram ou foram cancelados depois
+    // de confirmados) — espelho de ProjectController.getPreviousProjects do lado da empresa.
+    @GetMapping("/matches/previous")
+    public ResponseEntity<List<MatchResponseDTO>> getPreviousMatches() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new RuntimeException("Profile not found"));
+
+        return ResponseEntity.ok(
+                matchService.getPreviousProjectsByProfessional(professional.getId())
+                        .stream().map(this::toMatchResponseDTO).toList());
+    }
+
     @GetMapping("/profile/export")
     @ResponseBody
     public ResponseEntity<byte[]> exportPdf(
@@ -304,7 +338,8 @@ public class ProfessionalController {
                         professional.getName(),
                         professional.getPhone(),
                         professional.getReputation(),
-                        professional.getProfilePhotoUrl()
+                        professional.getProfilePhotoUrl(),
+                        professional.getSkills().stream().map(Skill::getName).toList()
                 ),
                 matchService.getScoreBreakdown(professional, m.getProject(), m),
                 m.getActive()

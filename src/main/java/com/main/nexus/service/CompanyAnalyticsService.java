@@ -4,25 +4,30 @@ import com.main.nexus.dto.CompanyDashboardAnalyticsDTO;
 import com.main.nexus.dto.MatchSummaryDTO;
 import com.main.nexus.dto.MonthlyMatchDTO;
 import com.main.nexus.dto.ProjectAcceptanceRateDTO;
+import com.main.nexus.dto.ProjectStatusDistributionDTO;
 import com.main.nexus.dto.ReputationSummaryDTO;
 import com.main.nexus.dto.ScoreDistributionDTO;
 import com.main.nexus.dto.SkillDemandDTO;
+import com.main.nexus.dto.SoftSkillFeedbackDTO;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.ReputationMetrics;
+import com.main.nexus.model.Review;
+import com.main.nexus.model.enums.NegativeReason;
+import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProjectRepository;
+import com.main.nexus.repository.ReviewRepository;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.format.TextStyle;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -34,6 +39,9 @@ public class CompanyAnalyticsService {
 
     @Autowired
     private ProjectRepository projectRepository;
+
+    @Autowired
+    private ReviewRepository reviewRepository;
 
     @Autowired
     private ReputationService reputationService;
@@ -48,40 +56,46 @@ public class CompanyAnalyticsService {
                 buildAcceptanceRatePerProject(companyId),
                 buildMostRequiredSkills(companyId),
                 buildReputationSummary(companyId),
-                buildAvgDaysToFirstMatch(companyId)
+                buildSoftSkillFeedback(companyId),
+                buildProjectStatusDistribution(companyId)
         );
     }
 
-    // Tempo médio (em dias) entre a publicação de uma oportunidade e o primeiro match
-    // MATCHED daquela oportunidade — só considera oportunidades que já tiveram pelo menos
-    // um match confirmado. Retorna null (não zero) quando a empresa ainda não tem nenhum,
-    // pra o frontend exibir "—" em vez de um enganoso "0 dias".
-    private Double buildAvgDaysToFirstMatch(Long companyId) {
-        List<Object[]> firstMatchPerProject = matchRepository.findFirstMatchDatePerProject(companyId);
-        if (firstMatchPerProject.isEmpty()) {
-            return null;
+    // Distribuição dos projetos/vagas da empresa por status atual (OPEN/PAUSED/CLOSED) —
+    // conceito exclusivo de empresa, usado no card "Status de Vagas".
+    private List<ProjectStatusDistributionDTO> buildProjectStatusDistribution(Long companyId) {
+        List<Project> projects = projectRepository.findByCompanyId(companyId);
+
+        Map<ProjectStatus, Long> counts = new EnumMap<>(ProjectStatus.class);
+        for (Project project : projects) {
+            if (project.getStatus() == null) continue;
+            counts.merge(project.getStatus(), 1L, Long::sum);
         }
 
-        Map<Long, LocalDateTime> createdAtByProject = projectRepository.findByCompanyId(companyId).stream()
-                .collect(Collectors.toMap(Project::getId, Project::getCreatedAt));
+        return counts.entrySet().stream()
+                .sorted(Map.Entry.<ProjectStatus, Long>comparingByValue().reversed())
+                .map(e -> ProjectStatusDistributionDTO.of(e.getKey(), e.getValue()))
+                .toList();
+    }
 
-        List<Long> daysUntilFirstMatch = new ArrayList<>();
-        for (Object[] row : firstMatchPerProject) {
-            Long projectId = ((Number) row[0]).longValue();
-            LocalDateTime firstMatchDate = (LocalDateTime) row[1];
-            LocalDateTime projectCreatedAt = createdAtByProject.get(projectId);
-            if (projectCreatedAt == null || firstMatchDate == null) {
-                continue;
+    // Motivos negativos mais frequentes nas avaliações que a empresa recebeu dos
+    // profissionais — indicação de aprimoramento pro card "SoftSkills".
+    private List<SoftSkillFeedbackDTO> buildSoftSkillFeedback(Long companyId) {
+        List<Review> reviews = reviewRepository.findProfessionalReviewsForCompany(companyId);
+
+        Map<NegativeReason, Long> counts = new EnumMap<>(NegativeReason.class);
+        for (Review review : reviews) {
+            if (review.getNegativeReasons() == null) continue;
+            for (NegativeReason reason : review.getNegativeReasons()) {
+                counts.merge(reason, 1L, Long::sum);
             }
-            daysUntilFirstMatch.add(ChronoUnit.DAYS.between(projectCreatedAt, firstMatchDate));
         }
 
-        if (daysUntilFirstMatch.isEmpty()) {
-            return null;
-        }
-
-        double avg = daysUntilFirstMatch.stream().mapToLong(Long::longValue).average().orElse(0.0);
-        return Math.round(avg * 10.0) / 10.0;
+        return counts.entrySet().stream()
+                .sorted(Map.Entry.<NegativeReason, Long>comparingByValue().reversed())
+                .limit(5)
+                .map(e -> SoftSkillFeedbackDTO.of(e.getKey(), e.getValue()))
+                .toList();
     }
 
     // Resumo geral de matches
@@ -101,18 +115,12 @@ public class CompanyAnalyticsService {
                 ? Math.round((double) confirmed / total * 1000.0) / 10.0
                 : 0.0;
 
-        Double avgScore = matchRepository.findAverageMatchScoreByCompany(companyId);
-        double roundedAvg = avgScore != null
-                ? Math.round(avgScore * 10.0) / 10.0
-                : 0.0;
-
         return new MatchSummaryDTO(
                 total,
                 confirmed,
                 pending,
                 rejected,
-                acceptanceRate,
-                roundedAvg
+                acceptanceRate
         );
     }
 
@@ -206,12 +214,6 @@ public class CompanyAnalyticsService {
                     ? Math.round((double) confirmed / matches.size() * 1000.0) / 10.0
                     : 0.0;
 
-            double avgScore = matches.stream()
-                    .mapToDouble(Match::getMatchScore)
-                    .average()
-                    .orElse(0.0);
-            avgScore = Math.round(avgScore * 10.0) / 10.0;
-
             result.add(new ProjectAcceptanceRateDTO(
                     project.getId(),
                     project.getTitle(),
@@ -219,8 +221,7 @@ public class CompanyAnalyticsService {
                     matches.size(),
                     confirmed,
                     rejected,
-                    acceptanceRate,
-                    avgScore
+                    acceptanceRate
             ));
         }
 

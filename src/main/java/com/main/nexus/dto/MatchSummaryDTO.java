@@ -5,6 +5,5 @@ public record MatchSummaryDTO(
         long confirmedMatches,
         long pendingMatches,
         long rejectedMatches,
-        double overallAcceptanceRate,
-        double averageMatchScore
+        double overallAcceptanceRate
 ) {}

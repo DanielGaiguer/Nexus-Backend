@@ -2,6 +2,7 @@ package com.main.nexus.scheduler;
 
 import com.main.nexus.service.MatchExpirationService;
 import com.main.nexus.service.NotificationService;
+import com.main.nexus.service.ProfessionalInactivityService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,9 @@ public class NexusScheduler {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private ProfessionalInactivityService professionalInactivityService;
 
     // segundo minuto hora dia-do-mês mês dia-da-semana
     @Scheduled(cron = "0 0 0 * * *") //meia-noite, todo dia. Roda checkAndExpireMatches (a checagem de expiração de 30 dias)   
@@ -35,5 +39,12 @@ public class NexusScheduler {
     @Scheduled(cron = "0 0 3 * * *")
     public void runOldNotificationsCleanup() {
         notificationService.deleteAllOldNotifications();
+    }
+
+    // 4h da manhã, todo dia — horário de baixo tráfego. Marca como indisponível quem
+    // não loga há 1 mês, pra parar de gerar/pontuar match pra quem sumiu da plataforma.
+    @Scheduled(cron = "0 0 4 * * *")
+    public void runProfessionalInactivityCheck() {
+        professionalInactivityService.markInactiveProfessionalsUnavailable();
     }
 }

@@ -10,6 +10,7 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.CompanyRejectionReason;
 import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.service.CompanyService;
@@ -191,7 +192,8 @@ public class MatchController {
                         professional.getName(),
                         professional.getPhone(),
                         professional.getReputation(),
-                        professional.getProfilePhotoUrl()
+                        professional.getProfilePhotoUrl(),
+                        professional.getSkills().stream().map(Skill::getName).toList()
                 ),
                 null,
                 m.getActive()

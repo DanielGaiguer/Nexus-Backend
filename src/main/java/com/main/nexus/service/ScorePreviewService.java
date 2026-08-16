@@ -54,6 +54,13 @@ public class ScorePreviewService {
     private ScorePreviewResponseDTO buildPreview(Professional professional, Project project) {
         Match match = matchRepository
                 .findByProjectIdAndProfessionalId(project.getId(), professional.getId())
+                .map(existing -> {
+                    // Reaproveita o match existente, mas atualiza o score primeiro — senão o
+                    // preview mostra um score congelado de quando o match foi criado, e não o
+                    // que os dados atuais do profissional realmente calculam.
+                    matchService.refreshMatchScore(existing);
+                    return existing;
+                })
                 .orElseGet(() -> {
                     Match transientMatch = new Match();
                     transientMatch.setProject(project);

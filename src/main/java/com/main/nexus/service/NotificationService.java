@@ -257,6 +257,21 @@ public class NotificationService {
         );
     }
     
+    // Disparado por ProfessionalInactivityService quando o profissional passa 1 mês sem
+    // logar e é marcado indisponível automaticamente.
+    @Async
+    public void notifyAccountMarkedUnavailable(User user) {
+        notify(
+            user,
+            NotificationType.ACCOUNT_MARKED_UNAVAILABLE,
+            "Sua conta foi marcada como indisponível",
+            "Faz um mês que você não acessa o Nexus, então marcamos sua conta como indisponível — " +
+            "você deixou de participar do cálculo de compatibilidade com as oportunidades. " +
+            "Para voltar a aparecer nos rankings, acesse seu perfil e marque-se como disponível novamente.",
+            "/pro/profile"
+        );
+    }
+
     @Async
     public void notifyIncompleteProfile(User user, List<String> missingFields) {
         String fieldList = String.join(", ", missingFields);

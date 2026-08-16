@@ -8,5 +8,7 @@ public record ProfessionalDashboardAnalyticsDTO(
         List<ScoreDistributionDTO> scoreDistribution,
         List<CompanyAcceptanceRateDTO> acceptanceRatePerCompany,
         List<SkillDemandDTO> mostRequiredSkills,
-        ReputationSummaryDTO reputationSummary
+        ReputationSummaryDTO reputationSummary,
+        List<SkillGapDTO> skillGaps,
+        List<SoftSkillFeedbackDTO> softSkillFeedback
 ) {}
