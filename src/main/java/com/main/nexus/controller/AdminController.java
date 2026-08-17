@@ -32,6 +32,7 @@ import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.EmailService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.PreviousProjectService;
+import com.main.nexus.service.ProfessionalCredentialService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.ProjectResponseAssembler;
@@ -86,6 +87,9 @@ public class AdminController {
 
     @Autowired
     private PreviousProjectService previousProjectService;
+
+    @Autowired
+    private ProfessionalCredentialService professionalCredentialService;
 
     @Autowired
     private ProfessionalService professionalService;
@@ -470,7 +474,8 @@ public class AdminController {
                 p.getResume(),
                 p.getGithubUrl(),
                 extractGithubLogin(p.getGithubUrl()),
-                p.getGithubUrl() != null
+                p.getGithubUrl() != null,
+                professionalCredentialService.findByProfessional(p.getId())
         );
     }
 

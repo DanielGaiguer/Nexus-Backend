@@ -3,6 +3,7 @@ package com.main.nexus.controller;
 import com.main.nexus.dto.ContactInfoDTO;
 import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.PreviousProjectDTO;
+import com.main.nexus.dto.ProfessionalCredentialDTO;
 import com.main.nexus.dto.ProfessionalProfileDTO;
 import com.main.nexus.dto.ProfessionalStatsDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
@@ -13,6 +14,7 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
+import com.main.nexus.model.ProfessionalCredential;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.ReputationMetrics;
@@ -27,6 +29,7 @@ import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.NotificationService;
 import com.main.nexus.service.PreviousProjectService;
+import com.main.nexus.service.ProfessionalCredentialService;
 import com.main.nexus.service.PdfService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
@@ -71,7 +74,10 @@ public class ProfessionalController {
     
     @Autowired
     private PreviousProjectService previousProjectService;
-    
+
+    @Autowired
+    private ProfessionalCredentialService professionalCredentialService;
+
     @Autowired
     private GeolocationService geolocationService;
     
@@ -144,6 +150,55 @@ public class ProfessionalController {
                         HttpStatusCode.valueOf(404), "Profile not found"));
         previousProjectService.delete(projectId, professional.getId());
         return ResponseEntity.ok("Previous project deleted.");
+    }
+
+    @GetMapping("/credentials")
+    public ResponseEntity<?> listCredentials() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+        return ResponseEntity.ok(professionalCredentialService.findByProfessional(professional.getId()));
+    }
+
+    @PostMapping("/credentials")
+    public ResponseEntity<String> addCredential(
+            @RequestBody ProfessionalCredentialDTO request) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+
+        ProfessionalCredential credential = new ProfessionalCredential();
+        credential.setProfessional(professional);
+        credential.setType(request.type());
+        credential.setName(request.name());
+        credential.setColor(request.color());
+        professionalCredentialService.save(credential);
+
+        return ResponseEntity.ok("Credential added.");
+    }
+
+    @PutMapping("/credentials/{credentialId}")
+    public ResponseEntity<String> updateCredential(
+            @PathVariable Long credentialId,
+            @RequestBody ProfessionalCredentialDTO request) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+        professionalCredentialService.update(credentialId, professional.getId(), request);
+        return ResponseEntity.ok("Credential updated.");
+    }
+
+    @DeleteMapping("/credentials/{credentialId}")
+    public ResponseEntity<String> deleteCredential(@PathVariable Long credentialId) {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Profile not found"));
+        professionalCredentialService.delete(credentialId, professional.getId());
+        return ResponseEntity.ok("Credential deleted.");
     }
 
     @GetMapping("/profile")
@@ -400,7 +455,8 @@ public class ProfessionalController {
                 p.getResume(),
                 p.getGithubUrl(),
                 extractGithubLogin(p.getGithubUrl()),
-                p.getGithubUrl() != null
+                p.getGithubUrl() != null,
+                professionalCredentialService.findByProfessional(p.getId())
         );
     }
 

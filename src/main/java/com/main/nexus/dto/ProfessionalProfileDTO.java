@@ -39,5 +39,8 @@ public record ProfessionalProfileDTO(
         // githubLogin é derivado de githubUrl no momento da montagem do DTO.
         String githubUrl,
         String githubLogin,
-        boolean hasGitHub
+        boolean hasGitHub,
+
+        // Certificados e eventos cadastrados pelo profissional (badges coloridos no perfil)
+        List<ProfessionalCredentialDTO> credentials
 ) {}

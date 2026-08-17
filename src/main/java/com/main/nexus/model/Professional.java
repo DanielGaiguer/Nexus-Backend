@@ -81,6 +81,9 @@ public class Professional {
 
     @OneToMany(mappedBy = "professional", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PreviousProject> projects = new ArrayList<>();
+
+    @OneToMany(mappedBy = "professional", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProfessionalCredential> credentials = new ArrayList<>();
     
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
@@ -231,6 +234,14 @@ public class Professional {
 
     public void setProjects(List<PreviousProject> projects) {
         this.projects = projects;
+    }
+
+    public List<ProfessionalCredential> getCredentials() {
+        return credentials;
+    }
+
+    public void setCredentials(List<ProfessionalCredential> credentials) {
+        this.credentials = credentials;
     }
 
     public List<ProjectType> getPreferredTypes() {

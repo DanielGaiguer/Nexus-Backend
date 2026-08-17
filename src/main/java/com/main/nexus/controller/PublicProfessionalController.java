@@ -25,6 +25,7 @@ import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.ProfessionalCredentialService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import java.util.List;
 import java.util.Optional;
@@ -69,6 +70,9 @@ public class PublicProfessionalController {
 
     @Autowired
     private ProjectResponseAssembler projectResponseAssembler;
+
+    @Autowired
+    private ProfessionalCredentialService professionalCredentialService;
 
     // Endpoints em /api/public são permitAll, mas o JwtFilter ainda popula o SecurityContext
     // quando um Authorization Bearer válido é enviado. Assim conseguimos identificar se quem
@@ -140,7 +144,8 @@ public class PublicProfessionalController {
                 preferredTypeNames,
                 p.getGithubUrl(),
                 extractGithubLogin(p.getGithubUrl()),
-                p.getGithubUrl() != null
+                p.getGithubUrl() != null,
+                professionalCredentialService.findByProfessional(p.getId())
         );
 
         return ResponseEntity.ok(dto);

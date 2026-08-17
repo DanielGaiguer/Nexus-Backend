@@ -21,5 +21,7 @@ public record PublicProfessionalDTO(
 
         String githubUrl,
         String githubLogin,
-        boolean hasGitHub
+        boolean hasGitHub,
+
+        List<ProfessionalCredentialDTO> credentials
 ) {}
