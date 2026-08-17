@@ -34,6 +34,21 @@ public class SkillService {
         return skillRepository.findAllById(ids);
     }
 
+    public java.util.Optional<Skill> findByNameIgnoreCase(String name) {
+        return skillRepository.findByNameIgnoreCase(name);
+    }
+
+    // Categorias distintas em uso pelo catálogo ativo — usado pra validar a categoria
+    // informada em /api/skills/suggest (só aceita categoria já existente, não cria nova).
+    public List<String> getDistinctCategories() {
+        return findAll().stream()
+                .map(Skill::getCategory)
+                .filter(c -> c != null && !c.isBlank())
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
     public Skill create(String name, String category) {
         if (name == null || name.isBlank()) {
             throw new ResponseStatusException(

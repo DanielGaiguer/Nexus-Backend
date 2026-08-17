@@ -1,7 +1,9 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.CompanyRejectRequestDTO;
 import com.main.nexus.dto.MatchHistoryDTO;
 import com.main.nexus.dto.MatchResponseDTO;
+import com.main.nexus.dto.ProfessionalRejectRequestDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
@@ -10,9 +12,9 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
-import com.main.nexus.model.enums.CompanyRejectionReason;
-import com.main.nexus.model.enums.ProfessionalRejectionReason;
+import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
@@ -110,9 +112,10 @@ public class MatchController {
     @PostMapping("/{matchId}/company-reject")
     public ResponseEntity<String> companyRejects(
             @PathVariable Long matchId,
-            @RequestBody List<CompanyRejectionReason> reasons) {
+            @RequestBody CompanyRejectRequestDTO request) {
         Long companyId = getLoggedCompanyId();
-        matchService.companyRejectsWithFeedback(matchId, companyId, reasons);
+        matchService.companyRejectsWithFeedback(
+                matchId, companyId, request.reasons(), request.description());
         return ResponseEntity.ok("Invite rejected.");
     }
 
@@ -160,9 +163,10 @@ public class MatchController {
     @PostMapping("/{matchId}/professional-reject")
     public ResponseEntity<String> professionalRejects(
             @PathVariable Long matchId,
-            @RequestBody List<ProfessionalRejectionReason> reasons) {
+            @RequestBody ProfessionalRejectRequestDTO request) {
         Long professionalId = getLoggedProfessionalId();
-        matchService.professionalRejectsWithFeedback(matchId, professionalId, reasons);
+        matchService.professionalRejectsWithFeedback(
+                matchId, professionalId, request.reasons(), request.description());
         return ResponseEntity.ok("Invite rejected.");
     }
 
@@ -179,6 +183,8 @@ public class MatchController {
 
     private MatchResponseDTO toMatchResponseDTO(Match m) {
         Professional professional = m.getProfessional();
+        RejectionFeedback feedback = m.getStatus() == StatusMatch.REJECTED
+                ? matchService.getRejectionFeedback(m.getId()) : null;
         return new MatchResponseDTO(
                 m.getId(),
                 m.getMatchScore(),
@@ -196,7 +202,9 @@ public class MatchController {
                         professional.getSkills().stream().map(Skill::getName).toList()
                 ),
                 null,
-                m.getActive()
+                m.getActive(),
+                matchService.getRejectionReasonNames(feedback),
+                feedback != null ? feedback.getDescription() : null
         );
     }
 

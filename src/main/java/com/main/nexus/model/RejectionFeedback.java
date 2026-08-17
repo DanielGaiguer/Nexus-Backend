@@ -59,6 +59,11 @@ public class RejectionFeedback {
     @Column(name = "reason", nullable = false, length = 40)
     private List<CompanyRejectionReason> companyReasons;
 
+    // Texto livre opcional, escrito por quem rejeitou, complementando os motivos
+    // selecionados acima — exibido no card de match recusado como "Observação sobre a rejeição".
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -100,6 +105,14 @@ public class RejectionFeedback {
 
     public void setCompanyReasons(List<CompanyRejectionReason> companyReasons) {
         this.companyReasons = companyReasons;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public LocalDateTime getCreatedAt() {

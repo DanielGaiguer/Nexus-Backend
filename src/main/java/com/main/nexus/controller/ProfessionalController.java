@@ -14,9 +14,11 @@ import com.main.nexus.model.Match;
 import com.main.nexus.model.PreviousProject;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
+import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.NotificationType;
+import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.PreviousProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
 import com.main.nexus.service.CompanyService;
@@ -325,6 +327,8 @@ public class ProfessionalController {
 
     private MatchResponseDTO toMatchResponseDTO(Match m) {
         Professional professional = m.getProfessional();
+        RejectionFeedback feedback = m.getStatus() == StatusMatch.REJECTED
+                ? matchService.getRejectionFeedback(m.getId()) : null;
         return new MatchResponseDTO(
                 m.getId(),
                 m.getMatchScore(),
@@ -342,7 +346,9 @@ public class ProfessionalController {
                         professional.getSkills().stream().map(Skill::getName).toList()
                 ),
                 matchService.getScoreBreakdown(professional, m.getProject(), m),
-                m.getActive()
+                m.getActive(),
+                matchService.getRejectionReasonNames(feedback),
+                feedback != null ? feedback.getDescription() : null
         );
     }
 

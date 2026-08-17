@@ -55,7 +55,10 @@ public class Company {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CompanyStatus status = CompanyStatus.PENDING;
-    
+
+    @Column(columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @Column(length = 500)
     private String profilePhotoUrl;
 
@@ -164,6 +167,14 @@ public class Company {
 
     public void setStatus(CompanyStatus status) {
         this.status = status;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 
     public String getProfilePhotoUrl() {

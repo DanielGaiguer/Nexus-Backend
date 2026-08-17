@@ -3,6 +3,7 @@ package com.main.nexus.dto;
 import com.main.nexus.model.enums.InterestStatus;
 import com.main.nexus.model.enums.StatusMatch;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record MatchResponseDTO(
         Long id,
@@ -14,5 +15,10 @@ public record MatchResponseDTO(
         ProjectResponseDTO project,
         ProfessionalSummaryDTO professional,
         ScoreBreakdownDTO scoreBreakdown,
-        Boolean active
+        Boolean active,
+        // Preenchidos apenas quando status == REJECTED — motivos selecionados (nomes brutos
+        // do enum CompanyRejectionReason/ProfessionalRejectionReason, traduzidos no front) e a
+        // observação em texto livre escrita por quem rejeitou.
+        List<String> rejectionReasons,
+        String rejectionDescription
 ) {}

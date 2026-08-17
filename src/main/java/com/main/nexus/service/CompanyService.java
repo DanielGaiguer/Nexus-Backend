@@ -77,7 +77,7 @@ public class CompanyService {
         return saved;
     }
 
-    public Company reject(Long companyId) {
+    public Company reject(Long companyId, String reason) {
         Company company = findById(companyId);
 
         if (company.getStatus() != CompanyStatus.PENDING) {
@@ -85,7 +85,13 @@ public class CompanyService {
                     HttpStatusCode.valueOf(409), "Company is not pending approval");
         }
 
+        if (reason == null || reason.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatusCode.valueOf(400), "A rejection reason must be provided.");
+        }
+
         company.setStatus(CompanyStatus.REJECTED);
+        company.setRejectionReason(reason);
         Company saved = companyRepository.save(company);
 
         // Notifica a empresa
@@ -95,8 +101,9 @@ public class CompanyService {
         emailService.send(
             company.getUser().getEmail(),
             "Cadastro não aprovado — Nexus",
-            "Olá " + company.getCompanyName() + ",\n\nSeu cadastro não foi aprovado pelo administrador. " +
-            "Entre em contato com o suporte para mais informações.\n\nEquipe Nexus"
+            "Olá " + company.getCompanyName() + ",\n\nSeu cadastro não foi aprovado pelo administrador.\n\n" +
+            "Motivo: " + reason + "\n\n" +
+            "Se tiver dúvidas, entre em contato com o suporte.\n\nEquipe Nexus"
         );
 
         return saved;

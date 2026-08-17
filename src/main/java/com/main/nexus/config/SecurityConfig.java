@@ -44,6 +44,10 @@ public class SecurityConfig {
 
                 .requestMatchers(HttpMethod.GET, "/api/reputation/**").permitAll()
 
+                .requestMatchers(HttpMethod.GET, "/api/skills").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/skills/categories").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/skills/suggest").hasAnyRole("PROFESSIONAL", "COMPANY")
+
                 .requestMatchers("/api/professional/profile/export").authenticated()
                     
                 .requestMatchers("/api/notifications/**").authenticated()
@@ -81,6 +85,16 @@ public class SecurityConfig {
                 .requestMatchers("/api/analytics/professional/*/dashboard").hasRole("ADMIN")
 
                 .requestMatchers("/api/matches/**").hasAnyRole("COMPANY", "PROFESSIONAL")
+
+                // Exibição de avaliações (top 3 do card de preview + página dedicada) é
+                // informação pública de perfil, igual ao resto do /api/public/** — precisa
+                // vir antes da regra genérica de /api/reviews/** abaixo, que exige login.
+                .requestMatchers(HttpMethod.GET, "/api/reviews/professional/*/count").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/reviews/company/*/count").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/reviews/professional/*/top3").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/reviews/professional/*/all").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/reviews/company/*/top3").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/reviews/company/*/all").permitAll()
 
                 .requestMatchers("/api/reviews/**").hasAnyRole("COMPANY", "PROFESSIONAL")
                 

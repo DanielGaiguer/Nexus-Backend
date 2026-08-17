@@ -678,7 +678,8 @@ public class MatchService {
     }
 
     @Transactional
-    public Match companyRejectsWithFeedback(Long matchId, Long companyId, List<CompanyRejectionReason> reasons) {
+    public Match companyRejectsWithFeedback(
+            Long matchId, Long companyId, List<CompanyRejectionReason> reasons, String description) {
         Match match = findById(matchId);
         //Valida se empresa e realmente dona
         validateCompanyOwnership(match, companyId);
@@ -696,7 +697,7 @@ public class MatchService {
         Match saved = matchRepository.save(match);
 
         // Salva a rejeicao, com os devidos motivos dela, e notifica o profissional da rejeicao
-        saveCompanyRejection(match, reasons);
+        saveCompanyRejection(match, reasons, description);
         notificationService.notifyInviteRejected( 
             match.getProfessional().getUser(), 
             match.getProject().getCompany().getCompanyName(),
@@ -745,7 +746,8 @@ public class MatchService {
 
     @Transactional
     //Exatamente o mesmo fluxo de rejeicao por parte de company
-    public Match professionalRejectsWithFeedback(Long matchId, Long professionalId, List<ProfessionalRejectionReason> reasons) {
+    public Match professionalRejectsWithFeedback(
+            Long matchId, Long professionalId, List<ProfessionalRejectionReason> reasons, String description) {
         Match match = findById(matchId);
         validateProfessionalOwnership(match, professionalId);
 
@@ -760,7 +762,7 @@ public class MatchService {
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
         Match saved = matchRepository.save(match);
 
-        saveProfessionalRejection(match, reasons);
+        saveProfessionalRejection(match, reasons, description);
         notificationService.notifyInviteRejected(
             match.getProject().getCompany().getUser(),
             match.getProfessional().getName(),
@@ -925,24 +927,45 @@ public class MatchService {
 
     // prersistência de feedback de rejeicao, separado por quem rejeita 
     
-    private void saveProfessionalRejection(Match match, List<ProfessionalRejectionReason> reasons) {
+    private void saveProfessionalRejection(Match match, List<ProfessionalRejectionReason> reasons, String description) {
         RejectionFeedback feedback = new RejectionFeedback();
         feedback.setMatch(match);
         feedback.setRejectedBy(AuthorType.PROFESSIONAL);
         feedback.setProfessionalReasons(reasons);
+        feedback.setDescription(description);
         //Recalcula a reputacao depois de rejeitado
         rejectionFeedbackRepository.save(feedback);
         reputationService.recalculateForCompany(match.getProject().getCompany().getId());
     }
 
-    private void saveCompanyRejection(Match match, List<CompanyRejectionReason> reasons) {
+    private void saveCompanyRejection(Match match, List<CompanyRejectionReason> reasons, String description) {
         RejectionFeedback feedback = new RejectionFeedback();
         feedback.setMatch(match);
         feedback.setRejectedBy(AuthorType.COMPANY);
         feedback.setCompanyReasons(reasons);
+        feedback.setDescription(description);
         //Recalcula a reputacao depois de rejeitado
         rejectionFeedbackRepository.save(feedback);
         reputationService.recalculateForProfessional(match.getProfessional().getId());
+    }
+
+    // Usado pelas telas de "Recusados" pra mostrar motivos + observação no card do match.
+    public RejectionFeedback getRejectionFeedback(Long matchId) {
+        return rejectionFeedbackRepository.findByMatchId(matchId).orElse(null);
+    }
+
+    // Nomes brutos (do enum) dos motivos selecionados na rejeição — só um dos dois lados
+    // (companyReasons/professionalReasons) vem preenchido por vez, dependendo de quem
+    // rejeitou. O front traduz esses nomes pra rótulo em português.
+    public List<String> getRejectionReasonNames(RejectionFeedback feedback) {
+        if (feedback == null) return null;
+        if (feedback.getCompanyReasons() != null && !feedback.getCompanyReasons().isEmpty()) {
+            return feedback.getCompanyReasons().stream().map(Enum::name).toList();
+        }
+        if (feedback.getProfessionalReasons() != null && !feedback.getProfessionalReasons().isEmpty()) {
+            return feedback.getProfessionalReasons().stream().map(Enum::name).toList();
+        }
+        return List.of();
     }
 
     // PROFISSIONAL — OPORTUNIDADES E INICIATIVA

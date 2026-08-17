@@ -1,6 +1,8 @@
 package com.main.nexus.service;
 
 import com.main.nexus.dto.PendingReviewDTO;
+import com.main.nexus.dto.ReviewDisplayDTO;
+import com.main.nexus.dto.ReviewPageDTO;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.MatchStatusCheck;
 import com.main.nexus.model.Review;
@@ -10,10 +12,13 @@ import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.MatchStatusCheckRepository;
 import com.main.nexus.repository.ReviewRepository;
+import com.main.nexus.util.ReviewReasonMapper;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -109,5 +114,90 @@ public class ReviewService {
 
     public Set<Long> getReviewedMatchIdsForCompany(Long companyId) {
         return new HashSet<>(reviewRepository.findReviewedMatchIdsByCompany(companyId));
+    }
+
+    // Contagem rápida (sem trazer o corpo das avaliações) — usado pelo badge do item
+    // "Avaliações" da sidebar, que roda em toda página pra quem está logado, então precisa
+    // ser leve (ao contrário de getAllForX, que traz a lista inteira).
+    public long getReviewCountForProfessional(Long professionalId) {
+        return reviewRepository.countByMatchProfessionalIdAndAuthorType(professionalId, AuthorType.COMPANY);
+    }
+
+    public long getReviewCountForCompany(Long companyId) {
+        return reviewRepository.countByCompanyId(companyId);
+    }
+
+    // As 3 melhores avaliações — usado no card de preview do perfil (público, próprio ou
+    // visto pelo admin), sempre a mesma chamada independente de quem está olhando.
+
+    public List<ReviewDisplayDTO> getTop3ForProfessional(Long professionalId) {
+        return reviewRepository.findTop3ByProfessionalId(professionalId, PageRequest.of(0, 3))
+                .stream().map(this::toDisplayDTO).toList();
+    }
+
+    public List<ReviewDisplayDTO> getTop3ForCompany(Long companyId) {
+        return reviewRepository.findTop3ByCompanyId(companyId, PageRequest.of(0, 3))
+                .stream().map(this::toDisplayDTO).toList();
+    }
+
+    // Página dedicada de avaliações, com filtro opcional por nota.
+
+    public ReviewPageDTO getAllForProfessional(Long professionalId, Integer ratingFilter) {
+        List<Review> reviews = ratingFilter == null
+                ? reviewRepository.findCompanyReviewsForProfessional(professionalId)
+                : reviewRepository.findByProfessionalIdAndRating(professionalId, ratingFilter);
+
+        Double avg = reviewRepository.findAverageRatingByProfessionalId(professionalId);
+        long total = reviewRepository.countByMatchProfessionalIdAndAuthorType(professionalId, AuthorType.COMPANY);
+
+        return new ReviewPageDTO(
+                reviews.stream().map(this::toDisplayDTO).toList(),
+                total,
+                avg != null ? avg : 0.0);
+    }
+
+    public ReviewPageDTO getAllForCompany(Long companyId, Integer ratingFilter) {
+        List<Review> reviews = ratingFilter == null
+                ? reviewRepository.findProfessionalReviewsForCompany(companyId)
+                : reviewRepository.findByCompanyIdAndRating(companyId, ratingFilter);
+
+        Double avg = reviewRepository.findAverageRatingByCompanyId(companyId);
+        long total = reviewRepository.countByCompanyId(companyId);
+
+        return new ReviewPageDTO(
+                reviews.stream().map(this::toDisplayDTO).toList(),
+                total,
+                avg != null ? avg : 0.0);
+    }
+
+    // Monta o DTO de exibição — resolve quem é o autor (empresa ou profissional) a partir
+    // do match, e traduz os motivos pra português via ReviewReasonMapper.
+    private ReviewDisplayDTO toDisplayDTO(Review review) {
+        Match match = review.getMatch();
+        boolean authoredByCompany = review.getAuthorType() == AuthorType.COMPANY;
+
+        String reviewerName = authoredByCompany
+                ? match.getProject().getCompany().getCompanyName()
+                : match.getProfessional().getName();
+        String reviewerPhotoUrl = authoredByCompany
+                ? match.getProject().getCompany().getProfilePhotoUrl()
+                : match.getProfessional().getProfilePhotoUrl();
+
+        List<String> positive = review.getPositiveReasons() == null ? List.of()
+                : review.getPositiveReasons().stream().map(ReviewReasonMapper::toPortuguese).toList();
+        List<String> negative = review.getNegativeReasons() == null ? List.of()
+                : review.getNegativeReasons().stream().map(ReviewReasonMapper::toPortuguese).toList();
+
+        return new ReviewDisplayDTO(
+                review.getId(),
+                review.getRating() != null ? review.getRating() : 0,
+                review.getComment(),
+                positive,
+                negative,
+                reviewerName,
+                reviewerPhotoUrl,
+                review.getAuthorType().name(),
+                match.getProject().getTitle(),
+                review.getCreatedAt());
     }
 }
