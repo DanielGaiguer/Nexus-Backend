@@ -32,6 +32,13 @@ public class GeolocationService {
     private static final double FALLBACK_LATITUDE = -23.588651;
     private static final double FALLBACK_LONGITUDE = -46.652219;
 
+    // Second demo-day fallback CEP (Avenida Luigi Amorese, bairro Leonor,
+    // Londrina/PR — address as returned by ViaCEP, coordinates as actually
+    // returned by LocationIQ for this address).
+    private static final String FALLBACK_CEP_2 = "86071020";
+    private static final double FALLBACK_LATITUDE_2 = -23.2967661;
+    private static final double FALLBACK_LONGITUDE_2 = -51.1950507;
+
     private final RestTemplate restTemplate = buildRestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -111,18 +118,20 @@ public class GeolocationService {
             }
         }
         if (geoResult == null) {
-            if (cleanCep.equals(FALLBACK_CEP)) {
+            AddressData fallback = fallbackFor(cleanCep, city, state);
+            if (fallback != null) {
                 logger.warn("LocationIQ exhausted retries for CEP {}; using fallback coordinates.", cleanCep);
-                return new AddressData(FALLBACK_LATITUDE, FALLBACK_LONGITUDE, city, state);
+                return fallback;
             }
             throw new ResponseStatusException(HttpStatusCode.valueOf(502),
                     "Failed to resolve coordinates.", lastFailure);
         }
 
         if (!geoResult.isArray() || geoResult.isEmpty()) {
-            if (cleanCep.equals(FALLBACK_CEP)) {
+            AddressData fallback = fallbackFor(cleanCep, city, state);
+            if (fallback != null) {
                 logger.warn("LocationIQ returned no results for CEP {}; using fallback coordinates.", cleanCep);
-                return new AddressData(FALLBACK_LATITUDE, FALLBACK_LONGITUDE, city, state);
+                return fallback;
             }
             throw new ResponseStatusException(HttpStatusCode.valueOf(404), "Could not geocode this address.");
         }
@@ -131,5 +140,15 @@ public class GeolocationService {
         double lon = geoResult.get(0).path("lon").asDouble();
 
         return new AddressData(lat, lon, city, state);
+    }
+
+    private static AddressData fallbackFor(String cleanCep, String city, String state) {
+        if (cleanCep.equals(FALLBACK_CEP)) {
+            return new AddressData(FALLBACK_LATITUDE, FALLBACK_LONGITUDE, city, state);
+        }
+        if (cleanCep.equals(FALLBACK_CEP_2)) {
+            return new AddressData(FALLBACK_LATITUDE_2, FALLBACK_LONGITUDE_2, city, state);
+        }
+        return null;
     }
 }
