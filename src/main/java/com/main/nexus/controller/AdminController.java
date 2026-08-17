@@ -238,7 +238,8 @@ public class AdminController {
                         resolveUserName(u),
                         u.getEmail(),
                         u.getType().name(),
-                        u.getActive()))
+                        u.getActive(),
+                        resolveUserPhotoUrl(u)))
                 .toList();
         return ResponseEntity.ok(users);
     }
@@ -253,6 +254,20 @@ public class AdminController {
                     .map(com.main.nexus.model.Company::getCompanyName)
                     .orElse(u.getEmail());
             case ADMIN -> "Admin";
+        };
+    }
+
+    // Foto/logo de perfil por tipo de usuário — admin não tem esse conceito, então null
+    // (o frontend cai pro avatar de iniciais nesse caso).
+    private String resolveUserPhotoUrl(com.main.nexus.model.User u) {
+        return switch (u.getType()) {
+            case PROFESSIONAL -> professionalRepository.findByUserId(u.getId())
+                    .map(com.main.nexus.model.Professional::getProfilePhotoUrl)
+                    .orElse(null);
+            case COMPANY -> companyRepository.findByUserId(u.getId())
+                    .map(com.main.nexus.model.Company::getProfilePhotoUrl)
+                    .orElse(null);
+            case ADMIN -> null;
         };
     }
 

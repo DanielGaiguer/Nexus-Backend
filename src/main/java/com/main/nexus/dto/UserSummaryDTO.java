@@ -1,4 +1,3 @@
-
 package com.main.nexus.dto;
 
 public record UserSummaryDTO(
@@ -6,5 +5,6 @@ public record UserSummaryDTO(
         String name,
         String email,
         String type,
-        Boolean active
+        Boolean active,
+        String profilePhotoUrl
 ) {}

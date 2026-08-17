@@ -67,9 +67,17 @@ public class MatchService {
     private ProfileCompletionService profileCompletionService;
 
     // SCORE ENGINE — fórmula principal
-    // ScoreMatch = (Skills*0.35) + (Budget*0.25) + (History*0.20) + (Reputation*0.10) + (Availability*0.10)
+    // ScoreMatch = (Skills*0.39) + (Budget*0.28) + (History*0.22) + (Reputation*0.11)
     // ou, para ONSITE/HYBRID:
-    // ScoreMatch = (Skills*0.30) + (Budget*0.20) + (History*0.17) + (Reputation*0.09) + (Availability*0.09) + (Distance*0.15)
+    // ScoreMatch = (Skills*0.33) + (Budget*0.22) + (History*0.19) + (Reputation*0.10) + (Distance*0.16)
+    //
+    // Obs.: o componente "Disponibilidade" foi removido daqui — como getScore()
+    // já retorna 0.0 de cara para profissional indisponível (linha abaixo),
+    // calculateAvailabilityScore() sempre valia 100 nesse ponto, ou seja, era
+    // uma constante disfarçada de peso variável. O peso que ela ocupava foi
+    // redistribuído proporcionalmente entre os demais componentes de cada
+    // cenário, mantendo o score de qualquer profissional disponível idêntico
+    // ao que já era exibido antes da mudança (ver RN65).
     public double getScore(Professional professional, Project project) {
 
         // Indisponível anula o score
@@ -77,11 +85,10 @@ public class MatchService {
             return 0.0;
         }
 
-        double skillScore        = calculateSkillScore(professional, project);
-        double budgetScore       = calculateBudgetScore(professional, project);
-        double historyScore      = calculateHistoryScore(professional);
-        double reputationScore   = calculateReputationScore(professional);
-        double availabilityScore = calculateAvailabilityScore(professional);
+        double skillScore      = calculateSkillScore(professional, project);
+        double budgetScore     = calculateBudgetScore(professional, project);
+        double historyScore    = calculateHistoryScore(professional);
+        double reputationScore = calculateReputationScore(professional);
 
         boolean considersDistance   = project.getWorkMode() == Modality.ONSITE
                                     || project.getWorkMode() == Modality.HYBRID;
@@ -90,47 +97,43 @@ public class MatchService {
         double baseScore;
 
         if (considersDistance && considersExperience) {
-            // ONSITE/HYBRID com experiência (7 componentes)
+            // ONSITE/HYBRID com experiência (6 componentes)
             double distanceScore   = calculateDistanceScore(professional, project);
             double experienceScore = calculateExperienceScore(professional, project);
 
-            baseScore = (skillScore        * 0.26)
-                      + (budgetScore       * 0.18)
-                      + (historyScore      * 0.15)
-                      + (reputationScore   * 0.08)
-                      + (availabilityScore * 0.08)
-                      + (distanceScore     * 0.13)
-                      + (experienceScore   * 0.12);
+            baseScore = (skillScore      * 0.28)
+                      + (budgetScore     * 0.20)
+                      + (historyScore    * 0.16)
+                      + (reputationScore * 0.09)
+                      + (distanceScore   * 0.14)
+                      + (experienceScore * 0.13);
 
         } else if (considersDistance) {
-            // ONSITE/HYBRID sem experiência (6 componentes)
+            // ONSITE/HYBRID sem experiência (5 componentes)
             double distanceScore = calculateDistanceScore(professional, project);
 
-            baseScore = (skillScore        * 0.30)
-                      + (budgetScore       * 0.20)
-                      + (historyScore      * 0.17)
-                      + (reputationScore   * 0.09)
-                      + (availabilityScore * 0.09)
-                      + (distanceScore     * 0.15);
+            baseScore = (skillScore      * 0.33)
+                      + (budgetScore     * 0.22)
+                      + (historyScore    * 0.19)
+                      + (reputationScore * 0.10)
+                      + (distanceScore   * 0.16);
 
         } else if (considersExperience) {
-            // REMOTO com experiência (6 componentes)
+            // REMOTO com experiência (5 componentes)
             double experienceScore = calculateExperienceScore(professional, project);
 
-            baseScore = (skillScore        * 0.30)
-                      + (budgetScore       * 0.22)
-                      + (historyScore      * 0.18)
-                      + (reputationScore   * 0.09)
-                      + (availabilityScore * 0.09)
-                      + (experienceScore   * 0.12);
+            baseScore = (skillScore      * 0.33)
+                      + (budgetScore     * 0.24)
+                      + (historyScore    * 0.20)
+                      + (reputationScore * 0.10)
+                      + (experienceScore * 0.13);
 
         } else {
-            // REMOTO sem experiência (5 componentes, fórmula original)
-            baseScore = (skillScore        * 0.35)
-                      + (budgetScore       * 0.25)
-                      + (historyScore      * 0.20)
-                      + (reputationScore   * 0.10)
-                      + (availabilityScore * 0.10);
+            // REMOTO sem experiência (4 componentes)
+            baseScore = (skillScore      * 0.39)
+                      + (budgetScore     * 0.28)
+                      + (historyScore    * 0.22)
+                      + (reputationScore * 0.11);
         }
 
         //Calculo de reputacao, do projeto e do profissional. O score ele nao e recalculado, e sim multiplicado para baixo ou para cima, dependendo se a reputacao for positiva ou negativa
@@ -152,10 +155,13 @@ public class MatchService {
 
     public ScoreBreakdownDTO getScoreBreakdown(Professional professional, Project project, Match match) {
 
-        double skillScore        = calculateSkillScore(professional, project);
-        double budgetScore       = calculateBudgetScore(professional, project);
-        double historyScore      = calculateHistoryScore(professional);
-        double reputationScore   = calculateReputationScore(professional);
+        double skillScore      = calculateSkillScore(professional, project);
+        double budgetScore     = calculateBudgetScore(professional, project);
+        double historyScore    = calculateHistoryScore(professional);
+        double reputationScore = calculateReputationScore(professional);
+        // availabilityScore não entra mais no cálculo do baseScore (ver nota em
+        // getScore()); mantido aqui apenas para exibição informativa no
+        // comparativo de candidatos, conforme RN88.
         double availabilityScore = calculateAvailabilityScore(professional);
 
         boolean considersDistance   = project.getWorkMode() == Modality.ONSITE
@@ -169,7 +175,7 @@ public class MatchService {
 
         double baseScore = computeBaseScoreForBreakdown( //O sistema recalcula os componentes individuais agora. Sao os dados atuais
                 skillScore, budgetScore, historyScore, reputationScore,
-                availabilityScore, distanceScore, experienceScore,
+                distanceScore, experienceScore,
                 considersDistance, considersExperience);
 
         double reputationAdjustment = match.getMatchScore() - baseScore; //A diferença entre o score final antigo e o score base recalculado agora.
@@ -192,25 +198,25 @@ public class MatchService {
     // desse multiplicador contribuiu (reputationAdjustment) separadamente.
     private double computeBaseScoreForBreakdown(
             double skill, double budget, double history,
-            double reputation, double availability,
+            double reputation,
             Double distance, Double experience,
             boolean considersDistance, boolean considersExperience) {
 
         if (considersDistance && considersExperience) {
-            return (skill * 0.26) + (budget * 0.18) + (history * 0.15)
-                 + (reputation * 0.08) + (availability * 0.08)
-                 + (distance   * 0.13) + (experience  * 0.12);
+            return (skill * 0.28) + (budget * 0.20) + (history * 0.16)
+                 + (reputation * 0.09)
+                 + (distance   * 0.14) + (experience  * 0.13);
         } else if (considersDistance) {
-            return (skill * 0.30) + (budget * 0.20) + (history * 0.17)
-                 + (reputation * 0.09) + (availability * 0.09)
-                 + (distance * 0.15);
+            return (skill * 0.33) + (budget * 0.22) + (history * 0.19)
+                 + (reputation * 0.10)
+                 + (distance * 0.16);
         } else if (considersExperience) {
-            return (skill * 0.30) + (budget * 0.22) + (history * 0.18)
-                 + (reputation * 0.09) + (availability * 0.09)
-                 + (experience * 0.12);
+            return (skill * 0.33) + (budget * 0.24) + (history * 0.20)
+                 + (reputation * 0.10)
+                 + (experience * 0.13);
         } else {
-            return (skill * 0.35) + (budget * 0.25) + (history * 0.20)
-                 + (reputation * 0.10) + (availability * 0.10);
+            return (skill * 0.39) + (budget * 0.28) + (history * 0.22)
+                 + (reputation * 0.11);
         }
     }
 
