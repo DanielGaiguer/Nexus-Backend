@@ -48,7 +48,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Object[]> findMonthlyMatchCounts(@Param("since") java.time.LocalDateTime since);
 
     // Projetos anteriores de uma empresa: matches que foram confirmados (MATCHED em algum
-    // momento) e já encerraram — seja porque expiraram naturalmente após 30 dias
+    // momento) e já encerraram, seja porque expiraram naturalmente após 30 dias
     // (MatchExpirationService só marca active=false, mantendo status=MATCHED) ou porque
     // foram cancelados depois de confirmados (cancelMatchInternal também marca
     // active=false, mas muda status para REJECTED).
@@ -120,9 +120,12 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     // Matches confirmados há tempo suficiente cujo status check ainda não foi respondido
     // pela empresa — usado tanto pelo lembrete automático quanto pra exibir a pergunta
     // direto no dashboard, sem a empresa precisar abrir a notificação.
+    // Não filtra por active: um match que expirou (30 dias) sem nunca ter sido respondido
+    // continua precisando da resposta — é pré-requisito pra avaliação (ReviewService.save),
+    // e não existe outro lugar na UI pra responder isso fora desse prompt do dashboard.
+    // Excluir os inativos aqui deixava esses matches travados pra sempre sem poder avaliar.
     @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId " +
            "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
-           "AND (m.active = true OR m.active IS NULL) " +
            "AND m.createdAt < :threshold " +
            "AND NOT EXISTS (SELECT 1 FROM MatchStatusCheck c WHERE c.match = m) " +
            "ORDER BY m.createdAt ASC")
@@ -132,19 +135,27 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     // Matches que expiraram (30 dias, active=false) e ainda não têm avaliação desse lado —
     // usado pra abrir a avaliação automaticamente no dashboard, igual ao status check.
+    // Exclui match marcado como "sem contato" no status check — ReviewService.save() barra
+    // a avaliação nesse caso, então não faz sentido a pergunta abrir sozinha pra depois falhar.
     @Query("SELECT m FROM Match m WHERE m.professional.id = :professionalId " +
            "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
            "AND m.active = false " +
            "AND NOT EXISTS (SELECT 1 FROM Review r WHERE r.match = m " +
            "                AND r.authorType = com.main.nexus.model.enums.AuthorType.PROFESSIONAL) " +
+           "AND NOT EXISTS (SELECT 1 FROM MatchStatusCheck c WHERE c.match = m " +
+           "                AND c.outcome = com.main.nexus.model.enums.MatchOutcome.NO_CONTACT_YET) " +
            "ORDER BY m.createdAt ASC")
     List<Match> findPendingReviewsForProfessional(@Param("professionalId") Long professionalId);
 
+    // Avaliação da empresa também exige o status check já respondido (ver ReviewService.save) —
+    // sem isso a pergunta abriria sozinha no dashboard só pra falhar em seguida.
     @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId " +
            "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
            "AND m.active = false " +
            "AND NOT EXISTS (SELECT 1 FROM Review r WHERE r.match = m " +
            "                AND r.authorType = com.main.nexus.model.enums.AuthorType.COMPANY) " +
+           "AND EXISTS (SELECT 1 FROM MatchStatusCheck c WHERE c.match = m " +
+           "            AND c.outcome <> com.main.nexus.model.enums.MatchOutcome.NO_CONTACT_YET) " +
            "ORDER BY m.createdAt ASC")
     List<Match> findPendingReviewsForCompany(@Param("companyId") Long companyId);
 }

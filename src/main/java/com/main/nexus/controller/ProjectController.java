@@ -1,5 +1,7 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.AiExtractionRequestDTO;
+import com.main.nexus.dto.AiExtractionResponseDTO;
 import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectRequestDTO;
@@ -16,6 +18,7 @@ import com.main.nexus.model.enums.UserType;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.ProjectAiExtractionService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.SkillService;
@@ -58,6 +61,18 @@ public class ProjectController {
 
     @Autowired
     private ProjectResponseAssembler projectResponseAssembler;
+
+    @Autowired
+    private ProjectAiExtractionService projectAiExtractionService;
+
+    // Autopreenchimento por IA: só devolve uma sugestão estruturada para pré-preencher o
+    // formulário. Não persiste nada — nem toca em ProjectRepository. A publicação continua
+    // sendo o POST /api/projects normal, chamado manualmente pela empresa depois da revisão.
+    @PostMapping("/ai-extract")
+    public ResponseEntity<AiExtractionResponseDTO> extractFromText(@RequestBody AiExtractionRequestDTO request) {
+        Company company = getLoggedCompany();
+        return ResponseEntity.ok(projectAiExtractionService.extract(company.getId(), request.rawText()));
+    }
 
     @GetMapping("/skills")
     public ResponseEntity<?> listSkills() {
