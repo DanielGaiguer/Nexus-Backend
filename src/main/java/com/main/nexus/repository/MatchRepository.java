@@ -12,7 +12,15 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByProjectId(Long projectId);
-    List<Match> findByProfessionalId(Long professionalId);
+
+    // Todas as listas de matches por profissional/empresa (recebidos, enviados,
+    // confirmados, recusados, "todos") partem daqui -- sem ORDER BY, o banco não
+    // garante nenhuma ordem específica (na prática costuma sair em ordem de
+    // inserção, mas isso nunca foi um contrato). Ordenado explicitamente do
+    // mais recente pro mais antigo, igual a findPreviousProjectsBy* abaixo.
+    @Query("SELECT m FROM Match m WHERE m.professional.id = :professionalId ORDER BY m.createdAt DESC")
+    List<Match> findByProfessionalId(@Param("professionalId") Long professionalId);
+
     List<Match> findByStatus(StatusMatch status);
     @Query("SELECT m FROM Match m WHERE m.status = :status AND m.createdAt < :createdAtBefore " +
            "AND (m.active = true OR m.active IS NULL)")
@@ -20,8 +28,11 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
             @Param("status") StatusMatch status,
             @Param("createdAtBefore") java.time.LocalDateTime createdAtBefore);
     Optional<Match> findByProjectIdAndProfessionalId(Long projectId, Long professionalId);
-    List<Match> findByProjectCompanyId(Long companyId);
-    
+
+    // Mesmo motivo do findByProfessionalId acima.
+    @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId ORDER BY m.createdAt DESC")
+    List<Match> findByProjectCompanyId(@Param("companyId") Long companyId);
+
     long countByStatus(StatusMatch status);
     long countByProfessionalId(Long professionalId);
     long countByProfessionalIdAndStatus(Long professionalId, StatusMatch status);

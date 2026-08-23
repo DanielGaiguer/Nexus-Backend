@@ -3,6 +3,7 @@ package com.main.nexus.controller;
 import com.main.nexus.dto.CompanyRejectRequestDTO;
 import com.main.nexus.dto.MatchHistoryDTO;
 import com.main.nexus.dto.MatchResponseDTO;
+import com.main.nexus.dto.MatchStatusDTO;
 import com.main.nexus.dto.ProfessionalRejectRequestDTO;
 import com.main.nexus.dto.ProfessionalSummaryDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
@@ -112,6 +113,17 @@ public class MatchController {
         Long companyId = getLoggedCompanyId();
         matchService.companyShowsInterestByProject(professionalId, projectId, companyId);
         return ResponseEntity.ok("Interest sent to professional.");
+    }
+
+    // Status do match (se existir) entre um profissional e um projeto -- ver
+    // MatchService#getStatusByPair.
+    @GetMapping("/status-by-pair")
+    public ResponseEntity<MatchStatusDTO> statusByPair(
+            @RequestParam Long professionalId,
+            @RequestParam Long projectId) {
+        Long companyId = getLoggedCompanyId();
+        return ResponseEntity.ok(
+                matchService.getStatusByPair(professionalId, projectId, companyId));
     }
 
     // Empresa responde a um interesse do profissional

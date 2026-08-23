@@ -106,6 +106,9 @@ public class ProfessionalAnalyticsService {
         for (Review review : reviews) {
             if (review.getNegativeReasons() == null) continue;
             for (NegativeReason reason : review.getNegativeReasons()) {
+                // "Outros" é só um catch-all sem indicação prática de melhoria --
+                // não faz sentido aparecer no card "SoftSkills".
+                if (reason == NegativeReason.OTHER) continue;
                 counts.merge(reason, 1L, Long::sum);
             }
         }
@@ -130,8 +133,15 @@ public class ProfessionalAnalyticsService {
         long pending   = companyInterested + professionalInterested;
         long total     = pending + confirmed + rejected;
 
-        double acceptanceRate = total > 0
-                ? Math.round((double) confirmed / total * 1000.0) / 10.0
+        // "Taxa de aceitação" só faz sentido sobre matches já DECIDIDOS
+        // (confirmados ou recusados) -- um convite ainda pendente não foi
+        // recusado, então não deve contar contra a taxa. Dividir por `total`
+        // (incluindo pendentes) diluía a taxa pra quem tem muitos convites
+        // em aberto; esse é o mesmo cálculo do app antigo
+        // (MatchSummaryDTO#recalculate).
+        long decided = confirmed + rejected;
+        double acceptanceRate = decided > 0
+                ? Math.round((double) confirmed / decided * 1000.0) / 10.0
                 : 0.0;
 
         return new MatchSummaryDTO(
@@ -237,8 +247,12 @@ public class ProfessionalAnalyticsService {
             long rejected  = companyMatches.stream()
                     .filter(m -> m.getStatus() == StatusMatch.REJECTED).count();
 
-            double acceptanceRate = companyMatches.size() > 0
-                    ? Math.round((double) confirmed / companyMatches.size() * 1000.0) / 10.0
+            // Mesmo critério de buildMatchSummary: só considera matches
+            // decididos (confirmados ou recusados) -- pendente não conta
+            // contra a taxa.
+            long decided = confirmed + rejected;
+            double acceptanceRate = decided > 0
+                    ? Math.round((double) confirmed / decided * 1000.0) / 10.0
                     : 0.0;
 
             result.add(new CompanyAcceptanceRateDTO(

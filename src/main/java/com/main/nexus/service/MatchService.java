@@ -1,5 +1,6 @@
 package com.main.nexus.service;
 
+import com.main.nexus.dto.MatchStatusDTO;
 import com.main.nexus.dto.ScoreBreakdownDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
@@ -625,6 +626,27 @@ public class MatchService {
                 });
 
         return applyCompanyInterest(match);
+    }
+
+    // Status do match (se existir) entre um profissional e um projeto -- usado
+    // pelos diálogos de comparação (ProfessionalCompareDialog) pra decidir se
+    // mostram "Demonstrar interesse": só faz sentido quando ainda não há
+    // nenhum envolvimento (status null ou WAITING), não quando já está em
+    // andamento (COMPANY_INTERESTED/PROFESSIONAL_INTERESTED/MATCHED) ou
+    // recusado.
+    public MatchStatusDTO getStatusByPair(Long professionalId, Long projectId, Long companyId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Project not found."));
+
+        if (!project.getCompany().getId().equals(companyId)) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "This project does not belong to your company.");
+        }
+
+        return matchRepository.findByProjectIdAndProfessionalId(projectId, professionalId)
+                .map(m -> new MatchStatusDTO(m.getStatus()))
+                .orElseGet(() -> new MatchStatusDTO(null));
     }
 
     // Núcleo compartilhado por companyShowsInterest e companyShowsInterestByProject

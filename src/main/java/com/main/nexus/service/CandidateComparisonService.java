@@ -101,7 +101,46 @@ public class CandidateComparisonService {
         );
     }
 
-    // Monta o item de comparação de um candidato 
+    /**
+     * Mesma comparação de {@link #compare}, mas do ponto de vista do próprio
+     * profissional: em vez de validar dono do projeto (empresa), valida que
+     * o match pertence ao profissional autenticado. Projeto e requiredSkills
+     * vêm direto do match — o profissional não escolhe projectId livremente,
+     * só pode comparar com a vaga do match que é dele.
+     */
+    public CandidateComparisonResponseDTO compareForProfessional(Long matchId, Long professionalId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Match not found."));
+
+        if (!match.getProfessional().getId().equals(professionalId)) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "This match does not belong to you.");
+        }
+
+        Project project = match.getProject();
+        List<String> requiredSkillNames = project.getRequiredSkills()
+                .stream().map(Skill::getName).toList();
+
+        CandidateComparisonItemDTO candidate = buildComparisonItem(
+                match, match.getProfessional(), project, requiredSkillNames);
+
+        return new CandidateComparisonResponseDTO(
+                project.getId(),
+                project.getTitle(),
+                requiredSkillNames,
+                project.getWorkMode() != null ? project.getWorkMode().name() : null,
+                project.getExperienceLevel() != null ? project.getExperienceLevel().name() : null,
+                project.getOpportunityType() != null ? project.getOpportunityType().name() : null,
+                project.getMinimumBudget(),
+                project.getMaximumBudget(),
+                project.getMonthlySalaryMin(),
+                project.getMonthlySalaryMax(),
+                List.of(candidate)
+        );
+    }
+
+    // Monta o item de comparação de um candidato
 
     private CandidateComparisonItemDTO buildComparisonItem(
             Match match,

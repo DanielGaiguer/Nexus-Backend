@@ -91,11 +91,13 @@ public class CompanyController {
 
         existing.setCompanyName(request.companyName());
         existing.setPhone(request.phone());
-        existing.setCep(request.cep());
         existing.setDescription(request.description());
         existing.setLinkedinUrl(request.linkedinUrl());
 
+        // Só sobrescreve o CEP (e recalcula geolocalização) quando vier
+        // preenchido — um envio em branco não deve apagar o CEP já salvo.
         if (request.cep() != null && !request.cep().isBlank()) {
+            existing.setCep(request.cep());
             GeolocationService.AddressData address = geolocationService.resolveFromCep(request.cep());
             existing.setLatitude(address.latitude());
             existing.setLongitude(address.longitude());
