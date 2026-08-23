@@ -39,6 +39,8 @@ public class ProjectAiExtractionService {
     // futuro, isso precisa virar algo compartilhado (ex: tabela ou Redis), mas para o volume
     // atual não vale a complexidade extra.
     private static final int MAX_CALLS_PER_HOUR = 10;
+    // ele está guardado na memória da própria aplicação Java, e não no banco
+    // Esses horários estão simplesmente ocupando memória RAM
     private final Map<Long, Deque<Instant>> callHistoryByCompany = new ConcurrentHashMap<>();
 
     @Autowired
@@ -69,9 +71,12 @@ public class ProjectAiExtractionService {
 
     private void enforceRateLimit(Long companyId) {
         Instant now = Instant.now();
+                                                                // se não existir, crie uma ArrayDeque nova
         Deque<Instant> history = callHistoryByCompany.computeIfAbsent(companyId, id -> new ArrayDeque<>());
 
+        // Enquanto uma thread estiver mexendo nesse history, outra thread não pode mexer nele ao mesmo tempo.
         synchronized (history) {
+            // O primeiro horário da fila aconteceu antes de uma hora atrás
             while (!history.isEmpty() && history.peekFirst().isBefore(now.minus(1, ChronoUnit.HOURS))) {
                 history.pollFirst();
             }
@@ -87,6 +92,15 @@ public class ProjectAiExtractionService {
     // Normalização/validação defensiva pós-resposta. Não confia cegamente nas instruções do
     // prompt: revalida tudo que é barato/objetivo de revalidar aqui, mesmo sabendo que
     // ProjectService.validateByType() é a fonte de verdade final na criação real.
+    
+    // Esta é a parte que não confia no que o modelo disse, mesmo seguindo o prompt — é uma segunda camada de validação, independente e mais barata que uma chamada de IA:
+
+//    - Zera campos cruzados por tipo: se opportunityType != PROJECT, minimumBudget/maximumBudget/deadline saem sempre null, não importa o que o modelo tenha respondido; o mesmo pro grupo de JOB (contractType/salário/benefits/startDate/workload). Isso existe porque validateByType() rejeitaria a mistura na publicação — aqui só evita confundir a revisão da empresa antes disso.
+//    - Range de orçamento/salário: se min > max, descarta os dois e marca ambos em lowConfidenceFields.
+//    - Datas (deadline, startDate): descarta se estiver no passado ou > 5 anos no futuro.
+//    - CEP: só aceita se tiver exatamente 8 dígitos após remover não-numéricos; qualquer outra coisa vira null (a empresa digita manualmente).
+//    - maxPositions: descarta se <= 0.
+//    - Casamento de skills (matchSkills): para cada nome extraído, normaliza (minúsculas, sem acento) e busca no catálogo real (SkillRepository.findAllByActiveTrue()). Achou → foundInCatalog=true + matchedSkillId/Name; não achou → foundInCatalog=false, sem id. Nunca cria skill nova.
     private AiExtractionResponseDTO normalize(AiExtractionResponseDTO raw) {
         AiOpportunityExtractionDTO s = raw.suggestion();
         if (s == null) {

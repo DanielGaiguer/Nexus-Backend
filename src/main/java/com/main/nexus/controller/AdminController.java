@@ -243,9 +243,31 @@ public class AdminController {
                         u.getEmail(),
                         u.getType().name(),
                         u.getActive(),
-                        resolveUserPhotoUrl(u)))
+                        resolveUserPhotoUrl(u),
+                        resolveEntityId(u)))
                 .toList();
         return ResponseEntity.ok(users);
+    }
+
+    // Id da linha professional/company dona desse usuário — PK própria, gerada
+    // por IDENTITY independente da do usuário (não confundir com u.getId()).
+    // Bug encontrado: telas de admin que montavam /admin/professional/{id} ou
+    // /admin/company/{id} usando o id do User (ex.: admin-users) caíam num
+    // registro professional/company qualquer que por acaso tivesse aquele
+    // mesmo número de PK — professional/company e user têm sequências de id
+    // independentes, só coincidem por acidente pros primeiros cadastros de
+    // cada tipo (companies foram semeadas primeiro aqui, daí ids batendo só
+    // até o primeiro professional).
+    private Long resolveEntityId(com.main.nexus.model.User u) {
+        return switch (u.getType()) {
+            case PROFESSIONAL -> professionalRepository.findByUserId(u.getId())
+                    .map(com.main.nexus.model.Professional::getId)
+                    .orElse(null);
+            case COMPANY -> companyRepository.findByUserId(u.getId())
+                    .map(com.main.nexus.model.Company::getId)
+                    .orElse(null);
+            case ADMIN -> null;
+        };
     }
 
     // Nome de exibição por tipo de usuário — mesmo critério do resolveName() em AuthService.

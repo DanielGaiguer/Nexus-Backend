@@ -35,7 +35,7 @@ public class CandidateComparisonService {
     @Autowired
     private MatchService matchService;
 
-    private static final int MIN_CANDIDATES = 2;
+    private static final int MIN_CANDIDATES = 1;
     private static final int MAX_CANDIDATES = 5;
 
     public CandidateComparisonResponseDTO compare(

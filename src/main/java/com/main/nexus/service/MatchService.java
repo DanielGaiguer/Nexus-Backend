@@ -590,8 +590,47 @@ public class MatchService {
         Match match = findById(matchId);
         // Valida se aquela empresa e dona
         validateCompanyOwnership(match, companyId);
+        return applyCompanyInterest(match);
+    }
 
-        
+    // Mesma ideia de professionalShowsInterest, do lado da empresa: usado quando a
+    // empresa demonstra interesse num profissional achado pelo diretório geral
+    // (/company/professionals), não pelo ranking de um projeto -- pode não existir
+    // match nenhum ainda entre os dois, então localiza ou cria um (nasce WAITING,
+    // ver Match#status) antes de aplicar o mesmo fluxo de companyShowsInterest.
+    @Transactional
+    public Match companyShowsInterestByProject(Long professionalId, Long projectId, Long companyId) {
+        Professional professional = professionalRepository.findById(professionalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Professional not found"));
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Project not found"));
+
+        if (!project.getCompany().getId().equals(companyId)) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(403),
+                    "This project does not belong to your company.");
+        }
+
+        Match match = matchRepository
+                .findByProjectIdAndProfessionalId(projectId, professionalId)
+                .orElseGet(() -> {
+                    Match newMatch = new Match();
+                    newMatch.setProject(project);
+                    newMatch.setProfessional(professional);
+                    newMatch.setMatchScore(getScore(professional, project));
+                    newMatch.setInitiatedBy(InitiatedBy.COMPANY);
+                    return newMatch;
+                });
+
+        return applyCompanyInterest(match);
+    }
+
+    // Núcleo compartilhado por companyShowsInterest e companyShowsInterestByProject
+    // -- a única diferença entre os dois é como o Match chega até aqui (por id já
+    // existente vs. localizado/criado a partir de profissional+projeto).
+    private Match applyCompanyInterest(Match match) {
         if (match.getStatus() == StatusMatch.REJECTED) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "This match was rejected and cannot be reactivated.");
@@ -1332,10 +1371,13 @@ public class MatchService {
         return sent;
     }
 
+    // Só matches MATCHED e ATIVOS -- os já encerrados (active=false) saem daqui e
+    // aparecem em getPreviousProjectsByCompany, não nos dois ao mesmo tempo.
     public List<Match> getConfirmedMatchesForCompany(Long companyId) {
         List<Match> confirmed = matchRepository.findByProjectCompanyId(companyId)
                 .stream()
                 .filter(m -> m.getStatus() == StatusMatch.MATCHED)
+                .filter(m -> !Boolean.FALSE.equals(m.getActive()))
                 .toList();
 
         confirmed.forEach(this::refreshMatchScore);

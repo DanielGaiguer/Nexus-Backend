@@ -117,6 +117,9 @@ public class GeminiExtractionClient implements AiExtractionClient {
                     .system(SYSTEM_PROMPT)
                     .user(userMessage)
                     .call()
+                    // .call().entity(AiExtractionResponseDTO.class) — isso é structured output do Spring AI: 
+                    // ele monta o schema JSON a partir do record Java, instrui o modelo a responder nesse formato, 
+                    // faz parse, e se a resposta vier fora do schema, o Spring AI 2.0 tenta uma auto-correção antes de desistir.
                     .entity(AiExtractionResponseDTO.class);
         } catch (RuntimeException e) {
             // ResponseStatusException não imprime a causa no log padrão do

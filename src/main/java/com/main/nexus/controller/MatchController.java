@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -97,6 +98,19 @@ public class MatchController {
     public ResponseEntity<String> companyShowsInterest(@PathVariable Long matchId) {
         Long companyId = getLoggedCompanyId();
         matchService.companyShowsInterest(matchId, companyId);
+        return ResponseEntity.ok("Interest sent to professional.");
+    }
+
+    // Mesma ideia acima, mas pra quando a empresa demonstra interesse num
+    // profissional achado pelo diretório geral (/company/professionals) -- pode
+    // não existir match nenhum ainda entre os dois, então não há matchId pra
+    // usar no endpoint acima.
+    @PostMapping("/company-interest-by-project")
+    public ResponseEntity<String> companyShowsInterestByProject(
+            @RequestParam Long professionalId,
+            @RequestParam Long projectId) {
+        Long companyId = getLoggedCompanyId();
+        matchService.companyShowsInterestByProject(professionalId, projectId, companyId);
         return ResponseEntity.ok("Interest sent to professional.");
     }
 

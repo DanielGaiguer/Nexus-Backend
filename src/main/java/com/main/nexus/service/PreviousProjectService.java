@@ -8,7 +8,9 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class PreviousProjectService {
@@ -39,13 +41,17 @@ public class PreviousProjectService {
 
     private List<String> normalizeTechnologies(List<String> technologies) {
         if (technologies == null) {
-            return List.of();
+            return new ArrayList<>();
         }
 
+        // Coleta em uma ArrayList mutável (em vez de .toList(), que é imutável) -
+        // o Hibernate precisa mutar essa lista ao sincronizar o PersistentBag
+        // gerenciado da entidade durante o merge/flush, senão lança
+        // UnsupportedOperationException.
         List<String> normalized = technologies.stream()
                 .filter(tech -> tech != null && !tech.isBlank()) // Remove nulos e vazios
                 .map(String::trim) // Remove espacos do inicio e final de cada texto
-                .toList(); // Transforma o Stream novamente em uma lista
+                .collect(Collectors.toCollection(ArrayList::new));
 
         if (normalized.size() > MAX_TECHNOLOGIES) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
