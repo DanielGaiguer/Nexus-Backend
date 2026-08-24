@@ -86,6 +86,8 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/matches/**").hasAnyRole("COMPANY", "PROFESSIONAL")
 
+                .requestMatchers("/api/proposals/**").hasAnyRole("COMPANY", "PROFESSIONAL")
+
                 // Exibição de avaliações (top 3 do card de preview + página dedicada) é
                 // informação pública de perfil, igual ao resto do /api/public/** — precisa
                 // vir antes da regra genérica de /api/reviews/** abaixo, que exige login.

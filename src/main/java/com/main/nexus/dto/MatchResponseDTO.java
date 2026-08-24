@@ -20,5 +20,8 @@ public record MatchResponseDTO(
         // do enum CompanyRejectionReason/ProfessionalRejectionReason, traduzidos no front) e a
         // observação em texto livre escrita por quem rejeitou.
         List<String> rejectionReasons,
-        String rejectionDescription
+        String rejectionDescription,
+        // Preenchido para sempre quando este match foi confirmado via aceite de uma Proposal
+        // (ProposalService.acceptProposal) -- fica visível em toda tela que já usa este DTO.
+        ProposalResponseDTO acceptedProposal
 ) {}

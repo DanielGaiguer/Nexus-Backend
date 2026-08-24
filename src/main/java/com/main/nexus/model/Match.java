@@ -57,6 +57,22 @@ public class Match {
     @Column(nullable = false)
     private Boolean active = true;
 
+    // Setado apenas quando este match é confirmado através do aceite de uma Proposal
+    // (ProposalService.acceptProposal) -- permanece vinculado pra sempre, mesmo que o match
+    // depois seja cancelado/expire, para o histórico continuar mostrando qual proposta gerou
+    // essa contratação.
+    @ManyToOne
+    @JoinColumn(name = "accepted_proposal_id")
+    private Proposal acceptedProposal;
+
+    public Proposal getAcceptedProposal() {
+        return acceptedProposal;
+    }
+
+    public void setAcceptedProposal(Proposal acceptedProposal) {
+        this.acceptedProposal = acceptedProposal;
+    }
+
     public Boolean getActive() {
         return active;
     }

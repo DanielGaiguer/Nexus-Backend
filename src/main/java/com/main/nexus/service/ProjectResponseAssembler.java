@@ -115,6 +115,8 @@ public class ProjectResponseAssembler {
                 fullAccess ? p.getSalaryVisibleTo().contains(UserType.COMPANY) : null,
                 salaryVisible,
 
+                p.getAcceptsProposals(),
+
                 companyDTO
         );
     }

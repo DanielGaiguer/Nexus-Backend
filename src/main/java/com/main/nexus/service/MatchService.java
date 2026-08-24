@@ -1458,7 +1458,9 @@ public class MatchService {
     
     // Barra novo engajamento (convite, interesse ou confirmação) numa oportunidade que não
     // está mais aberta — encerrada ou pausada por ter atingido o limite de vagas.
-    private void assertProjectIsOpen(Project project) {
+    // Package-private (não private): ProposalService, no mesmo pacote, reaproveita a mesma
+    // checagem ao aceitar uma proposta -- mesmo motivo de refreshMatchScore logo acima.
+    void assertProjectIsOpen(Project project) {
         if (project.getStatus() != ProjectStatus.OPEN) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(409),
                     "This opportunity is not open.");
@@ -1467,7 +1469,8 @@ public class MatchService {
 
     // Barra a confirmação de mais um match quando o projeto já não tem vagas livres (encerrado,
     // pausado por ter atingido o limite, ou outro match concorrente acabou de preenchê-lo).
-    private void assertProjectHasOpenPositions(Project project) {
+    // Package-private pelo mesmo motivo de assertProjectIsOpen -- reaproveitado por ProposalService.
+    void assertProjectHasOpenPositions(Project project) {
         assertProjectIsOpen(project);
         if (!project.hasOpenPositions()) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(409),
@@ -1476,7 +1479,9 @@ public class MatchService {
     }
 
     // Efeito cascata de pausar projeto
-    private void incrementFilledPositions(Project project) {
+    // Package-private pelo mesmo motivo de assertProjectIsOpen -- reaproveitado por ProposalService
+    // ao aceitar uma proposta (também preenche uma posição).
+    void incrementFilledPositions(Project project) {
         // UPDATE atomico no banco
         projectRepository.incrementFilledPositions(project.getId());
         // a query acima é um bulk update — sincroniza o objeto em memória pra que a checagem

@@ -3,6 +3,7 @@ package com.main.nexus.scheduler;
 import com.main.nexus.service.MatchExpirationService;
 import com.main.nexus.service.NotificationService;
 import com.main.nexus.service.ProfessionalInactivityService;
+import com.main.nexus.service.ProposalService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,9 @@ public class NexusScheduler {
 
     @Autowired
     private ProfessionalInactivityService professionalInactivityService;
+
+    @Autowired
+    private ProposalService proposalService;
 
     // segundo minuto hora dia-do-mês mês dia-da-semana
     @Scheduled(cron = "0 0 0 * * *") //meia-noite, todo dia. Roda checkAndExpireMatches (a checagem de expiração de 30 dias)   
@@ -46,5 +50,13 @@ public class NexusScheduler {
     @Scheduled(cron = "0 0 4 * * *")
     public void runProfessionalInactivityCheck() {
         professionalInactivityService.markInactiveProfessionalsUnavailable();
+    }
+
+    // 5h da manhã, todo dia — horário de baixo tráfego, mesmo espírito dos jobs acima. Marca
+    // como EXPIRED as propostas PENDING cuja validade (definida pelo próprio profissional no
+    // envio) já passou, sem exigir que a empresa tenha respondido.
+    @Scheduled(cron = "0 0 5 * * *")
+    public void runProposalExpirationCheck() {
+        proposalService.expirePendingProposals();
     }
 }

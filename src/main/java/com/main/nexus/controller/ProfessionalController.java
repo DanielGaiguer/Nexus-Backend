@@ -34,6 +34,7 @@ import com.main.nexus.service.PdfService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.ProjectResponseAssembler;
+import com.main.nexus.service.ProposalService;
 import com.main.nexus.service.SkillService;
 import com.main.nexus.service.SupabaseStorageService;
 import java.util.List;
@@ -68,6 +69,9 @@ public class ProfessionalController {
 
     @Autowired
     private MatchService matchService;
+
+    @Autowired
+    private ProposalService proposalService;
 
     @Autowired
     private SkillService skillService;
@@ -403,7 +407,8 @@ public class ProfessionalController {
                 matchService.getScoreBreakdown(professional, m.getProject(), m),
                 m.getActive(),
                 matchService.getRejectionReasonNames(feedback),
-                feedback != null ? feedback.getDescription() : null
+                feedback != null ? feedback.getDescription() : null,
+                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null
         );
     }
 

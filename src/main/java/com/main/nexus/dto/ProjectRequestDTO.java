@@ -36,5 +36,8 @@ public record ProjectRequestDTO(
         // Visibilidade — nulo é tratado como "visível/aberto" (comportamento anterior à feature)
         Boolean visibleToCompanies,
         Boolean salaryVisibleToProfessionals,
-        Boolean salaryVisibleToCompanies
+        Boolean salaryVisibleToCompanies,
+
+        // Exclusivo de PROJECT — libera o fluxo de Proposal (ver ProjectService.validateByType)
+        Boolean acceptsProposals
 ) {}

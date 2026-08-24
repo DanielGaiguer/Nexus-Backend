@@ -77,6 +77,11 @@ public class ProjectService {
         }
 
         if (project.getOpportunityType() == OpportunityType.JOB) {
+            // Campo exclusivo de PROJECT
+            if (Boolean.TRUE.equals(project.getAcceptsProposals())) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "Field 'acceptsProposals' is not allowed for a JOB.");
+            }
             // Campos de PROJECT não devem estar preenchidos
             if (project.getMinimumBudget() != null || project.getMaximumBudget() != null) {
                 throw new ResponseStatusException(HttpStatusCode.valueOf(400),

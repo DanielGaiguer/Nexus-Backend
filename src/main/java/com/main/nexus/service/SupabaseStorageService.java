@@ -26,6 +26,9 @@ public class SupabaseStorageService {
     @Value("${supabase.bucket.resumes}")
     private String resumeBucket;
 
+    @Value("${supabase.bucket.proposal-attachments}")
+    private String proposalAttachmentsBucket;
+
     @Value("${supabase.service-key}")
     private String serviceKey;
 
@@ -54,6 +57,23 @@ public class SupabaseStorageService {
 
     public void deleteResume(String publicUrl) {
         deleteFromBucket(publicUrl, resumeBucket);
+    }
+
+    // Anexos/portfólio de Proposal -- diferente de foto de perfil/currículo, aqui não é "1
+    // arquivo que substitui o anterior": cada proposta pode ter vários anexos, cada um com sua
+    // própria linha em ProposalAttachment, então não há um "arquivo anterior" pra deletar antes
+    // do upload -- o chamador decide se remove um anexo específico via deleteProposalAttachment.
+    public String uploadProposalAttachment(MultipartFile file, Long proposalId) {
+        validateProposalAttachmentFile(file);
+
+        String extension = getExtension(file.getOriginalFilename());
+        String fileName = "proposals/" + proposalId + "/" + UUID.randomUUID() + "." + extension;
+
+        return uploadToBucket(file, proposalAttachmentsBucket, fileName);
+    }
+
+    public void deleteProposalAttachment(String publicUrl) {
+        deleteFromBucket(publicUrl, proposalAttachmentsBucket);
     }
 
     public byte[] downloadResume(String publicUrl) {
@@ -151,6 +171,29 @@ public class SupabaseStorageService {
         if (file.getSize() > maxSize) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "Resume size must not exceed 10MB.");
+        }
+    }
+
+    private static final java.util.Set<String> PROPOSAL_ATTACHMENT_CONTENT_TYPES = java.util.Set.of(
+            "application/pdf", "image/jpeg", "image/png", "image/webp", "application/zip",
+            "application/x-zip-compressed");
+
+    private void validateProposalAttachmentFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Attachment file is required.");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !PROPOSAL_ATTACHMENT_CONTENT_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Only PDF, PNG, JPEG, WebP and ZIP files are accepted.");
+        }
+
+        long maxSize = 15 * 1024 * 1024; // 15MB
+        if (file.getSize() > maxSize) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Attachment size must not exceed 15MB.");
         }
     }
 

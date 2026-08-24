@@ -18,5 +18,10 @@ public enum NotificationType {
     MATCH_EXPIRED_REVIEW_REQUEST, // match completou 30 dias e expirou, pede avaliação a ambos os lados
     PROJECT_POSITIONS_FULL,  // projeto atingiu o limite de vagas e foi pausado automaticamente
     PROJECT_ADDED_TO_PORTFOLIO, // empresa confirmou o status do match como "trabalhando juntos" e o projeto foi adicionado ao portfólio do profissional
-    ACCOUNT_MARKED_UNAVAILABLE // profissional ficou 1 mês sem logar e foi marcado indisponível automaticamente
+    ACCOUNT_MARKED_UNAVAILABLE, // profissional ficou 1 mês sem logar e foi marcado indisponível automaticamente
+    PROPOSAL_RECEIVED,       // profissional enviou uma nova proposta para o projeto da empresa
+    PROPOSAL_ACCEPTED,       // empresa aceitou a proposta do profissional
+    PROPOSAL_REJECTED,       // empresa recusou ativamente a proposta do profissional
+    PROPOSAL_POSITION_FILLED, // proposta foi auto-recusada porque outra proposta preencheu a última vaga
+    PROPOSAL_EXPIRED         // proposta expirou sem resposta da empresa dentro da validade
 }

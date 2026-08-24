@@ -20,6 +20,7 @@ import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProjectResponseAssembler;
+import com.main.nexus.service.ProposalService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -49,6 +50,9 @@ public class MatchController {
 
     @Autowired
     private ProjectResponseAssembler projectResponseAssembler;
+
+    @Autowired
+    private ProposalService proposalService;
 
     @GetMapping("/{matchId}")
     public ResponseEntity<MatchResponseDTO> findById(@PathVariable Long matchId) {
@@ -230,7 +234,8 @@ public class MatchController {
                 null,
                 m.getActive(),
                 matchService.getRejectionReasonNames(feedback),
-                feedback != null ? feedback.getDescription() : null
+                feedback != null ? feedback.getDescription() : null,
+                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null
         );
     }
 

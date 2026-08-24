@@ -138,6 +138,11 @@ public class Project {
     @Column(name = "viewer_role", length = 20)
     private Set<UserType> salaryVisibleTo = new HashSet<>(Set.of(UserType.PROFESSIONAL, UserType.COMPANY));
 
+    // Campo exclusivo de PROJECT (ver ProjectService.validateByType) -- quando true, libera o
+    // fluxo de Proposal para profissionais, além do match bilateral que já existe pros dois tipos.
+    @Column(nullable = false)
+    private Boolean acceptsProposals = false;
+
     public Long getId() {
         return id;
     }
@@ -396,5 +401,13 @@ public class Project {
 
     public void setSalaryVisibleTo(Set<UserType> salaryVisibleTo) {
         this.salaryVisibleTo = salaryVisibleTo;
+    }
+
+    public Boolean getAcceptsProposals() {
+        return acceptsProposals;
+    }
+
+    public void setAcceptsProposals(Boolean acceptsProposals) {
+        this.acceptsProposals = acceptsProposals;
     }
 }

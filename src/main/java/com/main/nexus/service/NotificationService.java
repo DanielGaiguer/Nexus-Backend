@@ -273,6 +273,63 @@ public class NotificationService {
     }
 
     @Async
+    public void notifyProposalReceived(User companyUser,
+                                       String professionalName, String projectTitle,
+                                       Long projectId) {
+        notify(
+            companyUser,
+            NotificationType.PROPOSAL_RECEIVED,
+            "Nova proposta recebida",
+            professionalName + " enviou uma proposta para o seu projeto \"" + projectTitle + "\".",
+            "/company/projects/" + projectId + "/proposals"
+        );
+    }
+    @Async
+    public void notifyProposalAccepted(User professionalUser,
+                                       String companyName, String projectTitle,
+                                       Long matchId) {
+        notify(
+            professionalUser,
+            NotificationType.PROPOSAL_ACCEPTED,
+            "Proposta aceita!",
+            companyName + " aceitou sua proposta para o projeto \"" + projectTitle + "\". O match foi confirmado e os contatos já estão disponíveis.",
+            "/matches/" + matchId
+        );
+    }
+    @Async
+    public void notifyProposalRejected(User professionalUser,
+                                       String companyName, String projectTitle) {
+        notify(
+            professionalUser,
+            NotificationType.PROPOSAL_REJECTED,
+            "Proposta recusada",
+            companyName + " recusou sua proposta para o projeto \"" + projectTitle + "\".",
+            "/pro/opportunities"
+        );
+    }
+    @Async
+    public void notifyProposalPositionFilled(User professionalUser,
+                                             String companyName, String projectTitle) {
+        notify(
+            professionalUser,
+            NotificationType.PROPOSAL_POSITION_FILLED,
+            "Vaga preenchida",
+            "O projeto \"" + projectTitle + "\" de " + companyName + " já teve suas vagas preenchidas por outra proposta. Sua proposta não segue mais em análise.",
+            "/pro/opportunities"
+        );
+    }
+    @Async
+    public void notifyProposalExpired(User professionalUser, String projectTitle) {
+        notify(
+            professionalUser,
+            NotificationType.PROPOSAL_EXPIRED,
+            "Sua proposta expirou",
+            "O prazo de validade da sua proposta para o projeto \"" + projectTitle + "\" terminou sem resposta do contratante. Você pode enviar uma nova proposta se ainda tiver interesse.",
+            "/pro/opportunities"
+        );
+    }
+
+    @Async
     public void notifyIncompleteProfile(User user, List<String> missingFields) {
         String fieldList = String.join(", ", missingFields);
         notify(

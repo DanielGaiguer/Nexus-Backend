@@ -21,6 +21,7 @@ import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProjectAiExtractionService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
+import com.main.nexus.service.ProposalService;
 import com.main.nexus.service.SkillService;
 import java.util.HashSet;
 import java.util.List;
@@ -64,6 +65,9 @@ public class ProjectController {
 
     @Autowired
     private ProjectAiExtractionService projectAiExtractionService;
+
+    @Autowired
+    private ProposalService proposalService;
 
     // Autopreenchimento por IA: só devolve uma sugestão estruturada para pré-preencher o
     // formulário. Não persiste nada — nem toca em ProjectRepository. A publicação continua
@@ -233,6 +237,9 @@ public class ProjectController {
             salaryVisibleTo.add(UserType.COMPANY);
         }
         project.setSalaryVisibleTo(salaryVisibleTo);
+
+        // Exclusivo de PROJECT -- ProjectService.validateByType barra true numa JOB
+        project.setAcceptsProposals(Boolean.TRUE.equals(r.acceptsProposals()));
     }
 
     @PutMapping("/{id}/close")
@@ -326,7 +333,8 @@ public class ProjectController {
                 matchService.getScoreBreakdown(professional, m.getProject(), m),
                 m.getActive(),
                 matchService.getRejectionReasonNames(feedback),
-                feedback != null ? feedback.getDescription() : null
+                feedback != null ? feedback.getDescription() : null,
+                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null
         );
     }
 

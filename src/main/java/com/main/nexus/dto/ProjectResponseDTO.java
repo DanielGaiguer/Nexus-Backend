@@ -53,5 +53,7 @@ public record ProjectResponseDTO(
         Boolean salaryVisibleToCompanies,
         Boolean salaryVisible,
 
+        Boolean acceptsProposals,
+
         PublicCompanyDTO company
 ) {}
