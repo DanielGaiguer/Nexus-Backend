@@ -123,7 +123,7 @@ public class NotificationService {
             professional,
             NotificationType.HIGH_SCORE_OPPORTUNITY,
             "Oportunidade muito compatível!",
-            String.format("O projeto \"%s\" da empresa %s tem %.0f%% de compatibilidade com o seu perfil.",
+            String.format("O projeto \"%s\" do contratante %s tem %.0f%% de compatibilidade com o seu perfil.",
                     projectTitle, companyName, score),
             "/opportunities/" + projectId
         );
@@ -146,8 +146,8 @@ public class NotificationService {
         notify(
             adminUser,
             NotificationType.NEW_COMPANY_REGISTRATION,
-            "Nova empresa aguardando aprovação",
-            "A empresa \"" + companyName + "\" se cadastrou e está aguardando sua análise.",
+            "Novo contratante aguardando aprovação",
+            "O contratante \"" + companyName + "\" se cadastrou e está aguardando sua análise.",
             "/admin/company/" + companyId
         );
     }
@@ -157,7 +157,7 @@ public class NotificationService {
             companyUser,
             NotificationType.COMPANY_APPROVED,
             "Cadastro aprovado!",
-            "Parabéns! O cadastro da empresa \"" + companyName + "\" foi aprovado. Você já pode publicar vagas e encontrar profissionais.",
+            "Parabéns! O cadastro do contratante \"" + companyName + "\" foi aprovado. Você já pode publicar vagas e encontrar profissionais.",
             "/company/dashboard"
         );
     }
@@ -167,7 +167,7 @@ public class NotificationService {
             companyUser,
             NotificationType.COMPANY_REJECTED,
             "Cadastro não aprovado",
-            "O cadastro da empresa \"" + companyName + "\" não foi aprovado pelo administrador. Entre em contato para mais informações.",
+            "O cadastro do contratante \"" + companyName + "\" não foi aprovado pelo administrador. Entre em contato para mais informações.",
             null
         );
     }
@@ -214,7 +214,7 @@ public class NotificationService {
             professionalUser,
             NotificationType.PROJECT_CLOSED,
             "Vaga encerrada",
-            "A vaga \"" + projectTitle + "\" da empresa " + companyName + " foi encerrada.",
+            "A vaga \"" + projectTitle + "\" do contratante " + companyName + " foi encerrada.",
             "/opportunities"
         );
     }
@@ -290,8 +290,8 @@ public class NotificationService {
         notify(
             user,
             NotificationType.COMPLETE_YOUR_PROFILE,
-            "Complete o perfil da empresa para melhorar seus matches",
-            "O perfil da sua empresa ainda está incompleto. Para melhorar a qualidade dos matches com profissionais, preencha: " + fieldList + ".",
+            "Complete seu perfil de contratante para melhorar seus matches",
+            "Seu perfil de contratante ainda está incompleto. Para melhorar a qualidade dos matches com profissionais, preencha: " + fieldList + ".",
             "/company/profile"
         );
     }

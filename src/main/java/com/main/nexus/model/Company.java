@@ -1,6 +1,7 @@
 package com.main.nexus.model;
 
 import com.main.nexus.model.enums.CompanyStatus;
+import com.main.nexus.model.enums.CompanyType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -55,6 +56,13 @@ public class Company {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CompanyStatus status = CompanyStatus.PENDING;
+
+    // Default no columnDefinition garante que empresas ja cadastradas sejam
+    // populadas como LEGAL_ENTITY pelo proprio ALTER TABLE (ddl-auto=update),
+    // sem exigir migracao manual de dado.
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'LEGAL_ENTITY'")
+    private CompanyType type = CompanyType.LEGAL_ENTITY;
 
     @Column(columnDefinition = "TEXT")
     private String rejectionReason;
@@ -167,6 +175,14 @@ public class Company {
 
     public void setStatus(CompanyStatus status) {
         this.status = status;
+    }
+
+    public CompanyType getType() {
+        return type;
+    }
+
+    public void setType(CompanyType type) {
+        this.type = type;
     }
 
     public String getRejectionReason() {

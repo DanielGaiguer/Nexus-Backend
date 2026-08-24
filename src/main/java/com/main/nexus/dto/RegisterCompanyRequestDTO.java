@@ -1,6 +1,8 @@
 
 package com.main.nexus.dto;
 
+import com.main.nexus.model.enums.CompanyType;
+
 public record RegisterCompanyRequestDTO(
         String email,
         String password,
@@ -8,5 +10,6 @@ public record RegisterCompanyRequestDTO(
         String taxId,
         String phone,
         String cep,
-        String description
+        String description,
+        CompanyType type
 ) {}

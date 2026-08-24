@@ -11,6 +11,7 @@ import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.User;
 import com.main.nexus.model.enums.CompanyStatus;
+import com.main.nexus.model.enums.CompanyType;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.UserRepository;
@@ -178,11 +179,13 @@ public class AuthService {
                     "Email already registered in the system.");
         }
 
+        CompanyType type = request.type() != null ? request.type() : CompanyType.LEGAL_ENTITY;
+
         if (request.taxId() != null && !request.taxId().isBlank()) {
-            validateTaxId(request.taxId());
+            DocumentValidator.validate(request.taxId(), type);
             if (companyRepository.existsByTaxId(request.taxId())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "CNPJ already registered in the system.");
+                        (type == CompanyType.INDIVIDUAL ? "CPF" : "CNPJ") + " already registered in the system.");
             }
         }
 
@@ -203,7 +206,7 @@ public class AuthService {
                         "Could not validate the ZIP code at this moment. Please try again in a few seconds.");
             }
         }
-        
+
         User user = new User();
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
@@ -214,6 +217,7 @@ public class AuthService {
         company.setUser(savedUser);
         company.setCompanyName(request.companyName());
         company.setTaxId(request.taxId());
+        company.setType(type);
         company.setPhone(request.phone());
         company.setCep(request.cep());
 
@@ -543,11 +547,13 @@ public class AuthService {
                     "This LinkedIn account is already linked to another user.");
         }
 
+        CompanyType type = request.type() != null ? request.type() : CompanyType.LEGAL_ENTITY;
+
         if (request.taxId() != null && !request.taxId().isBlank()) {
-            validateTaxId(request.taxId());
+            DocumentValidator.validate(request.taxId(), type);
             if (companyRepository.existsByTaxId(request.taxId())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "CNPJ already registered in the system.");
+                        (type == CompanyType.INDIVIDUAL ? "CPF" : "CNPJ") + " already registered in the system.");
             }
         }
 
@@ -580,6 +586,7 @@ public class AuthService {
         company.setUser(savedUser);
         company.setCompanyName(request.companyName());
         company.setTaxId(request.taxId());
+        company.setType(type);
         company.setPhone(request.phone());
         company.setCep(request.cep());
 
@@ -622,8 +629,8 @@ public class AuthService {
 
             emailService.send(
                 admin.getEmail(),
-                "Nova empresa aguardando aprovação — Nexus",
-                "Olá,\n\nA empresa \"" + company.getCompanyName() + "\" acabou de se cadastrar no Nexus e está " +
+                "Novo contratante aguardando aprovação — Nexus",
+                "Olá,\n\nO contratante \"" + company.getCompanyName() + "\" acabou de se cadastrar no Nexus e está " +
                 "aguardando aprovação.\n\nAcesse o painel administrativo para analisar o cadastro.\n\nEquipe Nexus"
             );
         }
@@ -912,47 +919,4 @@ public class AuthService {
     }
 
 
-    private void validateTaxId(String taxId) {
-        if (taxId == null || taxId.isBlank()) return;
-
-        String digits = taxId.replaceAll("[^0-9]", "");
-
-        if (digits.length() != 14) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "CNPJ has an invalid format. Expected 14 digits, e.g. 12.345.678/0001-99 or 12345678000199.");
-        }
-
-        if (digits.chars().distinct().count() == 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "CNPJ is invalid. Sequences of identical digits are not accepted.");
-        }
-
-        if (!isCnpjValid(digits)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "CNPJ is invalid. Please check the number and try again.");
-        }
-    }
-
-    private boolean isCnpjValid(String digits) {
-        int[] weights1 = {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
-        int[] weights2 = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
-
-        int sum = 0;
-        for (int i = 0; i < 12; i++) {
-            sum += Character.getNumericValue(digits.charAt(i)) * weights1[i];
-        }
-        int remainder = sum % 11;
-        int digit1 = remainder < 2 ? 0 : 11 - remainder;
-
-        if (digit1 != Character.getNumericValue(digits.charAt(12))) return false;
-
-        sum = 0;
-        for (int i = 0; i < 13; i++) {
-            sum += Character.getNumericValue(digits.charAt(i)) * weights2[i];
-        }
-        remainder = sum % 11;
-        int digit2 = remainder < 2 ? 0 : 11 - remainder;
-
-        return digit2 == Character.getNumericValue(digits.charAt(13));
-    }
 }

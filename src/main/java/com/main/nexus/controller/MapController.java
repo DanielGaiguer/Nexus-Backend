@@ -129,7 +129,8 @@ public class MapController {
                         c.getLatitude(),
                         c.getLongitude(),
                         c.getReputation(),
-                        openProjectsByCompanyId.getOrDefault(c.getId(), 0)
+                        openProjectsByCompanyId.getOrDefault(c.getId(), 0),
+                        c.getType().name()
                 ))
                 .toList();
 

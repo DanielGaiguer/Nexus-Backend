@@ -16,6 +16,7 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.enums.CompanyStatus;
+import com.main.nexus.model.enums.CompanyType;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
@@ -163,14 +164,18 @@ public class PublicProfessionalController {
     @GetMapping("/companies")
     public ResponseEntity<CompanyDirectoryPageDTO> listCompanies(
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) CompanyType type,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
         // Pageable representa as informações de paginação
         // Sort.by("companyName").ascending(), Define a ordenação pelo campo companyName em ordem crescente.
         Pageable pageable = PageRequest.of(page, size, Sort.by("companyName").ascending());
-        Page<Company> result = companyRepository.findByStatusAndCompanyNameContainingIgnoreCase(
-                CompanyStatus.APPROVED, search != null ? search : "", pageable);
+        Page<Company> result = type != null
+                ? companyRepository.findByStatusAndCompanyNameContainingIgnoreCaseAndType(
+                        CompanyStatus.APPROVED, search != null ? search : "", type, pageable)
+                : companyRepository.findByStatusAndCompanyNameContainingIgnoreCase(
+                        CompanyStatus.APPROVED, search != null ? search : "", pageable);
 
         List<CompanyDirectoryItemDTO> content = result.getContent().stream()
                 .map(c -> new CompanyDirectoryItemDTO(
@@ -180,7 +185,8 @@ public class PublicProfessionalController {
                         c.getUf(),
                         c.getReputation(),
                         c.getProfilePhotoUrl(),
-                        c.getDescription()
+                        c.getDescription(),
+                        c.getType().name()
                 ))
                 .toList();
 
@@ -260,7 +266,8 @@ public class PublicProfessionalController {
                 c.getTaxId(),
                 c.getStatus().name(),
                 List.of(),
-                c.getUser() != null ? c.getUser().getEmail() : null
+                c.getUser() != null ? c.getUser().getEmail() : null,
+                c.getType().name()
         );
 
         // Se outra empresa acessar diretamente uma oportunidade marcada como não visível
@@ -279,7 +286,15 @@ public class PublicProfessionalController {
             return true;
         }
         if (viewer.type() == UserType.COMPANY) {
-            return viewer.companyId() != null && viewer.companyId().equals(project.getCompany().getId());
+            if (viewer.companyId() != null && viewer.companyId().equals(project.getCompany().getId())) {
+                return true;
+            }
+            // Oportunidade encerrada que a empresa dona marcou como visível para outras
+            // empresas — mesma regra usada no histórico de contratações do perfil da
+            // empresa; sem isso o link "ver detalhes" dessa lista sempre cairia em 404
+            // pra qualquer empresa que não fosse a dona.
+            return project.getStatus() == ProjectStatus.CLOSED
+                    && Boolean.TRUE.equals(project.getVisibleToCompanies());
         }
         if (viewer.type() == UserType.PROFESSIONAL) {
             Long professionalId = resolveLoggedProfessionalId();
@@ -314,9 +329,21 @@ public class PublicProfessionalController {
 
         ReputationMetrics metrics = reputationMetricsRepository.findByCompanyId(id).orElse(null);
 
+        // Mesma regra de visibilidade das listagens de projeto (ProjectResponseAssembler)
+        // — se a empresa marcou a oportunidade como não visível para outras empresas, ela
+        // não aparece no histórico de contratações quando quem está olhando é outra
+        // empresa. Profissionais e admin sempre veem tudo (isHiddenFrom só restringe
+        // viewer.isCompany()).
+        ProjectResponseAssembler.Viewer viewer = resolveViewer();
         List<CompanyPreviousProjectDTO> previousProjects = matchService.getPreviousProjectsByCompany(id)
                 .stream()
-                .map(m -> new CompanyPreviousProjectDTO(m.getId(), m.getProject().getTitle(), m.getCreatedAt()))
+                .filter(m -> !projectResponseAssembler.isHiddenFrom(m.getProject(), viewer))
+                .map(m -> new CompanyPreviousProjectDTO(
+                        m.getId(),
+                        m.getProject().getId(),
+                        m.getProject().getTitle(),
+                        m.getProject().getOpportunityType(),
+                        m.getCreatedAt()))
                 .toList();
 
         PublicCompanyDTO dto = new PublicCompanyDTO(
@@ -331,7 +358,8 @@ public class PublicProfessionalController {
                 c.getTaxId(),
                 c.getStatus().name(),
                 previousProjects,
-                c.getUser() != null ? c.getUser().getEmail() : null
+                c.getUser() != null ? c.getUser().getEmail() : null,
+                c.getType().name()
         );
 
         return ResponseEntity.ok(dto);

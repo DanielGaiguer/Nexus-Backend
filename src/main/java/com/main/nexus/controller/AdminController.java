@@ -21,6 +21,7 @@ import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.CompanyStatus;
+import com.main.nexus.model.enums.CompanyType;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.CompanyRepository;
@@ -55,6 +56,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -195,8 +197,12 @@ public class AdminController {
     }
 
     @GetMapping("/companies")
-    public ResponseEntity<List<CompanyProfileDTO>> listCompanies() {
-        List<CompanyProfileDTO> companies = companyRepository.findAll()
+    public ResponseEntity<List<CompanyProfileDTO>> listCompanies(
+            @RequestParam(required = false) CompanyType type) {
+        List<Company> source = type != null
+                ? companyRepository.findByType(type)
+                : companyRepository.findAll();
+        List<CompanyProfileDTO> companies = source
                 .stream()
                 .map(this::toCompanyProfileDTO)
                 .toList();
@@ -443,7 +449,8 @@ public class AdminController {
                 c.getTaxId(),
                 c.getStatus().name(),
                 List.of(),
-                c.getUser() != null ? c.getUser().getEmail() : null
+                c.getUser() != null ? c.getUser().getEmail() : null,
+                c.getType().name()
         );
     }
 
@@ -463,7 +470,8 @@ public class AdminController {
                 c.getLongitude(),
                 c.getStatus().name(),
                 c.getProfilePhotoUrl(),
-                c.getLinkedinUrl()
+                c.getLinkedinUrl(),
+                c.getType().name()
         );
     }
 

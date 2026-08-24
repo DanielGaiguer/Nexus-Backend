@@ -11,10 +11,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-// Endpoints públicos de exibição de avaliações — card de preview (top 3) e página
-// dedicada (todas, com filtro de estrela) tanto de profissional quanto de empresa.
-// Público porque avaliações são informação de perfil, visível por qualquer visitante,
-// igual ao resto do perfil público.
+// Endpoints públicos de exibição de avaliações — card de preview (top 3 por padrão,
+// tamanho ajustável via ?size=) e página dedicada (todas, com filtro de estrela) tanto
+// de profissional quanto de empresa. Público porque avaliações são informação de
+// perfil, visível por qualquer visitante, igual ao resto do perfil público.
 @RestController
 @RequestMapping("/api/reviews")
 public class ReviewDisplayController {
@@ -33,8 +33,10 @@ public class ReviewDisplayController {
     }
 
     @GetMapping("/professional/{professionalId}/top3")
-    public List<ReviewDisplayDTO> getTop3ForProfessional(@PathVariable Long professionalId) {
-        return reviewService.getTop3ForProfessional(professionalId);
+    public List<ReviewDisplayDTO> getTop3ForProfessional(
+            @PathVariable Long professionalId,
+            @RequestParam(defaultValue = "3") int size) {
+        return reviewService.getTop3ForProfessional(professionalId, size);
     }
 
     @GetMapping("/professional/{professionalId}/all")
@@ -45,8 +47,10 @@ public class ReviewDisplayController {
     }
 
     @GetMapping("/company/{companyId}/top3")
-    public List<ReviewDisplayDTO> getTop3ForCompany(@PathVariable Long companyId) {
-        return reviewService.getTop3ForCompany(companyId);
+    public List<ReviewDisplayDTO> getTop3ForCompany(
+            @PathVariable Long companyId,
+            @RequestParam(defaultValue = "3") int size) {
+        return reviewService.getTop3ForCompany(companyId, size);
     }
 
     @GetMapping("/company/{companyId}/all")

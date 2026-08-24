@@ -127,16 +127,17 @@ public class ReviewService {
         return reviewRepository.countByCompanyId(companyId);
     }
 
-    // As 3 melhores avaliações — usado no card de preview do perfil (público, próprio ou
-    // visto pelo admin), sempre a mesma chamada independente de quem está olhando.
+    // As melhores avaliações — usado no card de preview do perfil (público, próprio ou
+    // visto pelo admin). `size` é opcional (default 3) pra não quebrar quem já chama sem
+    // o parâmetro (nexus-frontend, o app antigo); o nexus-frontend-next pede 5.
 
-    public List<ReviewDisplayDTO> getTop3ForProfessional(Long professionalId) {
-        return reviewRepository.findTop3ByProfessionalId(professionalId, PageRequest.of(0, 3))
+    public List<ReviewDisplayDTO> getTop3ForProfessional(Long professionalId, int size) {
+        return reviewRepository.findTop3ByProfessionalId(professionalId, PageRequest.of(0, size))
                 .stream().map(this::toDisplayDTO).toList();
     }
 
-    public List<ReviewDisplayDTO> getTop3ForCompany(Long companyId) {
-        return reviewRepository.findTop3ByCompanyId(companyId, PageRequest.of(0, 3))
+    public List<ReviewDisplayDTO> getTop3ForCompany(Long companyId, int size) {
+        return reviewRepository.findTop3ByCompanyId(companyId, PageRequest.of(0, size))
                 .stream().map(this::toDisplayDTO).toList();
     }
 

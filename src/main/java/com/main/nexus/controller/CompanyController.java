@@ -184,7 +184,8 @@ public class CompanyController {
                 c.getTaxId(),
                 c.getStatus().name(),
                 List.of(),
-                c.getUser() != null ? c.getUser().getEmail() : null
+                c.getUser() != null ? c.getUser().getEmail() : null,
+                c.getType().name()
         );
     }
 
@@ -257,7 +258,8 @@ public class CompanyController {
                 c.getLongitude(),
                 c.getStatus().name(),
                 c.getProfilePhotoUrl(),
-                c.getLinkedinUrl()
+                c.getLinkedinUrl(),
+                c.getType().name()
         );
     }
 }

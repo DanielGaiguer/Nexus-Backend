@@ -12,5 +12,6 @@ public record ChatSummaryDTO(
         LocalDateTime lastMessageAt,
         long unreadCount,
         Boolean matchActive,
-        Integer daysUntilExpiration) {
+        Integer daysUntilExpiration,
+        String otherPartyCompanyType) {
 }

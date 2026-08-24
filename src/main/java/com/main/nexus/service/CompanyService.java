@@ -63,7 +63,7 @@ public class CompanyService {
         
         Company saved = companyRepository.save(company);
 
-        // Notifica a empresa
+        // Notifica o contratante
         notificationService.notifyCompanyApproved(
             company.getUser(), company.getCompanyName());
 
@@ -94,7 +94,7 @@ public class CompanyService {
         company.setRejectionReason(reason);
         Company saved = companyRepository.save(company);
 
-        // Notifica a empresa
+        // Notifica o contratante
         notificationService.notifyCompanyRejected(
             company.getUser(), company.getCompanyName());
 

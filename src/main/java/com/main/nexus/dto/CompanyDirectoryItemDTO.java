@@ -7,5 +7,6 @@ public record CompanyDirectoryItemDTO(
         String uf,
         Double reputation,
         String profilePhotoUrl,
-        String description
+        String description,
+        String type
 ) {}

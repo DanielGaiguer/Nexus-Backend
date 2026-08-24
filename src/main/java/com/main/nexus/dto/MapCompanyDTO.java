@@ -8,5 +8,6 @@ public record MapCompanyDTO(
         Double latitude,
         Double longitude,
         Double reputation,
-        Integer openProjects
+        Integer openProjects,
+        String type
 ) {}

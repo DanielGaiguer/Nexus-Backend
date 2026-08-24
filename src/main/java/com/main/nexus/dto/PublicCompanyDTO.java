@@ -14,5 +14,6 @@ public record PublicCompanyDTO(
         String taxId,
         String status,
         List<CompanyPreviousProjectDTO> previousProjects,
-        String contactEmail
+        String contactEmail,
+        String type
 ) {}

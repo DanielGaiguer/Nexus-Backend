@@ -2,6 +2,7 @@ package com.main.nexus.service;
 
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
+import com.main.nexus.model.enums.CompanyType;
 import com.main.nexus.model.enums.OpportunityType;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,7 +111,7 @@ public class ProfileCompletionService {
         }
 
         if (company.getTaxId() == null || company.getTaxId().isBlank()) {
-            missing.add("CNPJ");
+            missing.add(company.getType() == CompanyType.INDIVIDUAL ? "CPF" : "CNPJ");
         }
 
         if (company.getPhone() == null || company.getPhone().isBlank()) {
@@ -118,7 +119,7 @@ public class ProfileCompletionService {
         }
 
         if (company.getDescription() == null || company.getDescription().isBlank()) {
-            missing.add("Descrição da empresa");
+            missing.add("Descrição do contratante");
         }
 
         return missing;

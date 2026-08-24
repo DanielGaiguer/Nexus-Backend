@@ -43,16 +43,16 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
            "ORDER BY r.rating DESC, r.createdAt DESC")
     List<Review> findProfessionalReviewsForCompany(@Param("companyId") Long companyId);
 
-    // As 3 melhores avaliações do profissional — usado no card de preview do perfil.
-    // Chamar com PageRequest.of(0, 3).
+    // As melhores avaliações do profissional — usado no card de preview do perfil.
+    // Chamar com PageRequest.of(0, size).
     @Query("SELECT r FROM Review r WHERE r.match.professional.id = :professionalId " +
            "AND r.authorType = com.main.nexus.model.enums.AuthorType.COMPANY " +
            "ORDER BY r.rating DESC, r.createdAt DESC")
     List<Review> findTop3ByProfessionalId(
             @Param("professionalId") Long professionalId, org.springframework.data.domain.Pageable pageable);
 
-    // As 3 melhores avaliações da empresa — usado no card de preview do perfil.
-    // Chamar com PageRequest.of(0, 3).
+    // As melhores avaliações da empresa — usado no card de preview do perfil.
+    // Chamar com PageRequest.of(0, size).
     @Query("SELECT r FROM Review r WHERE r.match.project.company.id = :companyId " +
            "AND r.authorType = com.main.nexus.model.enums.AuthorType.PROFESSIONAL " +
            "ORDER BY r.rating DESC, r.createdAt DESC")

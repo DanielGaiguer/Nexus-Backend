@@ -120,16 +120,19 @@ public class MessageController {
         String otherPartyName;
         String otherPartyPhotoUrl;
         String otherPartyType;
+        String otherPartyCompanyType;
         if (iAmProfessional) {
             Company company = match.getProject().getCompany();
             otherPartyName = company.getCompanyName();
             otherPartyPhotoUrl = company.getProfilePhotoUrl();
             otherPartyType = "COMPANY";
+            otherPartyCompanyType = company.getType().name();
         } else {
             Professional prof = match.getProfessional();
             otherPartyName = prof.getName();
             otherPartyPhotoUrl = prof.getProfilePhotoUrl();
             otherPartyType = "PROFESSIONAL";
+            otherPartyCompanyType = null;
         }
 
         // Pega todas as mensagens e organiza em ordem cronologica
@@ -164,7 +167,8 @@ public class MessageController {
                 lastMessage != null ? lastMessage.getSentAt() : null, // horario que foi enviada
                 unreadCount,
                 match.getActive(),
-                (int) daysUntilExpiration);
+                (int) daysUntilExpiration,
+                otherPartyCompanyType);
     }
 
     private MessageDTO toMessageDTO(Message message, Match match) {
