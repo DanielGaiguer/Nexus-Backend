@@ -16,6 +16,7 @@ import com.main.nexus.model.enums.InitiatedBy;
 import com.main.nexus.model.enums.InterestStatus;
 import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.OpportunityType;
+import com.main.nexus.model.enums.PendingIntentType;
 import com.main.nexus.model.enums.ProfessionalRejectionReason;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.ProjectType;
@@ -29,6 +30,7 @@ import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
@@ -66,6 +68,9 @@ public class MatchService {
 
     @Autowired
     private ProfileCompletionService profileCompletionService;
+
+    @Autowired
+    private ScreeningInvitationService screeningInvitationService;
 
     // SCORE ENGINE — fórmula principal
     // ScoreMatch = (Skills*0.39) + (Budget*0.28) + (History*0.22) + (Reputation*0.11)
@@ -192,6 +197,34 @@ public class MatchService {
                 roundToOneDecimal(reputationAdjustment),
                 roundToOneDecimal(match.getMatchScore()) // Score final oficial que foi persistido
         );
+    }
+
+    // Breakdown "vivo" pra telas que exibem um candidato/profissional sem necessariamente ter um
+    // Match persistido por trás ainda (proposta sem match bilateral, processo seletivo) -- mesmo
+    // padrão de resolução do ScorePreviewService.buildPreview: reaproveita o Match existente (com
+    // o score atualizado) ou monta um transiente só pra calcular o breakdown, sem salvar nada.
+    public ScoreBreakdownDTO getScoreBreakdownForCandidate(Long professionalId, Long projectId) {
+        Professional professional = professionalRepository.findById(professionalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Professional not found"));
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Project not found"));
+
+        Match match = matchRepository.findByProjectIdAndProfessionalId(projectId, professionalId)
+                .map(existing -> {
+                    refreshMatchScore(existing);
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    Match transientMatch = new Match();
+                    transientMatch.setProject(project);
+                    transientMatch.setProfessional(professional);
+                    transientMatch.setMatchScore(getScore(professional, project));
+                    return transientMatch;
+                });
+
+        return getScoreBreakdown(professional, project, match);
     }
 
     // Mesma fórmula de ponderação usada em getScore(), mas sem o multiplicador
@@ -681,10 +714,14 @@ public class MatchService {
             match.setInitiatedBy(InitiatedBy.COMPANY);
         }
 
-        // Esse metodo salva o historico do match, para popular uma linha do tempo
-        matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
-        // Salva o Match atualizado
+        // Salva o Match primeiro -- precisa ter um id antes do histórico poder referenciá-lo.
+        // Só importa de verdade quando é a primeira vez entre esse par (match ainda não existia,
+        // criado agora em companyShowsInterestByProject): salvar o histórico antes do match em
+        // si fazia o Hibernate recusar (TransientPropertyValueException), já que MatchHistory
+        // apontava pra um Match sem id ainda.
         Match saved = matchRepository.save(match);
+        // Esse metodo salva o historico do match, para popular uma linha do tempo
+        matchHistoryService.record(saved, fromStatus, saved.getStatus().name(), "COMPANY");
 
         // Se ja tem um profissional interessado, manda notificacao para ambos
         if (wasAlreadyProfessionalInterested) {
@@ -762,6 +799,7 @@ public class MatchService {
         match.setStatus(StatusMatch.REJECTED);
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "COMPANY");
         Match saved = matchRepository.save(match);
+        screeningInvitationService.cancelPendingForProfessionalProject(saved.getProject(), saved.getProfessional());
 
         // Salva a rejeicao, com os devidos motivos dela, e notifica o profissional da rejeicao
         saveCompanyRejection(match, reasons, description);
@@ -789,9 +827,10 @@ public class MatchService {
         return cancelMatchInternal(match, false, "PROFESSIONAL");
     }
 
-    //Espelho exato do companyAccepts
+    //Espelho exato do companyAccepts -- exceto pelo gate do questionário de triagem (ver
+    //ScreeningInvitationService), que pode segurar a confirmação até o profissional responder
     @Transactional
-    public Match professionalAccepts(Long matchId, Long professionalId) {
+    public MatchActionResult professionalAccepts(Long matchId, Long professionalId) {
         Match match = findById(matchId);
         validateProfessionalOwnership(match, professionalId);
 
@@ -800,6 +839,38 @@ public class MatchService {
                     "This match is not awaiting a professional response.");
         }
         assertProjectHasOpenPositions(match.getProject());
+
+        ScreeningInvitationService.GateResult gate = screeningInvitationService.checkGate(
+                match.getProject(), match.getProfessional(), PendingIntentType.MATCH_ACCEPT, match, null);
+        if (gate.blocked()) {
+            return new MatchActionResult(match, true, gate.invitationId());
+        }
+
+        return new MatchActionResult(applyProfessionalAccept(match, true), false, null);
+    }
+
+    // Núcleo que confirma o match -- chamado na hora (gate passou, precondições já validadas em
+    // professionalAccepts) ou depois, retomado por ScreeningInvitationController.submit quando o
+    // profissional termina o questionário obrigatório (ver PendingIntentType.MATCH_ACCEPT).
+    // `strict` diferencia as duas formas de chegar aqui: true replica exatamente o
+    // comportamento de sempre (lança erro se o estado não permitir); false é best-effort --
+    // usado só na retomada, quando o estado pode ter mudado enquanto o profissional respondia
+    // (ex.: empresa cancelou o convite nesse meio tempo) e não faz sentido falhar a submissão
+    // do questionário por causa disso.
+    @Transactional
+    public Match applyProfessionalAccept(Match match, boolean strict) {
+        if (match.getStatus() != StatusMatch.COMPANY_INTERESTED) {
+            if (strict) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "This match is not awaiting a professional response.");
+            }
+            return match;
+        }
+        if (strict) {
+            assertProjectHasOpenPositions(match.getProject());
+        } else if (!match.getProject().hasOpenPositions()) {
+            return match;
+        }
 
         String fromStatus = match.getStatus().name();
         match.setProfessionalStatus(InterestStatus.INTERESTED);
@@ -828,6 +899,7 @@ public class MatchService {
         match.setStatus(StatusMatch.REJECTED);
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), "PROFESSIONAL");
         Match saved = matchRepository.save(match);
+        screeningInvitationService.cancelPendingForProfessionalProject(saved.getProject(), saved.getProfessional());
 
         saveProfessionalRejection(match, reasons, description);
         notificationService.notifyInviteRejected(
@@ -863,6 +935,11 @@ public class MatchService {
                     project.getCompany().getCompanyName()
             );
         }
+
+        // Cobre também profissionais que ainda estavam no meio do questionário de triagem sem
+        // nem ter chegado a ter um Match (ex.: veio pelo gate de enviar proposta) -- por isso é
+        // uma varredura à parte do loop acima, não por-match.
+        screeningInvitationService.cancelAllPendingForProject(project);
     }
 
     // validações de posse
@@ -937,6 +1014,7 @@ public class MatchService {
         }
         matchHistoryService.record(match, fromStatus, match.getStatus().name(), changedBy);
         Match saved = matchRepository.save(match);
+        screeningInvitationService.cancelPendingForProfessionalProject(saved.getProject(), saved.getProfessional());
 
         notifyCancellation(saved, isCompanySide, wasMatched);
         return saved;
@@ -1083,6 +1161,7 @@ public class MatchService {
                 .forEach(this::refreshMatchScore);
     }
 
+    @Transactional
     public List<Match> getOpportunitiesForProfessional(Long professionalId) {
         Professional professional = professionalRepository.findById(professionalId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -1120,9 +1199,10 @@ public class MatchService {
     }
 
     
-    // Mesmo fluxo de companyShowsInterest
+    // Mesmo fluxo de companyShowsInterest -- exceto pelo gate do questionário de triagem (ver
+    // ScreeningInvitationService), que pode segurar a confirmação até o profissional responder
     @Transactional
-    public Match professionalShowsInterest(Long professionalId, Long projectId) {
+    public MatchActionResult professionalShowsInterest(Long professionalId, Long projectId) {
         Professional professional = professionalRepository.findById(professionalId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Professional not found"));
@@ -1150,26 +1230,61 @@ public class MatchService {
                     "This match was rejected and cannot be reactivated.");
         }
 
-        // Checa se a empresa ja esta interessada
+        // Precisa de um id salvo antes do gate poder referenciá-lo como pendingMatch (só
+        // relevante pra match recém-criado, ainda sem id -- o orElseGet acima não persiste).
+        if (match.getId() == null) {
+            match = matchRepository.save(match);
+        }
+
+        ScreeningInvitationService.GateResult gate = screeningInvitationService.checkGate(
+                project, professional, PendingIntentType.MATCH_INTEREST, match, null);
+        if (gate.blocked()) {
+            return new MatchActionResult(match, true, gate.invitationId());
+        }
+
+        return new MatchActionResult(applyProfessionalInterest(match, true), false, null);
+    }
+
+    // Núcleo que decide PROFESSIONAL_INTERESTED vs MATCHED (se a empresa já estava
+    // interessada) -- chamado na hora (gate passou) ou depois, retomado por
+    // ScreeningInvitationController.submit quando o profissional termina o questionário
+    // obrigatório (ver PendingIntentType.MATCH_INTEREST). `strict` tem o mesmo papel de
+    // applyProfessionalAccept: true replica o comportamento de sempre; false é best-effort,
+    // só usado na retomada, e não avança se o match saiu do estado esperado nesse meio tempo.
+    @Transactional
+    public Match applyProfessionalInterest(Match match, boolean strict) {
         boolean wasAlreadyCompanyInterested = match.getStatus() == StatusMatch.COMPANY_INTERESTED;
+
+        if (!strict) {
+            boolean stillActionable = match.getStatus() == StatusMatch.WAITING || wasAlreadyCompanyInterested;
+            if (!stillActionable) {
+                return match;
+            }
+        }
+
         String fromStatus = match.getStatus().name();
 
         if (wasAlreadyCompanyInterested) {
             // Verifica se o projeto esta aberto e tem posicoes disponiveis
-            assertProjectHasOpenPositions(match.getProject());
+            if (strict) {
+                assertProjectHasOpenPositions(match.getProject());
+            } else if (!match.getProject().hasOpenPositions()) {
+                return match;
+            }
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.MATCHED);
             incrementFilledPositions(match.getProject());
         } else {
             //Verifica se o projeto esta aberto, nao ve as posicoes por que nao gera um match completo
-            assertProjectIsOpen(project);
+            if (strict) {
+                assertProjectIsOpen(match.getProject());
+            } else if (match.getProject().getStatus() != ProjectStatus.OPEN) {
+                return match;
+            }
             match.setProfessionalStatus(InterestStatus.INTERESTED);
             match.setStatus(StatusMatch.PROFESSIONAL_INTERESTED);
         }
 
-        // Salva o Match primeiro — diferente dos outros fluxos de interesse, aqui o match
-        // pode ser recém-criado (orElseGet acima), ainda sem id; gravar o histórico antes
-        // do save falha (MatchHistory referenciando um Match transiente, não persistido).
         Match saved = matchRepository.save(match);
         matchHistoryService.record(saved, fromStatus, saved.getStatus().name(), "PROFESSIONAL");
 
@@ -1180,9 +1295,23 @@ public class MatchService {
                 saved.getProject().getTitle(),
                 saved.getId()
             );
-        }
-
-        if (wasAlreadyCompanyInterested) {
+            // Retomado depois de aprovar todas as etapas de triagem (strict=false só acontece
+            // nesse caminho) -- o profissional não recebe nenhum aviso de "avançou de etapa" pra
+            // essa última (não existe próxima), então avisa aqui que o processo terminou e agora
+            // a decisão do match é da empresa.
+            if (!strict) {
+                notificationService.notifyScreeningApprovedAwaitingMatchDecision(
+                        saved.getProfessional().getUser(), saved.getProject().getTitle());
+                emailService.send(
+                        saved.getProfessional().getUser().getEmail(),
+                        "Processo seletivo concluído — Nexus",
+                        "Olá " + saved.getProfessional().getName() + ",\n\n" +
+                        "Você foi aprovado em todas as etapas do processo seletivo do projeto \"" +
+                        saved.getProject().getTitle() + "\". A decisão final sobre o match agora é da empresa.\n\n" +
+                        "Acesse o Nexus para acompanhar.\n\nEquipe Nexus"
+                );
+            }
+        } else {
             notifyMutualMatch(saved);
         }
 
@@ -1191,6 +1320,7 @@ public class MatchService {
 
     // CONSULTAS
 
+    @Transactional
     public List<Match> getRankingByProject(Long projectId) {
         List<Match> ranking = matchRepository.findByProjectId(projectId)
                 .stream()
@@ -1274,6 +1404,7 @@ public class MatchService {
         return ranking;
     }
 
+    @Transactional
     public List<Match> getMatchesByProfessional(Long professionalId) {
         List<Match> matches = matchRepository.findByProfessionalId(professionalId);
         // Base de várias telas (dashboard, "Matches Confirmados"/"Recusados" filtrados no
@@ -1292,6 +1423,7 @@ public class MatchService {
                         HttpStatusCode.valueOf(404), "Match not found: " + id));
     }
 
+    @Transactional
     public List<Match> getPendingInvitesForProfessional(Long professionalId) {
         List<Match> invites = matchRepository.findByProfessionalId(professionalId)
                 .stream()
@@ -1299,9 +1431,36 @@ public class MatchService {
                 .filter(this::isActionablePending)
                 .toList();
 
-        invites.forEach(this::refreshMatchScore);
+        // Convite que o profissional já começou a responder (etapa de triagem em andamento) sai
+        // daqui e vai pra getInScreeningMatchesForProfessional -- ele não pode simplesmente
+        // aceitar/recusar esse convite agora, só terminar de responder.
+        Set<Long> inScreening = activeScreeningMatchIds(invites);
+        List<Match> result = invites.stream().filter(m -> !inScreening.contains(m.getId())).toList();
 
-        return invites;
+        result.forEach(this::refreshMatchScore);
+
+        return result;
+    }
+
+    // "Em processo" (profissional): convites/interesses ainda sem decisão final da empresa, mas
+    // que já têm um processo seletivo em andamento por trás -- hoje ficariam invisíveis (WAITING
+    // nunca aparece em nenhuma aba) ou misturados com convites que ainda dão pra aceitar/recusar
+    // direto (COMPANY_INTERESTED). Espelho de getInScreeningMatchesForCompany.
+    @Transactional
+    public List<Match> getInScreeningMatchesForProfessional(Long professionalId) {
+        List<Match> candidates = matchRepository.findByProfessionalId(professionalId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.WAITING
+                          || m.getStatus() == StatusMatch.COMPANY_INTERESTED)
+                .filter(this::isActionablePending)
+                .toList();
+
+        Set<Long> inScreening = activeScreeningMatchIds(candidates);
+        List<Match> result = candidates.stream().filter(m -> inScreening.contains(m.getId())).toList();
+
+        result.forEach(this::refreshMatchScore);
+
+        return result;
     }
 
     // Um convite/interesse só continua "pendente" (exigindo resposta) se a vaga ainda
@@ -1314,10 +1473,20 @@ public class MatchService {
                 && m.getProject().getStatus() == ProjectStatus.OPEN;
     }
 
+    // Dentre os matches informados, quais têm um processo seletivo em andamento por trás (ver
+    // ScreeningInvitationService.findMatchIdsWithActiveScreening) -- usado pelas abas "Em
+    // processo" dos dois lados, e pra excluir esses matches das abas normais de convite/interesse
+    // pendente (evita o mesmo match aparecer em duas abas ao mesmo tempo).
+    private Set<Long> activeScreeningMatchIds(List<Match> matches) {
+        return screeningInvitationService.findMatchIdsWithActiveScreening(
+                matches.stream().map(Match::getId).toList());
+    }
+
     // Espelho de getPendingInvitesForProfessional: interesses que o próprio profissional
     // enviou (professionalShowsInterest) e que ainda aguardam resposta da empresa.
     // Equivalente ao "Convites Enviados" (sentInvites/COMPANY_INTERESTED) que já existe
     // do lado da empresa em getMatchesByCompany + filtro no frontend.
+    @Transactional
     public List<Match> getSentInterestsForProfessional(Long professionalId) {
         List<Match> sent = matchRepository.findByProfessionalId(professionalId)
                 .stream()
@@ -1330,6 +1499,7 @@ public class MatchService {
         return sent;
     }
 
+    @Transactional
     public List<Match> getConfirmedMatchesForProfessional(Long professionalId) {
         List<Match> confirmed = matchRepository.findByProfessionalId(professionalId)
                 .stream()
@@ -1359,6 +1529,7 @@ public class MatchService {
                 .count();
     }
 
+    @Transactional
     public List<Match> getMatchesByCompany(Long companyId) {
         List<Match> matches = matchRepository.findByProjectCompanyId(companyId);
         matches.forEach(this::refreshMatchScore);
@@ -1367,6 +1538,7 @@ public class MatchService {
 
     // Espelho de getPendingInvitesForProfessional: interesses que profissionais enviaram
     // pra vagas da empresa (professionalShowsInterest) e que ainda aguardam resposta dela.
+    @Transactional
     public List<Match> getReceivedInterestsForCompany(Long companyId) {
         List<Match> received = matchRepository.findByProjectCompanyId(companyId)
                 .stream()
@@ -1381,6 +1553,7 @@ public class MatchService {
 
     // Espelho de getSentInterestsForProfessional: convites que a empresa enviou (a partir
     // do ranking) e que ainda aguardam resposta do profissional.
+    @Transactional
     public List<Match> getSentInvitesForCompany(Long companyId) {
         List<Match> sent = matchRepository.findByProjectCompanyId(companyId)
                 .stream()
@@ -1388,19 +1561,45 @@ public class MatchService {
                 .filter(this::isActionablePending)
                 .toList();
 
-        sent.forEach(this::refreshMatchScore);
+        // Convite que o profissional já começou a responder sai daqui e vai pra
+        // getInScreeningMatchesForCompany -- ver mesmo comentário em getPendingInvitesForProfessional.
+        Set<Long> inScreening = activeScreeningMatchIds(sent);
+        List<Match> result = sent.stream().filter(m -> !inScreening.contains(m.getId())).toList();
 
-        return sent;
+        result.forEach(this::refreshMatchScore);
+
+        return result;
+    }
+
+    // "Em processo" (empresa): candidaturas ainda sem decisão final, mas que já têm um processo
+    // seletivo em andamento por trás -- hoje ficariam invisíveis (interesse recém-demonstrado,
+    // WAITING, nunca aparece em nenhuma aba) ou misturadas com convites que a empresa já pode
+    // aceitar/recusar direto (COMPANY_INTERESTED sem etapa pendente). Espelho de
+    // getInScreeningMatchesForProfessional.
+    @Transactional
+    public List<Match> getInScreeningMatchesForCompany(Long companyId) {
+        List<Match> candidates = matchRepository.findByProjectCompanyId(companyId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.WAITING
+                          || m.getStatus() == StatusMatch.COMPANY_INTERESTED)
+                .filter(this::isActionablePending)
+                .toList();
+
+        Set<Long> inScreening = activeScreeningMatchIds(candidates);
+        List<Match> result = candidates.stream().filter(m -> inScreening.contains(m.getId())).toList();
+
+        result.forEach(this::refreshMatchScore);
+
+        return result;
     }
 
     // Só matches MATCHED e ATIVOS -- os já encerrados (active=false) saem daqui e
     // aparecem em getPreviousProjectsByCompany, não nos dois ao mesmo tempo.
+    @Transactional
     public List<Match> getConfirmedMatchesForCompany(Long companyId) {
-        List<Match> confirmed = matchRepository.findByProjectCompanyId(companyId)
-                .stream()
-                .filter(m -> m.getStatus() == StatusMatch.MATCHED)
-                .filter(m -> !Boolean.FALSE.equals(m.getActive()))
-                .toList();
+        // Filtro (MATCHED + ativo) agora resolvido no banco -- ver
+        // findConfirmedActiveByCompanyId.
+        List<Match> confirmed = matchRepository.findConfirmedActiveByCompanyId(companyId);
 
         confirmed.forEach(this::refreshMatchScore);
 

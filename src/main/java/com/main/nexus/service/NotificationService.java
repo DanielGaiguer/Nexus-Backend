@@ -329,6 +329,140 @@ public class NotificationService {
         );
     }
 
+    // Disparado pelo gate (ScreeningInvitationService.checkGate) quando o profissional tenta
+    // demonstrar interesse, enviar proposta ou aceitar um convite numa vaga com questionário de
+    // triagem vinculado, e ainda não tem uma tentativa concluída -- a ação original só se
+    // completa depois que ele responder.
+    @Async
+    public void notifyScreeningInvitationReceived(User professionalUser,
+                                                  String projectTitle, String stageTitle, Long invitationId) {
+        notify(
+            professionalUser,
+            NotificationType.SCREENING_INVITATION_RECEIVED,
+            "Responda para continuar",
+            "Para seguir com o projeto \"" + projectTitle + "\", responda a etapa \"" + stageTitle +
+            "\" do processo seletivo.",
+            "/pro/screening-invitations/" + invitationId + "/take"
+        );
+    }
+    @Async
+    public void notifyScreeningSubmitted(User companyUser,
+                                         String professionalName, String projectTitle, String stageTitle,
+                                         Long invitationId) {
+        notify(
+            companyUser,
+            NotificationType.SCREENING_SUBMITTED,
+            "Etapa do processo seletivo respondida",
+            professionalName + " respondeu a etapa \"" + stageTitle + "\" do projeto \"" + projectTitle +
+            "\" -- avalie para aprovar ou reprovar o avanço.",
+            "/company/screening-invitations/" + invitationId
+        );
+    }
+    @Async
+    public void notifyScreeningDeclined(User companyUser,
+                                        String professionalName, String projectTitle, String stageTitle) {
+        notify(
+            companyUser,
+            NotificationType.SCREENING_DECLINED,
+            "Etapa do processo seletivo recusada",
+            professionalName + " recusou a etapa \"" + stageTitle + "\" do projeto \"" + projectTitle + "\".",
+            "/company/matches"
+        );
+    }
+    @Async
+    public void notifyScreeningStageApproved(User professionalUser,
+                                             String projectTitle, String stageTitle,
+                                             Long nextInvitationId) {
+        notify(
+            professionalUser,
+            NotificationType.SCREENING_STAGE_APPROVED,
+            "Você avançou de etapa!",
+            "Você foi aprovado na etapa \"" + stageTitle + "\" do processo seletivo do projeto \"" +
+            projectTitle + "\" -- responda a próxima etapa para continuar.",
+            "/pro/screening-invitations/" + nextInvitationId + "/take"
+        );
+    }
+    // Aprovou a ÚLTIMA etapa, mas a ação que ficou pendente não se resolve sozinha em MATCHED --
+    // vira um match aguardando o aceite da empresa (interesse do profissional que a empresa ainda
+    // não tinha retribuído). Sem isso, o profissional nunca fica sabendo que terminou de
+    // responder tudo (notifyScreeningStageApproved só dispara quando existe uma PRÓXIMA etapa).
+    @Async
+    public void notifyScreeningApprovedAwaitingMatchDecision(User professionalUser, String projectTitle) {
+        notify(
+            professionalUser,
+            NotificationType.SCREENING_STAGE_APPROVED,
+            "Você concluiu o processo seletivo!",
+            "Você foi aprovado em todas as etapas do processo seletivo do projeto \"" + projectTitle +
+            "\" -- a decisão final sobre o match agora é da empresa.",
+            "/pro/matches"
+        );
+    }
+    // Espelho de notifyScreeningApprovedAwaitingMatchDecision pro caso de PROPOSAL_SUBMIT -- a
+    // proposta nunca é aceita/recusada automaticamente pelo resultado da triagem (decisão
+    // confirmada com o usuário), então o profissional também precisa ser avisado aqui.
+    @Async
+    public void notifyScreeningApprovedAwaitingProposalDecision(User professionalUser, String projectTitle) {
+        notify(
+            professionalUser,
+            NotificationType.SCREENING_STAGE_APPROVED,
+            "Você concluiu o processo seletivo!",
+            "Você foi aprovado em todas as etapas do processo seletivo do projeto \"" + projectTitle +
+            "\" -- a decisão final sobre sua proposta agora é da empresa.",
+            "/pro/proposals"
+        );
+    }
+    @Async
+    public void notifyScreeningStageReproved(User professionalUser,
+                                             String projectTitle, String stageTitle,
+                                             Long invitationId) {
+        notify(
+            professionalUser,
+            NotificationType.SCREENING_STAGE_REPROVED,
+            "Resultado do processo seletivo",
+            "Você não avançou na etapa \"" + stageTitle + "\" do processo seletivo do projeto \"" +
+            projectTitle + "\".",
+            "/pro/screening-invitations/" + invitationId
+        );
+    }
+    @Async
+    public void notifyScreeningExpiredForCompany(User companyUser,
+                                                 String professionalName, String projectTitle, String stageTitle) {
+        notify(
+            companyUser,
+            NotificationType.SCREENING_EXPIRED,
+            "Etapa do processo seletivo expirou sem resposta",
+            "A etapa \"" + stageTitle + "\" do projeto \"" + projectTitle + "\" (candidato " + professionalName +
+            ") expirou sem resposta.",
+            "/company/matches"
+        );
+    }
+    @Async
+    public void notifyScreeningExpiredForProfessional(User professionalUser, String projectTitle, String stageTitle) {
+        notify(
+            professionalUser,
+            NotificationType.SCREENING_EXPIRED,
+            "Uma etapa do processo seletivo expirou",
+            "O prazo para responder a etapa \"" + stageTitle + "\" do projeto \"" + projectTitle +
+            "\" terminou sem submissão. Não é mais possível responder ou tentar novamente para esta vaga.",
+            "/pro/matches"
+        );
+    }
+
+    // Disparado quando uma tentativa ainda pendente (SENT/IN_PROGRESS/SUBMITTED) é cancelada
+    // porque o match ou o projeto associado foi encerrado -- ver
+    // ScreeningInvitationService.cancelPendingForProfessionalProject/cancelAllPendingForProject,
+    // chamados a partir de MatchService em todo caminho que encerra um match ou fecha um projeto.
+    @Async
+    public void notifyScreeningCancelled(User professionalUser, String projectTitle) {
+        notify(
+            professionalUser,
+            NotificationType.SCREENING_CANCELLED,
+            "Etapa do processo seletivo cancelada",
+            "O processo seletivo do projeto \"" + projectTitle + "\" foi encerrado, e sua etapa pendente foi cancelada.",
+            "/pro/matches"
+        );
+    }
+
     @Async
     public void notifyIncompleteProfile(User user, List<String> missingFields) {
         String fieldList = String.join(", ", missingFields);

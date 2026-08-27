@@ -39,6 +39,7 @@ import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.ProposalService;
+import com.main.nexus.service.ScreeningInvitationService;
 import com.main.nexus.service.SkillService;
 import java.time.LocalDateTime;
 import java.time.Month;
@@ -72,6 +73,9 @@ public class AdminController {
 
     @Autowired
     private ProposalService proposalService;
+
+    @Autowired
+    private ScreeningInvitationService screeningInvitationService;
 
     @Autowired
     private UserRepository userRepository;
@@ -431,7 +435,8 @@ public class AdminController {
                 m.getActive(),
                 matchService.getRejectionReasonNames(feedback),
                 feedback != null ? feedback.getDescription() : null,
-                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null
+                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null,
+                screeningInvitationService.getSummariesForMatch(m)
         );
     }
 

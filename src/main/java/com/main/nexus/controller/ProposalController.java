@@ -79,11 +79,17 @@ public class ProposalController {
         return ResponseEntity.ok(proposals.stream().map(proposalService::toResponseDTO).toList());
     }
 
-    // EMPRESA — listagem por projeto, aceite, recusa
+    // EMPRESA — listagem por projeto, listagem geral, aceite, recusa
 
     @GetMapping("/project/{projectId}")
     public ResponseEntity<List<ProposalResponseDTO>> forProject(@PathVariable Long projectId) {
         List<Proposal> proposals = proposalService.listProposalsForProject(projectId, getLoggedCompanyId());
+        return ResponseEntity.ok(proposals.stream().map(proposalService::toResponseDTO).toList());
+    }
+
+    @GetMapping("/company/mine")
+    public ResponseEntity<List<ProposalResponseDTO>> forCompany() {
+        List<Proposal> proposals = proposalService.listProposalsForCompany(getLoggedCompanyId());
         return ResponseEntity.ok(proposals.stream().map(proposalService::toResponseDTO).toList());
     }
 

@@ -22,6 +22,7 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -89,6 +90,7 @@ public class Project {
         joinColumns = @JoinColumn(name = "job_id"),
         inverseJoinColumns = @JoinColumn(name = "skill_id")
     )
+    @BatchSize(size = 50)
     private List<Skill> requiredSkills = new ArrayList<>();
     
     @Column(nullable = false)
@@ -136,6 +138,7 @@ public class Project {
     @Enumerated(EnumType.STRING)
     @CollectionTable(name = "tb_project_salary_visibility", joinColumns = @JoinColumn(name = "project_id"))
     @Column(name = "viewer_role", length = 20)
+    @BatchSize(size = 50)
     private Set<UserType> salaryVisibleTo = new HashSet<>(Set.of(UserType.PROFESSIONAL, UserType.COMPANY));
 
     // Campo exclusivo de PROJECT (ver ProjectService.validateByType) -- quando true, libera o

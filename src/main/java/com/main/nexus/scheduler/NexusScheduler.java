@@ -4,6 +4,7 @@ import com.main.nexus.service.MatchExpirationService;
 import com.main.nexus.service.NotificationService;
 import com.main.nexus.service.ProfessionalInactivityService;
 import com.main.nexus.service.ProposalService;
+import com.main.nexus.service.ScreeningInvitationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,6 +24,9 @@ public class NexusScheduler {
 
     @Autowired
     private ProposalService proposalService;
+
+    @Autowired
+    private ScreeningInvitationService screeningInvitationService;
 
     // segundo minuto hora dia-do-mês mês dia-da-semana
     @Scheduled(cron = "0 0 0 * * *") //meia-noite, todo dia. Roda checkAndExpireMatches (a checagem de expiração de 30 dias)   
@@ -58,5 +62,13 @@ public class NexusScheduler {
     @Scheduled(cron = "0 0 5 * * *")
     public void runProposalExpirationCheck() {
         proposalService.expirePendingProposals();
+    }
+
+    // 6h da manhã, todo dia — mesmo espírito dos jobs acima. Marca como EXPIRED os
+    // ScreeningInvitation SENT/IN_PROGRESS cujo prazo de resposta (definido pelo
+    // ScreeningQuestionnaire, contado a partir do envio) já passou sem submissão.
+    @Scheduled(cron = "0 0 6 * * *")
+    public void runScreeningInvitationExpirationCheck() {
+        screeningInvitationService.expirePendingInvitations();
     }
 }

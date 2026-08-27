@@ -51,5 +51,14 @@ public record ProposalResponseDTO(
         Integer totalReviews,
         Integer previousProjectsCount,
         List<String> matchingSkills,
-        List<String> missingSkills
+        List<String> missingSkills,
+
+        // Tentativa(s) do profissional no questionário de triagem da vaga -- mesmo
+        // campo/mesma fonte que MatchResponseDTO.screeningInvitations. Lista vazia em toda
+        // vaga sem questionário vinculado.
+        List<ScreeningInvitationSummaryDTO> screeningInvitations,
+
+        // Breakdown "vivo" (MatchService.getScoreBreakdownForCandidate) -- mesmo formato exibido
+        // no card de match, pro card de proposta mostrar os mesmos índices de compatibilidade.
+        ScoreBreakdownDTO scoreBreakdown
 ) {}

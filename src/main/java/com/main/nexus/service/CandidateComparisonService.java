@@ -35,6 +35,9 @@ public class CandidateComparisonService {
     @Autowired
     private MatchService matchService;
 
+    @Autowired
+    private ScreeningInvitationService screeningInvitationService;
+
     private static final int MIN_CANDIDATES = 1;
     private static final int MAX_CANDIDATES = 5;
 
@@ -192,7 +195,8 @@ public class CandidateComparisonService {
                 professional.getProjects() != null ? professional.getProjects().size() : 0,
                 professional.getAvailable(),
                 match.getStatus(),
-                breakdown
+                breakdown,
+                screeningInvitationService.getSummariesForMatch(match)
         );
     }
 

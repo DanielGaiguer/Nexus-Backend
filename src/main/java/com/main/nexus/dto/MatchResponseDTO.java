@@ -23,5 +23,9 @@ public record MatchResponseDTO(
         String rejectionDescription,
         // Preenchido para sempre quando este match foi confirmado via aceite de uma Proposal
         // (ProposalService.acceptProposal) -- fica visível em toda tela que já usa este DTO.
-        ProposalResponseDTO acceptedProposal
+        ProposalResponseDTO acceptedProposal,
+        // Tentativa(s) do profissional no questionário de triagem da vaga (0..N -- pode ter
+        // mais de uma ao longo do tempo se recusou/expirou e tentou de novo). Lista vazia em
+        // toda vaga sem questionário vinculado -- não muda nenhuma tela existente.
+        List<ScreeningInvitationSummaryDTO> screeningInvitations
 ) {}

@@ -1,6 +1,7 @@
 package com.main.nexus.controller;
 
 import com.main.nexus.dto.CompanyRejectRequestDTO;
+import com.main.nexus.dto.MatchActionResponseDTO;
 import com.main.nexus.dto.MatchHistoryDTO;
 import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.MatchStatusDTO;
@@ -17,10 +18,12 @@ import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.MatchActionResult;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProposalService;
+import com.main.nexus.service.ScreeningInvitationService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -53,6 +56,9 @@ public class MatchController {
 
     @Autowired
     private ProposalService proposalService;
+
+    @Autowired
+    private ScreeningInvitationService screeningInvitationService;
 
     @GetMapping("/{matchId}")
     public ResponseEntity<MatchResponseDTO> findById(@PathVariable Long matchId) {
@@ -184,10 +190,16 @@ public class MatchController {
     // Profissional responde um interesse 
 
     @PostMapping("/{matchId}/professional-accept")
-    public ResponseEntity<String> professionalAccepts(@PathVariable Long matchId) {
+    public ResponseEntity<MatchActionResponseDTO> professionalAccepts(@PathVariable Long matchId) {
         Long professionalId = getLoggedProfessionalId();
-        matchService.professionalAccepts(matchId, professionalId);
-        return ResponseEntity.ok("Match confirmed! Contact details are now available.");
+        MatchActionResult result = matchService.professionalAccepts(matchId, professionalId);
+        if (result.screeningRequired()) {
+            return ResponseEntity.ok(new MatchActionResponseDTO(
+                    "Responda o questionário de triagem da vaga antes de continuar.",
+                    true, result.screeningInvitationId()));
+        }
+        return ResponseEntity.ok(new MatchActionResponseDTO(
+                "Match confirmed! Contact details are now available.", false, null));
     }
 
     @PostMapping("/{matchId}/professional-reject")
@@ -235,7 +247,8 @@ public class MatchController {
                 m.getActive(),
                 matchService.getRejectionReasonNames(feedback),
                 feedback != null ? feedback.getDescription() : null,
-                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null
+                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null,
+                screeningInvitationService.getSummariesForMatch(m)
         );
     }
 

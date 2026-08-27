@@ -23,5 +23,10 @@ public record CandidateComparisonItemDTO(
         Integer previousProjectsCount,
         Boolean available,
         StatusMatch matchStatus,
-        ScoreBreakdownDTO scoreBreakdown
+        ScoreBreakdownDTO scoreBreakdown,
+        // Questionário de triagem respondido (ou em andamento) por este profissional pra esta
+        // vaga -- mesmo campo/mesma fonte que MatchResponseDTO.screeningInvitations, exposto
+        // aqui também pra aparecer na tela de comparação de candidatos junto com
+        // score/reputação. Lista vazia em toda vaga sem questionário vinculado.
+        List<ScreeningInvitationSummaryDTO> screeningInvitations
 ) {}

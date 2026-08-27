@@ -18,6 +18,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -65,6 +66,7 @@ public class Proposal {
         joinColumns = @JoinColumn(name = "proposal_id"),
         inverseJoinColumns = @JoinColumn(name = "skill_id")
     )
+    @BatchSize(size = 50)
     private List<Skill> skills = new ArrayList<>();
 
     @Column(columnDefinition = "TEXT")
@@ -93,6 +95,7 @@ public class Proposal {
     private String questionsForCompany;
 
     @OneToMany(mappedBy = "proposal", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
     private List<ProposalAttachment> attachments = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)

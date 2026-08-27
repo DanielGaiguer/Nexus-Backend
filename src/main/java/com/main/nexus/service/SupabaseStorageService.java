@@ -1,6 +1,8 @@
 package com.main.nexus.service;
 
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -14,6 +16,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class SupabaseStorageService {
+
+    private static final Logger log = LoggerFactory.getLogger(SupabaseStorageService.class);
 
     // O sistema usa dois buckets do Supabase Storage, configurados no application.properties , profile-images-nexus (fotos de perfil, compartilhado entre profissionais e empresas)
     // e resume-professional-nexus (currículos, exclusivo de profissionais). O serviceKey a chave de serviço do Supabase
@@ -99,8 +103,10 @@ public class SupabaseStorageService {
             HttpEntity<byte[]> entity = new HttpEntity<>(bytes, headers);
             restTemplate.exchange(uploadUrl, HttpMethod.POST, entity, String.class);
         } catch (Exception e) {
+            log.error("Supabase upload failed: bucket={}, fileName={}, url={}",
+                    bucket, fileName, uploadUrl, e);
             throw new ResponseStatusException(HttpStatusCode.valueOf(502),
-                    "Failed to upload file to storage. Please try again.");
+                    "Failed to upload file to storage. Please try again.", e);
         }
 
         // Retorna a URL pública do arquivo

@@ -23,5 +23,12 @@ public enum NotificationType {
     PROPOSAL_ACCEPTED,       // empresa aceitou a proposta do profissional
     PROPOSAL_REJECTED,       // empresa recusou ativamente a proposta do profissional
     PROPOSAL_POSITION_FILLED, // proposta foi auto-recusada porque outra proposta preencheu a última vaga
-    PROPOSAL_EXPIRED         // proposta expirou sem resposta da empresa dentro da validade
+    PROPOSAL_EXPIRED,        // proposta expirou sem resposta da empresa dentro da validade
+    SCREENING_INVITATION_RECEIVED, // profissional precisa responder uma etapa do processo seletivo
+    SCREENING_SUBMITTED,           // profissional submeteu as respostas de uma etapa
+    SCREENING_DECLINED,            // profissional recusou uma etapa obrigatória
+    SCREENING_STAGE_APPROVED,      // empresa aprovou o avanço -- próxima etapa liberada
+    SCREENING_STAGE_REPROVED,      // empresa reprovou nesta etapa -- processo encerrado
+    SCREENING_EXPIRED,             // etapa expirou sem submissão dentro do prazo
+    SCREENING_CANCELLED            // etapa cancelada porque o match/projeto associado foi encerrado
 }

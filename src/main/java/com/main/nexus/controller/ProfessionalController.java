@@ -1,6 +1,7 @@
 package com.main.nexus.controller;
 
 import com.main.nexus.dto.ContactInfoDTO;
+import com.main.nexus.dto.MatchActionResponseDTO;
 import com.main.nexus.dto.MatchResponseDTO;
 import com.main.nexus.dto.PreviousProjectDTO;
 import com.main.nexus.dto.ProfessionalCredentialDTO;
@@ -26,6 +27,7 @@ import com.main.nexus.repository.ReputationMetricsRepository;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.EmailService;
 import com.main.nexus.service.GeolocationService;
+import com.main.nexus.service.MatchActionResult;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.NotificationService;
 import com.main.nexus.service.PreviousProjectService;
@@ -35,6 +37,7 @@ import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProfileCompletionService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProposalService;
+import com.main.nexus.service.ScreeningInvitationService;
 import com.main.nexus.service.SkillService;
 import com.main.nexus.service.SupabaseStorageService;
 import java.util.List;
@@ -72,6 +75,9 @@ public class ProfessionalController {
 
     @Autowired
     private ProposalService proposalService;
+
+    @Autowired
+    private ScreeningInvitationService screeningInvitationService;
 
     @Autowired
     private SkillService skillService;
@@ -339,6 +345,19 @@ public class ProfessionalController {
                         .stream().map(this::toMatchResponseDTO).toList());
     }
 
+    // Candidaturas sem decisão final ainda, mas com um processo seletivo em andamento por trás --
+    // hoje excluídas de /matches/invites (ver MatchService.getInScreeningMatchesForProfessional).
+    @GetMapping("/matches/in-screening")
+    public ResponseEntity<List<MatchResponseDTO>> getInScreeningMatches() {
+        UserDTO logged = getLoggedUser();
+        Professional professional = professionalService.findByUserId(logged.id())
+                .orElseThrow(() -> new RuntimeException("Profile not found"));
+
+        return ResponseEntity.ok(
+                matchService.getInScreeningMatchesForProfessional(professional.getId())
+                        .stream().map(this::toMatchResponseDTO).toList());
+    }
+
     // Matches que foram confirmados e já encerraram (expiraram ou foram cancelados depois
     // de confirmados) — espelho de ProjectController.getPreviousProjects do lado da empresa.
     @GetMapping("/matches/previous")
@@ -408,7 +427,8 @@ public class ProfessionalController {
                 m.getActive(),
                 matchService.getRejectionReasonNames(feedback),
                 feedback != null ? feedback.getDescription() : null,
-                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null
+                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null,
+                screeningInvitationService.getSummariesForMatch(m)
         );
     }
 
@@ -488,14 +508,19 @@ public class ProfessionalController {
 
     // Profissional demonstra interesse em um projeto
     @PostMapping("/opportunities/{projectId}/interest")
-    public ResponseEntity<String> showInterestInProject(@PathVariable Long projectId) {
+    public ResponseEntity<MatchActionResponseDTO> showInterestInProject(@PathVariable Long projectId) {
         UserDTO logged = getLoggedUser();
         Professional professional = professionalService.findByUserId(logged.id())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatusCode.valueOf(404), "Profile not found"));
 
-        matchService.professionalShowsInterest(professional.getId(), projectId);
-        return ResponseEntity.ok("Interest sent to company.");
+        MatchActionResult result = matchService.professionalShowsInterest(professional.getId(), projectId);
+        if (result.screeningRequired()) {
+            return ResponseEntity.ok(new MatchActionResponseDTO(
+                    "Responda o questionário de triagem da vaga antes de continuar.",
+                    true, result.screeningInvitationId()));
+        }
+        return ResponseEntity.ok(new MatchActionResponseDTO("Interest sent to company.", false, null));
     }
 
     // Upload de curriculo

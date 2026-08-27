@@ -22,6 +22,7 @@ import com.main.nexus.service.ProjectAiExtractionService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
 import com.main.nexus.service.ProposalService;
+import com.main.nexus.service.ScreeningInvitationService;
 import com.main.nexus.service.SkillService;
 import java.util.HashSet;
 import java.util.List;
@@ -68,6 +69,9 @@ public class ProjectController {
 
     @Autowired
     private ProposalService proposalService;
+
+    @Autowired
+    private ScreeningInvitationService screeningInvitationService;
 
     // Autopreenchimento por IA: só devolve uma sugestão estruturada para pré-preencher o
     // formulário. Não persiste nada — nem toca em ProjectRepository. A publicação continua
@@ -117,6 +121,15 @@ public class ProjectController {
     public ResponseEntity<List<MatchResponseDTO>> getRejectedMatches() {
         Company company = getLoggedCompany();
         List<Match> matches = matchService.getRejectedMatchesForCompany(company.getId());
+        return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
+    }
+
+    // Candidaturas sem decisão final ainda, mas com um processo seletivo em andamento por trás --
+    // hoje excluídas de /matches/received e /matches/sent (ver MatchService.getInScreeningMatchesForCompany).
+    @GetMapping("/matches/in-screening")
+    public ResponseEntity<List<MatchResponseDTO>> getInScreeningMatches() {
+        Company company = getLoggedCompany();
+        List<Match> matches = matchService.getInScreeningMatchesForCompany(company.getId());
         return ResponseEntity.ok(matches.stream().map(m -> toMatchResponseDTO(m, company)).toList());
     }
 
@@ -334,7 +347,8 @@ public class ProjectController {
                 m.getActive(),
                 matchService.getRejectionReasonNames(feedback),
                 feedback != null ? feedback.getDescription() : null,
-                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null
+                m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null,
+                screeningInvitationService.getSummariesForMatch(m)
         );
     }
 

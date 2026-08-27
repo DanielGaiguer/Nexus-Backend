@@ -33,6 +33,16 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId ORDER BY m.createdAt DESC")
     List<Match> findByProjectCompanyId(@Param("companyId") Long companyId);
 
+    // Espelha o filtro em memória de MatchService.getConfirmedMatchesForCompany
+    // (status MATCHED e ainda ativo), mas resolvido no banco. Sem isto, uma
+    // empresa com muitos candidatos pontuados automaticamente pelo ranking
+    // (status WAITING) carregava a lista inteira só pra descartar quase tudo.
+    @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId " +
+           "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
+           "AND (m.active IS NULL OR m.active = true) " +
+           "ORDER BY m.createdAt DESC")
+    List<Match> findConfirmedActiveByCompanyId(@Param("companyId") Long companyId);
+
     long countByStatus(StatusMatch status);
     long countByProfessionalId(Long professionalId);
     long countByProfessionalIdAndStatus(Long professionalId, StatusMatch status);
