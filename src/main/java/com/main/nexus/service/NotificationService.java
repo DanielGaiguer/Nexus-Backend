@@ -487,6 +487,60 @@ public class NotificationService {
         );
     }
 
+    // ── Plataforma personalizada (CustomPortal) ────────────────────────
+    @Async
+    public void notifyCustomPortalRequestReceived(User adminUser, String companyName) {
+        notify(
+            adminUser,
+            NotificationType.CUSTOM_PORTAL_REQUEST_RECEIVED,
+            "Nova solicitação de plataforma personalizada",
+            "O contratante \"" + companyName + "\" solicitou uma plataforma personalizada e aguarda sua análise.",
+            "/admin/custom-portals"
+        );
+    }
+    @Async
+    public void notifyCustomPortalRequestApproved(User companyUser, String subdomain) {
+        notify(
+            companyUser,
+            NotificationType.CUSTOM_PORTAL_REQUEST_APPROVED,
+            "Plataforma personalizada aprovada!",
+            "Sua solicitação foi aprovada. O subdomínio \"" + subdomain + "\" foi reservado para a sua plataforma.",
+            "/company/custom-portal"
+        );
+    }
+    @Async
+    public void notifyCustomPortalRequestRejected(User companyUser, String reason) {
+        notify(
+            companyUser,
+            NotificationType.CUSTOM_PORTAL_REQUEST_REJECTED,
+            "Solicitação de plataforma personalizada não aprovada",
+            "Sua solicitação não foi aprovada. Motivo: " + reason,
+            "/company/custom-portal"
+        );
+    }
+    @Async
+    public void notifyCustomPortalRenewalDue(User companyUser, java.time.LocalDate dueDate) {
+        notify(
+            companyUser,
+            NotificationType.CUSTOM_PORTAL_RENEWAL_DUE,
+            "Assinatura da plataforma personalizada perto do vencimento",
+            "A assinatura da sua plataforma personalizada vence em " + dueDate + ". Regularize o pagamento para não perder o acesso.",
+            "/company/custom-portal"
+        );
+    }
+    @Async
+    public void notifyCustomPortalSuspended(User companyUser, String note) {
+        String tail = (note == null || note.isBlank()) ? "" : " Motivo: " + note;
+        notify(
+            companyUser,
+            NotificationType.CUSTOM_PORTAL_SUSPENDED,
+            "Plataforma personalizada suspensa",
+            "Sua plataforma personalizada foi suspensa por um administrador." + tail
+                + " Seu cadastro normal no Nexus continua ativo.",
+            "/company/custom-portal"
+        );
+    }
+
     // CONSULTAS — consumidas pelo controller
 
     public NotificationSummaryDTO getSummary(Long userId) {

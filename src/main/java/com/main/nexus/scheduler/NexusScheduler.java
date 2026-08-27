@@ -1,5 +1,6 @@
 package com.main.nexus.scheduler;
 
+import com.main.nexus.service.CustomPortalService;
 import com.main.nexus.service.MatchExpirationService;
 import com.main.nexus.service.NotificationService;
 import com.main.nexus.service.ProfessionalInactivityService;
@@ -27,6 +28,9 @@ public class NexusScheduler {
 
     @Autowired
     private ScreeningInvitationService screeningInvitationService;
+
+    @Autowired
+    private CustomPortalService customPortalService;
 
     // segundo minuto hora dia-do-mês mês dia-da-semana
     @Scheduled(cron = "0 0 0 * * *") //meia-noite, todo dia. Roda checkAndExpireMatches (a checagem de expiração de 30 dias)   
@@ -70,5 +74,14 @@ public class NexusScheduler {
     @Scheduled(cron = "0 0 6 * * *")
     public void runScreeningInvitationExpirationCheck() {
         screeningInvitationService.expirePendingInvitations();
+    }
+
+    // 9h da manhã, todo dia — início do expediente, mesmo raciocínio do aviso de
+    // status check de match (maximiza a chance de o contratante regularizar a
+    // assinatura no mesmo dia). Avisa quem tem plataforma personalizada ACTIVE
+    // com vencimento em até 7 dias; a trava lastRenewalReminderFor evita repetir.
+    @Scheduled(cron = "0 0 9 * * *")
+    public void runCustomPortalRenewalCheck() {
+        customPortalService.notifyUpcomingRenewals();
     }
 }

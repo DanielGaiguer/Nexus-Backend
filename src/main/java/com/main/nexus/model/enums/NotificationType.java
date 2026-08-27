@@ -30,5 +30,12 @@ public enum NotificationType {
     SCREENING_STAGE_APPROVED,      // empresa aprovou o avanço -- próxima etapa liberada
     SCREENING_STAGE_REPROVED,      // empresa reprovou nesta etapa -- processo encerrado
     SCREENING_EXPIRED,             // etapa expirou sem submissão dentro do prazo
-    SCREENING_CANCELLED            // etapa cancelada porque o match/projeto associado foi encerrado
+    SCREENING_CANCELLED,           // etapa cancelada porque o match/projeto associado foi encerrado
+
+    // ── Plataforma personalizada (CustomPortal) ────────────────────────
+    CUSTOM_PORTAL_REQUEST_RECEIVED,  // contratante solicitou uma plataforma personalizada -> avisa o Admin
+    CUSTOM_PORTAL_REQUEST_APPROVED,  // Admin aprovou a solicitação -> plataforma criada
+    CUSTOM_PORTAL_REQUEST_REJECTED,  // Admin recusou a solicitação (com motivo)
+    CUSTOM_PORTAL_RENEWAL_DUE,       // assinatura da plataforma personalizada perto do vencimento
+    CUSTOM_PORTAL_SUSPENDED          // plataforma personalizada suspensa pelo Admin (ex.: inadimplência)
 }

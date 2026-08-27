@@ -51,6 +51,22 @@ public class SupabaseStorageService {
         deleteFromBucket(publicUrl, profileImagesBucket);
     }
 
+    // Imagens de branding da plataforma personalizada (logo/banner/favicon).
+    // Reusa a mesma validacao (JPEG/PNG/WebP, 5MB) e o mesmo bucket compartilhado
+    // de imagens; so muda a pasta.
+    public String uploadCustomPortalImage(MultipartFile file, Long portalId, String kind) {
+        validateImageFile(file);
+
+        String extension = getExtension(file.getOriginalFilename());
+        String fileName = "custom-portals/" + portalId + "/" + kind + "_" + UUID.randomUUID() + "." + extension;
+
+        return uploadToBucket(file, profileImagesBucket, fileName);
+    }
+
+    public void deleteCustomPortalImage(String publicUrl) {
+        deleteFromBucket(publicUrl, profileImagesBucket);
+    }
+
     public String uploadResume(MultipartFile file, Long professionalId) {
         validateResumeFile(file);
 
