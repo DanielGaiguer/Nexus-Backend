@@ -268,7 +268,13 @@ public class ScreeningQuestionnaireService {
     }
 
     public ScreeningQuestionnaireResponseDTO toResponseDTO(ScreeningQuestionnaire questionnaire) {
+        // Etapa removida (active=false) não deve reaparecer aqui -- este DTO alimenta o
+        // formulário de edição da vaga, e devolvê-la faria a etapa "voltar" pro formulário; se a
+        // empresa salvasse de novo sem notar, mergeStages reativaria ela (active=true
+        // incondicional pra qualquer etapa presente no request). Mesmo filtro que
+        // toStageResponseDTO já aplica nas questões.
         List<ScreeningStageResponseDTO> stages = questionnaire.getStages().stream()
+                .filter(ScreeningStage::getActive)
                 .map(this::toStageResponseDTO)
                 .toList();
 

@@ -701,6 +701,7 @@ public class ScreeningInvitationService {
         return new ScreeningAttemptDTO(
                 invitation.getId(),
                 questionnaire.getTitle(),
+                questionnaire.getInstructions(),
                 stage.getTitle(),
                 stageDisplayRank(questionnaire, stage),
                 countDisplayStages(questionnaire, stage),
@@ -763,6 +764,7 @@ public class ScreeningInvitationService {
                 invitation.getId(),
                 questionnaire.getId(),
                 questionnaire.getTitle(),
+                questionnaire.getInstructions(),
                 stage.getId(),
                 stage.getTitle(),
                 stageDisplayRank(questionnaire, stage),

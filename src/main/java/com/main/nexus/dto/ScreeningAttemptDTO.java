@@ -9,6 +9,10 @@ import java.util.List;
 public record ScreeningAttemptDTO(
         Long invitationId,
         String screeningQuestionnaireTitle,
+        // Instruções GERAIS do processo (ScreeningQuestionnaire.instructions) -- diferente de
+        // `instructions` abaixo, que é só desta etapa. Antes não chegava pro profissional em
+        // nenhuma tela.
+        String questionnaireInstructions,
         String stageTitle,
         Integer stageOrderIndex,
         Integer totalStages,

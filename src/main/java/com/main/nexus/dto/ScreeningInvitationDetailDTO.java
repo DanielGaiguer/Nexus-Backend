@@ -14,6 +14,9 @@ public record ScreeningInvitationDetailDTO(
         Long id,
         Long screeningQuestionnaireId,
         String screeningQuestionnaireTitle,
+        // Instruções GERAIS do processo (ScreeningQuestionnaire.instructions) -- diferente de
+        // `instructions` abaixo, que é só desta etapa. Antes não chegava pra nenhum dos dois lados.
+        String questionnaireInstructions,
         Long screeningStageId,
         String stageTitle,
         Integer stageOrderIndex,
