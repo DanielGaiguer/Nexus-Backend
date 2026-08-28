@@ -8,6 +8,7 @@ import com.main.nexus.dto.CustomPortalOverviewDTO;
 import com.main.nexus.dto.CustomPortalRequestDTO;
 import com.main.nexus.dto.CustomPortalSectionDTO;
 import com.main.nexus.dto.CustomPortalStatusHistoryDTO;
+import com.main.nexus.dto.PublicCustomPortalDTO;
 import com.main.nexus.dto.UpdateCustomPortalBrandingDTO;
 import com.main.nexus.dto.UpdateCustomPortalSubscriptionDTO;
 import com.main.nexus.model.Company;
@@ -555,6 +556,28 @@ public class CustomPortalService {
         return customPortalRepository.findByCompanyId(company.getId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Custom portal not found for this company."));
+    }
+
+    // ═══════════════════════ Página pública (Prompt 3) ════════════════
+
+    /**
+     * Resolve o portal por subdomínio para a página pública em
+     * empresa.nexus.com.br. 404 se o subdomínio não existir ou a empresa dona
+     * não estiver APPROVED. Devolve qualquer status de ciclo de vida —
+     * ACTIVE/SUSPENDED/CANCELED — e o frontend decide o que renderizar
+     * (página vs "plataforma indisponível").
+     */
+    public PublicCustomPortalDTO getPublicBySubdomain(String subdomain) {
+        String normalized = subdomain == null ? "" : subdomain.trim().toLowerCase();
+        CustomPortal portal = customPortalRepository.findBySubdomainIgnoreCase(normalized)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "No custom portal for this subdomain."));
+
+        if (portal.getCompany().getStatus() != CompanyStatus.APPROVED) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "No custom portal for this subdomain.");
+        }
+        return PublicCustomPortalDTO.from(portal);
     }
 
     // ═══════════════════════ Job diário ════════════════════════════════

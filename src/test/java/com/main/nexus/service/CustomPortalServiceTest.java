@@ -517,4 +517,40 @@ class CustomPortalServiceTest {
         assertNull(p.getBannerUrl());
         verify(supabaseStorageService).deleteCustomPortalImage("https://supabase/banner.png");
     }
+
+    // ── página pública / resolução de tenant (Prompt 3) ────────────
+
+    @Test
+    void getPublicBySubdomain_returnsDtoForAnyLifecycleStatus() {
+        CustomPortal p = portal(CustomPortalStatus.SUSPENDED);
+        p.setDisplayName("Carreiras Acme");
+        when(customPortalRepository.findBySubdomainIgnoreCase("acme")).thenReturn(Optional.of(p));
+
+        var dto = service.getPublicBySubdomain("  ACME ");
+
+        assertEquals("acme", dto.subdomain());
+        assertEquals("SUSPENDED", dto.status());
+        assertEquals("Carreiras Acme", dto.displayName());
+        assertEquals(company.getId(), dto.companyId());
+    }
+
+    @Test
+    void getPublicBySubdomain_404WhenSubdomainUnknown() {
+        when(customPortalRepository.findBySubdomainIgnoreCase("nope")).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.getPublicBySubdomain("nope"));
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
+    void getPublicBySubdomain_404WhenOwnerCompanyNotApproved() {
+        company.setStatus(CompanyStatus.PENDING);
+        CustomPortal p = portal(CustomPortalStatus.ACTIVE);
+        when(customPortalRepository.findBySubdomainIgnoreCase("acme")).thenReturn(Optional.of(p));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.getPublicBySubdomain("acme"));
+        assertEquals(404, ex.getStatusCode().value());
+    }
 }

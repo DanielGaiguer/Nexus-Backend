@@ -6,6 +6,7 @@ import com.main.nexus.dto.CompanyPreviousProjectDTO;
 import com.main.nexus.dto.ProfessionalDirectoryItemDTO;
 import com.main.nexus.dto.ProfessionalDirectoryPageDTO;
 import com.main.nexus.dto.PublicCompanyDTO;
+import com.main.nexus.dto.PublicCustomPortalDTO;
 import com.main.nexus.dto.PublicProfessionalDTO;
 import com.main.nexus.dto.PublicProjectDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
@@ -25,6 +26,7 @@ import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
 import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CustomPortalService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalCredentialService;
 import com.main.nexus.service.ProjectResponseAssembler;
@@ -74,6 +76,9 @@ public class PublicProfessionalController {
 
     @Autowired
     private ProfessionalCredentialService professionalCredentialService;
+
+    @Autowired
+    private CustomPortalService customPortalService;
 
     // Endpoints em /api/public são permitAll, mas o JwtFilter ainda popula o SecurityContext
     // quando um Authorization Bearer válido é enviado. Assim conseguimos identificar se quem
@@ -313,6 +318,14 @@ public class PublicProfessionalController {
             return null;
         }
         return professionalRepository.findByUserId(logged.id()).map(Professional::getId).orElse(null);
+    }
+
+    // Resolução de tenant da plataforma personalizada — a página pública em
+    // empresa.nexus.com.br chama isto pelo subdomínio (Prompt 3). 404 quando o
+    // subdomínio não existe; devolve o status pra a página tratar SUSPENDED/CANCELED.
+    @GetMapping("/custom-portal/{subdomain}")
+    public ResponseEntity<PublicCustomPortalDTO> getCustomPortal(@PathVariable String subdomain) {
+        return ResponseEntity.ok(customPortalService.getPublicBySubdomain(subdomain));
     }
 
     @GetMapping("/company/{id}")
