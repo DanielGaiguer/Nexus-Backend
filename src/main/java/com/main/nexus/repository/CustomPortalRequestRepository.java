@@ -12,6 +12,8 @@ public interface CustomPortalRequestRepository extends JpaRepository<CustomPorta
 
     List<CustomPortalRequest> findByStatusOrderByRequestedAtAsc(CustomPortalRequestStatus status);
 
+    long countByStatus(CustomPortalRequestStatus status);
+
     List<CustomPortalRequest> findAllByOrderByRequestedAtDesc();
 
     boolean existsByCompanyIdAndStatus(Long companyId, CustomPortalRequestStatus status);

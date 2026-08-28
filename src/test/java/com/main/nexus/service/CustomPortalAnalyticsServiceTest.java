@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.main.nexus.dto.AdminCustomPortalAnalyticsDTO;
 import com.main.nexus.dto.CustomPortalAnalyticsDTO;
 import com.main.nexus.dto.TrackPortalEventDTO;
 import com.main.nexus.model.Company;
@@ -18,11 +19,14 @@ import com.main.nexus.model.CustomPortalVisitEvent;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.User;
 import com.main.nexus.model.enums.CustomPortalEventType;
+import com.main.nexus.model.enums.CustomPortalRequestStatus;
 import com.main.nexus.model.enums.CustomPortalStatus;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.CustomPortalRepository;
+import com.main.nexus.repository.CustomPortalRequestRepository;
 import com.main.nexus.repository.CustomPortalVisitEventRepository;
 import com.main.nexus.repository.ProjectRepository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,6 +48,7 @@ class CustomPortalAnalyticsServiceTest {
 
     @Mock private CustomPortalVisitEventRepository eventRepository;
     @Mock private CustomPortalRepository customPortalRepository;
+    @Mock private CustomPortalRequestRepository customPortalRequestRepository;
     @Mock private CompanyRepository companyRepository;
     @Mock private ProjectRepository projectRepository;
 
@@ -181,5 +186,147 @@ class CustomPortalAnalyticsServiceTest {
         CustomPortalAnalyticsDTO dto = service.getAnalyticsForUser(5L, 30);
         assertEquals(0.0, dto.conversionRate());
         assertEquals(0.0, dto.avgSessionSeconds());
+    }
+
+    // ── Admin: uma plataforma por id ───────────────────────────────
+
+    @Test
+    void getAnalyticsForPortal_resolvesByIdAndAggregates() {
+        when(customPortalRepository.findById(2L)).thenReturn(Optional.of(portal));
+        when(eventRepository.countByType(eq(2L), eq(CustomPortalEventType.PAGE_VIEW), any()))
+                .thenReturn(50L);
+        when(eventRepository.countByType(eq(2L), eq(CustomPortalEventType.APPLY_CLICK), any()))
+                .thenReturn(5L);
+        when(eventRepository.countDistinctVisitors(eq(2L), any(), any())).thenReturn(40L);
+        when(eventRepository.avgSessionSeconds(eq(2L), any())).thenReturn(60.0);
+        when(eventRepository.viewsPerDay(eq(2L), any())).thenReturn(List.of());
+        when(eventRepository.topOpportunities(eq(2L), any())).thenReturn(List.of());
+        when(eventRepository.referrerBreakdown(eq(2L), any())).thenReturn(List.of());
+
+        CustomPortalAnalyticsDTO dto = service.getAnalyticsForPortal(2L, 30);
+
+        assertEquals(50L, dto.totalViews());
+        assertEquals(10.0, dto.conversionRate()); // 5/50*100
+        assertEquals(30, dto.viewsPerDay().size());
+    }
+
+    @Test
+    void getAnalyticsForPortal_404WhenMissing() {
+        when(customPortalRepository.findById(99L)).thenReturn(Optional.empty());
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.getAnalyticsForPortal(99L, 30));
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    // ── Admin: dashboard geral do módulo ──────────────────────────
+
+    @Test
+    void getSystemAnalytics_aggregatesModuleWideMetrics() {
+        CustomPortal a = sysPortal(2L, company(10L, "Acme"), "acme",
+                CustomPortalStatus.ACTIVE, "Pro", new BigDecimal("199.90"),
+                LocalDateTime.now());
+        CustomPortal b = sysPortal(3L, company(11L, "Beta"), "beta",
+                CustomPortalStatus.SUSPENDED, "Pro", new BigDecimal("99.90"),
+                LocalDateTime.now().minusMonths(1));
+        CustomPortal c = sysPortal(4L, company(12L, "Gama"), "gama",
+                CustomPortalStatus.CANCELED, "Basic", new BigDecimal("49.90"),
+                LocalDateTime.now().minusMonths(10));
+
+        when(customPortalRepository.findAll()).thenReturn(List.of(a, b, c));
+        when(customPortalRequestRepository.countByStatus(CustomPortalRequestStatus.PENDING))
+                .thenReturn(3L);
+
+        when(eventRepository.countByTypeAllPortals(eq(CustomPortalEventType.PAGE_VIEW), any()))
+                .thenReturn(500L);
+        when(eventRepository.countByTypeAllPortals(eq(CustomPortalEventType.APPLY_CLICK), any()))
+                .thenReturn(25L);
+        when(eventRepository.countDistinctVisitorsAllPortals(
+                eq(CustomPortalEventType.PAGE_VIEW), any())).thenReturn(300L);
+        when(eventRepository.avgSessionSecondsAllPortals(any())).thenReturn(100.0);
+        when(eventRepository.viewsPerDayAllPortals(any())).thenReturn(List.of());
+        when(eventRepository.topOpportunitiesAllPortals(any())).thenReturn(List.of());
+        when(eventRepository.referrerBreakdownAllPortals(any())).thenReturn(List.of());
+        when(eventRepository.viewsPerPortal(any())).thenReturn(List.<Object[]>of(
+                new Object[] { 2L, 400L }, new Object[] { 3L, 100L }));
+        when(eventRepository.applyClicksPerPortal(any())).thenReturn(List.<Object[]>of(
+                new Object[] { 2L, 20L }));
+
+        AdminCustomPortalAnalyticsDTO dto = service.getSystemAnalytics(30);
+
+        assertEquals(3L, dto.totalPortals());
+        assertEquals(1L, dto.activePortals());
+        assertEquals(1L, dto.suspendedPortals());
+        assertEquals(1L, dto.canceledPortals());
+        assertEquals(3L, dto.pendingRequests());
+        assertEquals(0, new BigDecimal("199.90").compareTo(dto.monthlyRecurringRevenue()));
+
+        // engajamento agregado
+        assertEquals(500L, dto.system().totalViews());
+        assertEquals(5.0, dto.system().conversionRate()); // 25/500*100
+
+        // ranking: só plataformas com acesso, ordenado por views desc
+        assertEquals(2, dto.topPortals().size());
+        assertEquals("acme", dto.topPortals().get(0).subdomain());
+        assertEquals(400L, dto.topPortals().get(0).views());
+        assertEquals(5.0, dto.topPortals().get(0).conversionRate()); // 20/400*100
+        assertEquals("beta", dto.topPortals().get(1).subdomain());
+        assertEquals(0.0, dto.topPortals().get(1).conversionRate());
+
+        // planos por contagem desc
+        assertEquals("Pro", dto.portalsByPlan().get(0).planName());
+        assertEquals(2L, dto.portalsByPlan().get(0).count());
+
+        // 3 status sempre presentes
+        assertEquals(3, dto.portalsByStatus().size());
+
+        // crescimento: janela de 6 meses -> A (mês atual) e B (-1); C (-10) fora
+        assertEquals(6, dto.portalsCreatedPerMonth().size());
+        long created = dto.portalsCreatedPerMonth().stream()
+                .mapToLong(AdminCustomPortalAnalyticsDTO.MonthlyCount::count).sum();
+        assertEquals(2L, created);
+    }
+
+    @Test
+    void getSystemAnalytics_emptyModule() {
+        when(customPortalRepository.findAll()).thenReturn(List.of());
+        when(customPortalRequestRepository.countByStatus(any())).thenReturn(0L);
+        when(eventRepository.countByTypeAllPortals(any(), any())).thenReturn(0L);
+        when(eventRepository.countDistinctVisitorsAllPortals(any(), any())).thenReturn(0L);
+        when(eventRepository.avgSessionSecondsAllPortals(any())).thenReturn(null);
+        when(eventRepository.viewsPerDayAllPortals(any())).thenReturn(List.of());
+        when(eventRepository.topOpportunitiesAllPortals(any())).thenReturn(List.of());
+        when(eventRepository.referrerBreakdownAllPortals(any())).thenReturn(List.of());
+        when(eventRepository.viewsPerPortal(any())).thenReturn(List.of());
+        when(eventRepository.applyClicksPerPortal(any())).thenReturn(List.of());
+
+        AdminCustomPortalAnalyticsDTO dto = service.getSystemAnalytics(9999);
+
+        assertEquals(0L, dto.totalPortals());
+        assertEquals(365, dto.rangeDays()); // clamp
+        assertEquals(0, BigDecimal.ZERO.compareTo(dto.monthlyRecurringRevenue()));
+        assertTrue(dto.topPortals().isEmpty());
+        assertEquals(0L, dto.system().totalViews());
+        assertEquals(365, dto.system().viewsPerDay().size());
+    }
+
+    private Company company(Long id, String name) {
+        Company c = new Company();
+        c.setId(id);
+        c.setCompanyName(name);
+        return c;
+    }
+
+    private CustomPortal sysPortal(Long id, Company company, String subdomain,
+            CustomPortalStatus status, String plan, BigDecimal price,
+            LocalDateTime createdAt) {
+        CustomPortal p = new CustomPortal();
+        p.setId(id);
+        p.setCompany(company);
+        p.setSubdomain(subdomain);
+        p.setStatus(status);
+        p.setPlanName(plan);
+        p.setPlanPrice(price);
+        p.setCreatedAt(createdAt);
+        return p;
     }
 }

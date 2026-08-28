@@ -1,7 +1,9 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.dto.AdminCustomPortalAnalyticsDTO;
 import com.main.nexus.dto.ApproveCustomPortalRequestDTO;
 import com.main.nexus.dto.CreateCustomPortalDTO;
+import com.main.nexus.dto.CustomPortalAnalyticsDTO;
 import com.main.nexus.dto.CustomPortalDTO;
 import com.main.nexus.dto.CustomPortalDetailDTO;
 import com.main.nexus.dto.CustomPortalRequestDTO;
@@ -12,6 +14,7 @@ import com.main.nexus.dto.UpdateCustomPortalSubscriptionDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.enums.BrandingImageKind;
 import com.main.nexus.model.enums.CustomPortalRequestStatus;
+import com.main.nexus.service.CustomPortalAnalyticsService;
 import com.main.nexus.service.CustomPortalService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +40,9 @@ public class AdminCustomPortalController {
 
     @Autowired
     private CustomPortalService customPortalService;
+
+    @Autowired
+    private CustomPortalAnalyticsService customPortalAnalyticsService;
 
     // ── Solicitações ──────────────────────────────────────────────────
 
@@ -69,9 +75,26 @@ public class AdminCustomPortalController {
         return ResponseEntity.ok(customPortalService.listPortals());
     }
 
+    // Dashboard geral do módulo — agregado de todas as plataformas. Caminho
+    // literal, resolve antes de /custom-portals/{portalId}.
+    @GetMapping("/custom-portals/analytics")
+    public ResponseEntity<AdminCustomPortalAnalyticsDTO> systemAnalytics(
+            @RequestParam(name = "days", defaultValue = "30") int days) {
+        return ResponseEntity.ok(customPortalAnalyticsService.getSystemAnalytics(days));
+    }
+
     @GetMapping("/custom-portals/{portalId}")
     public ResponseEntity<CustomPortalDetailDTO> portalDetail(@PathVariable Long portalId) {
         return ResponseEntity.ok(customPortalService.getPortalDetail(portalId));
+    }
+
+    // Mesmo dashboard "Análises" do contratante, para uma plataforma qualquer.
+    @GetMapping("/custom-portals/{portalId}/analytics")
+    public ResponseEntity<CustomPortalAnalyticsDTO> portalAnalytics(
+            @PathVariable Long portalId,
+            @RequestParam(name = "days", defaultValue = "30") int days) {
+        return ResponseEntity.ok(
+                customPortalAnalyticsService.getAnalyticsForPortal(portalId, days));
     }
 
     @PostMapping("/custom-portals")
