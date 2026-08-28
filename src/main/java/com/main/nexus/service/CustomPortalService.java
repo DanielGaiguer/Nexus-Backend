@@ -9,12 +9,14 @@ import com.main.nexus.dto.CustomPortalRequestDTO;
 import com.main.nexus.dto.CustomPortalSectionDTO;
 import com.main.nexus.dto.CustomPortalStatusHistoryDTO;
 import com.main.nexus.dto.PublicCustomPortalDTO;
+import com.main.nexus.dto.SocialLinksDTO;
 import com.main.nexus.dto.UpdateCustomPortalBrandingDTO;
 import com.main.nexus.dto.UpdateCustomPortalSubscriptionDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.CustomPortal;
 import com.main.nexus.model.CustomPortalRequest;
 import com.main.nexus.model.CustomPortalSection;
+import com.main.nexus.model.CustomPortalSocialLinks;
 import com.main.nexus.model.CustomPortalStatusHistory;
 import com.main.nexus.model.User;
 import com.main.nexus.model.enums.BrandingImageKind;
@@ -489,8 +491,37 @@ public class CustomPortalService {
         portal.getSections().clear();
         portal.getSections().addAll(parsed);
 
+        applySocialLinks(portal, dto.socialLinks());
+
         portal.setUpdatedAt(LocalDateTime.now());
         return customPortalRepository.save(portal);
+    }
+
+    private void applySocialLinks(CustomPortal portal, SocialLinksDTO in) {
+        CustomPortalSocialLinks links = portal.getSocialLinks();
+        if (links == null) {
+            links = new CustomPortalSocialLinks();
+            portal.setSocialLinks(links);
+        }
+        links.setWebsite(cleanUrl(in == null ? null : in.website()));
+        links.setLinkedin(cleanUrl(in == null ? null : in.linkedin()));
+        links.setInstagram(cleanUrl(in == null ? null : in.instagram()));
+        links.setFacebook(cleanUrl(in == null ? null : in.facebook()));
+        links.setYoutube(cleanUrl(in == null ? null : in.youtube()));
+        links.setX(cleanUrl(in == null ? null : in.x()));
+        links.setGithub(cleanUrl(in == null ? null : in.github()));
+    }
+
+    private static String cleanUrl(String raw) {
+        String value = blankToNull(raw);
+        if (value == null) {
+            return null;
+        }
+        if (!value.matches("^https?://.+")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid social link. URLs must start with http:// or https://.");
+        }
+        return value.length() > 300 ? value.substring(0, 300) : value;
     }
 
     private CustomPortal applyBrandingImage(CustomPortal portal, BrandingImageKind kind, MultipartFile file) {

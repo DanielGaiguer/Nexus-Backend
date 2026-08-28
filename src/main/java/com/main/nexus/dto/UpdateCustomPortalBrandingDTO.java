@@ -9,5 +9,6 @@ public record UpdateCustomPortalBrandingDTO(
         String displayName,
         String primaryColor,
         String aboutText,
-        List<CustomPortalSectionDTO> sections
+        List<CustomPortalSectionDTO> sections,
+        SocialLinksDTO socialLinks
 ) {}

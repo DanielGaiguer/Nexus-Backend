@@ -31,7 +31,8 @@ public record CustomPortalDTO(
         String bannerUrl,
         String faviconUrl,
         String aboutText,
-        List<CustomPortalSectionDTO> sections
+        List<CustomPortalSectionDTO> sections,
+        SocialLinksDTO socialLinks
 ) {
     public static CustomPortalDTO from(CustomPortal p) {
         return new CustomPortalDTO(
@@ -55,7 +56,8 @@ public record CustomPortalDTO(
                 p.getBannerUrl(),
                 p.getFaviconUrl(),
                 p.getAboutText(),
-                p.getSections().stream().map(CustomPortalSectionDTO::from).toList()
+                p.getSections().stream().map(CustomPortalSectionDTO::from).toList(),
+                SocialLinksDTO.from(p.getSocialLinks())
         );
     }
 }

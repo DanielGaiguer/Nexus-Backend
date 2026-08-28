@@ -403,8 +403,14 @@ class CustomPortalServiceTest {
 
     private UpdateCustomPortalBrandingDTO branding(
             String color, List<CustomPortalSectionDTO> sections) {
+        return branding(color, sections, null);
+    }
+
+    private UpdateCustomPortalBrandingDTO branding(
+            String color, List<CustomPortalSectionDTO> sections,
+            com.main.nexus.dto.SocialLinksDTO social) {
         return new UpdateCustomPortalBrandingDTO(
-                "Carreiras Acme", color, "Somos uma empresa incrível.", sections);
+                "Carreiras Acme", color, "Somos uma empresa incrível.", sections, social);
     }
 
     @Test
@@ -422,6 +428,36 @@ class CustomPortalServiceTest {
         assertEquals(2, p.getSections().size());
         assertEquals("Nossos valores", p.getSections().get(0).getTitle());
         assertEquals("Benefícios", p.getSections().get(1).getTitle());
+    }
+
+    @Test
+    void updateBranding_persistsSocialLinksAndClearsBlanks() {
+        CustomPortal p = portal(CustomPortalStatus.ACTIVE);
+        p.getSocialLinks().setInstagram("https://old.example");
+        when(customPortalRepository.findById(2L)).thenReturn(Optional.of(p));
+
+        var social = new com.main.nexus.dto.SocialLinksDTO(
+                "https://neostack.dev", null, "  ",
+                "https://facebook.com/neostack", null, null, "https://github.com/neostack");
+        CustomPortalDTO dto = service.updateBrandingAsAdmin(2L, branding("#4f46e5", List.of(), social));
+
+        assertEquals("https://neostack.dev", dto.socialLinks().website());
+        assertEquals("https://github.com/neostack", dto.socialLinks().github());
+        assertNull(dto.socialLinks().instagram()); // "  " -> limpo
+        assertNull(dto.socialLinks().linkedin());
+        assertNull(p.getSocialLinks().getInstagram());
+    }
+
+    @Test
+    void updateBranding_rejectsSocialLinkWithoutScheme() {
+        when(customPortalRepository.findById(2L))
+                .thenReturn(Optional.of(portal(CustomPortalStatus.ACTIVE)));
+
+        var social = new com.main.nexus.dto.SocialLinksDTO(
+                null, "linkedin.com/company/neostack", null, null, null, null, null);
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.updateBrandingAsAdmin(2L, branding("#4f46e5", List.of(), social)));
+        assertEquals(400, ex.getStatusCode().value());
     }
 
     @Test

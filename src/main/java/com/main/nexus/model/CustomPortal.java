@@ -5,6 +5,7 @@ import com.main.nexus.model.enums.CustomPortalStatus;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -107,6 +108,10 @@ public class CustomPortal {
     @OrderColumn(name = "position")
     @BatchSize(size = 50)
     private List<CustomPortalSection> sections = new ArrayList<>();
+
+    // Links de redes sociais no rodape da pagina publica (colunas social_*).
+    @Embedded
+    private CustomPortalSocialLinks socialLinks = new CustomPortalSocialLinks();
 
     // ── Auditoria ─────────────────────────────────────────────────────
     @Column(nullable = false)
@@ -292,5 +297,13 @@ public class CustomPortal {
 
     public void setSections(List<CustomPortalSection> sections) {
         this.sections = sections;
+    }
+
+    public CustomPortalSocialLinks getSocialLinks() {
+        return socialLinks;
+    }
+
+    public void setSocialLinks(CustomPortalSocialLinks socialLinks) {
+        this.socialLinks = socialLinks;
     }
 }
