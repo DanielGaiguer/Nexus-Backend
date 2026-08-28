@@ -1,12 +1,14 @@
 package com.main.nexus.controller;
 
 import com.main.nexus.dto.CreateCustomPortalRequestDTO;
+import com.main.nexus.dto.CustomPortalAnalyticsDTO;
 import com.main.nexus.dto.CustomPortalDTO;
 import com.main.nexus.dto.CustomPortalOverviewDTO;
 import com.main.nexus.dto.CustomPortalRequestDTO;
 import com.main.nexus.dto.UpdateCustomPortalBrandingDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.enums.BrandingImageKind;
+import com.main.nexus.service.CustomPortalAnalyticsService;
 import com.main.nexus.service.CustomPortalService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +31,9 @@ public class CustomPortalController {
 
     @Autowired
     private CustomPortalService customPortalService;
+
+    @Autowired
+    private CustomPortalAnalyticsService customPortalAnalyticsService;
 
     // Estado da plataforma personalizada do contratante logado: ultima
     // solicitacao, portal (se ja existir) e se ele pode abrir nova solicitacao.
@@ -70,6 +75,15 @@ public class CustomPortalController {
             @RequestParam("kind") BrandingImageKind kind) {
         return ResponseEntity.ok(
                 customPortalService.clearBrandingImageForUser(loggedUserId(), kind));
+    }
+
+    // ── Análises (dashboard do contratante) ──────────────────────────
+
+    @GetMapping("/analytics")
+    public ResponseEntity<CustomPortalAnalyticsDTO> analytics(
+            @RequestParam(name = "days", defaultValue = "30") int days) {
+        return ResponseEntity.ok(
+                customPortalAnalyticsService.getAnalyticsForUser(loggedUserId(), days));
     }
 
     private Long loggedUserId() {

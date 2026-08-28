@@ -11,6 +11,7 @@ import com.main.nexus.dto.PublicProfessionalDTO;
 import com.main.nexus.dto.PublicProjectDTO;
 import com.main.nexus.dto.ProjectResponseDTO;
 import com.main.nexus.dto.ReputationExplanationDTO;
+import com.main.nexus.dto.TrackPortalEventDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
@@ -26,6 +27,7 @@ import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
 import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CustomPortalAnalyticsService;
 import com.main.nexus.service.CustomPortalService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalCredentialService;
@@ -42,6 +44,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -79,6 +83,9 @@ public class PublicProfessionalController {
 
     @Autowired
     private CustomPortalService customPortalService;
+
+    @Autowired
+    private CustomPortalAnalyticsService customPortalAnalyticsService;
 
     // Endpoints em /api/public são permitAll, mas o JwtFilter ainda popula o SecurityContext
     // quando um Authorization Bearer válido é enviado. Assim conseguimos identificar se quem
@@ -326,6 +333,16 @@ public class PublicProfessionalController {
     @GetMapping("/custom-portal/{subdomain}")
     public ResponseEntity<PublicCustomPortalDTO> getCustomPortal(@PathVariable String subdomain) {
         return ResponseEntity.ok(customPortalService.getPublicBySubdomain(subdomain));
+    }
+
+    // Beacon anônimo de analytics da página pública do portal. 204 sempre —
+    // entrada inválida / portal inativo viram no-op silencioso no service.
+    @PostMapping("/custom-portal/{subdomain}/events")
+    public ResponseEntity<Void> trackCustomPortalEvent(
+            @PathVariable String subdomain,
+            @RequestBody TrackPortalEventDTO body) {
+        customPortalAnalyticsService.recordEvent(subdomain, body);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/company/{id}")
