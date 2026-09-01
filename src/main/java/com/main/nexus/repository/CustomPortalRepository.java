@@ -1,6 +1,7 @@
 package com.main.nexus.repository;
 
 import com.main.nexus.model.CustomPortal;
+import com.main.nexus.model.enums.CustomPortalPaymentStatus;
 import com.main.nexus.model.enums.CustomPortalStatus;
 import java.time.LocalDate;
 import java.util.List;
@@ -24,4 +25,11 @@ public interface CustomPortalRepository extends JpaRepository<CustomPortal, Long
     // Usado pelo job diario de aviso de vencimento.
     List<CustomPortal> findByStatusAndNextDueDateLessThanEqual(
             CustomPortalStatus status, LocalDate limit);
+
+    // ── Cobranca automatica da assinatura ──────────────────────────
+    Optional<CustomPortal> findByMpPreapprovalId(String mpPreapprovalId);
+
+    // Job de suspensao por inadimplencia: portais no ar mas com pagamento atrasado.
+    List<CustomPortal> findByPaymentStatusAndStatus(
+            CustomPortalPaymentStatus paymentStatus, CustomPortalStatus status);
 }

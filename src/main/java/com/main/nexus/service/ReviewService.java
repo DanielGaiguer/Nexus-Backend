@@ -4,7 +4,6 @@ import com.main.nexus.dto.PendingReviewDTO;
 import com.main.nexus.dto.ReviewDisplayDTO;
 import com.main.nexus.dto.ReviewPageDTO;
 import com.main.nexus.model.Match;
-import com.main.nexus.model.MatchStatusCheck;
 import com.main.nexus.model.Review;
 import com.main.nexus.model.enums.AuthorType;
 import com.main.nexus.model.enums.MatchOutcome;
@@ -57,17 +56,19 @@ public class ReviewService {
                     "A review from this author type already exists for this match.");
         }
 
-        // Rejeitados nunca chegaram a ser confirmados, então não há status check
-        // E necessario ter respondido o StatusCheck, caso nao tenha da erro
+        // Rejeitados nunca chegaram a ser confirmados, então não há status check.
+        // A avaliação do contratante exige que o LADO COMPANY já tenha respondido
+        // a janela de confirmação (agora há uma linha de MatchStatusCheck por lado).
         if (review.getAuthorType() == AuthorType.COMPANY && !matchRejected
-                && !matchStatusCheckRepository.existsByMatchId(match.getId())) {
+                && !matchStatusCheckRepository.existsByMatchIdAndAnsweredBy(
+                        match.getId(), AuthorType.COMPANY)) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "Please answer the match status check before reviewing.");
         }
 
-        MatchStatusCheck statusCheck = matchStatusCheckRepository.findByMatchId(match.getId()).orElse(null);
-        // Se ter statusCheck, e esse status for SEM CONTATO
-        if (statusCheck != null && statusCheck.getOutcome() == MatchOutcome.NO_CONTACT_YET) {
+        // Se qualquer lado respondeu "sem contato", nenhuma avaliação é liberada.
+        if (matchStatusCheckRepository.existsByMatchIdAndOutcome(
+                match.getId(), MatchOutcome.NO_CONTACT_YET)) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "Reviews are not available when there was no contact.");
         }

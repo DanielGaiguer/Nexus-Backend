@@ -40,6 +40,15 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/public/**").permitAll()
 
+                // Webhook do Mercado Pago (Prompt 5) -- chamado server-to-server pelo MP,
+                // sem sessão. A autenticidade é conferida no controller pela assinatura
+                // x-signature quando MP_WEBHOOK_SECRET está configurado.
+                .requestMatchers(HttpMethod.POST, "/api/payments/mercadopago/webhook").permitAll()
+
+                // Webhook do eNotas (Prompt 6) -- server-to-server, sem sessão. O
+                // controller apenas extrai o id da nota e re-consulta o eNotas.
+                .requestMatchers(HttpMethod.POST, "/api/invoices/enotas/webhook").permitAll()
+
                 .requestMatchers("/ws/**").permitAll()
 
                 .requestMatchers(HttpMethod.GET, "/api/reputation/**").permitAll()
@@ -53,6 +62,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/notifications/**").authenticated()
 
                 .requestMatchers("/api/chat/**").authenticated()
+
+                // Chat de suporte -- lado do usuário (profissional/contratante); o service
+                // valida que quem chama é o dono da conversa. O lado do Admin cai na regra
+                // genérica /api/admin/** abaixo.
+                .requestMatchers("/api/support/**").authenticated()
 
                 .requestMatchers("/api/professional/stats").hasAnyRole("PROFESSIONAL", "ADMIN")
 

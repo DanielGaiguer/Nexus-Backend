@@ -171,16 +171,173 @@ public class NotificationService {
             null
         );
     }
+    // ── Janela de confirmação pós-contratação (30 dias) — Prompt 2 ─────
+    // Reutiliza NotificationType.MATCH_STATUS_CHECK (o valor persiste no banco;
+    // não faz sentido criar um tipo novo para a mesma "pergunta pós-match").
+
     @Async
-    public void notifyMatchStatusCheck(User companyUser,
-                                       String professionalName, String projectTitle,
-                                       Long matchId) {
+    public void notifyConfirmationWindowOpened(User user,
+                                               String otherPartyName, String projectTitle,
+                                               Long matchId) {
+        notify(
+            user,
+            NotificationType.MATCH_STATUS_CHECK,
+            "Confirme sua contratação",
+            "Sua contratação com " + otherPartyName + " no projeto \"" + projectTitle +
+            "\" completou 30 dias. Confirme se o trabalho foi concluído e informe o valor final combinado. Você tem 7 dias.",
+            "/matches/" + matchId + "/status-check"
+        );
+    }
+
+    @Async
+    public void notifyConfirmationConfirmed(User user, String projectTitle, Long matchId) {
+        notify(
+            user,
+            NotificationType.MATCH_STATUS_CHECK,
+            "Contratação confirmada",
+            "A confirmação da contratação no projeto \"" + projectTitle + "\" foi concluída — os dois lados bateram o valor final.",
+            "/matches/" + matchId
+        );
+    }
+
+    @Async
+    public void notifyConfirmationPendingReview(User user, String projectTitle, Long matchId) {
+        notify(
+            user,
+            NotificationType.MATCH_STATUS_CHECK,
+            "Confirmação em análise",
+            "A confirmação da contratação no projeto \"" + projectTitle + "\" foi encaminhada para análise do suporte do Nexus.",
+            "/matches/" + matchId
+        );
+    }
+
+    @Async
+    public void notifyConfirmationClosedNoCharge(User user, String projectTitle, Long matchId) {
+        notify(
+            user,
+            NotificationType.MATCH_STATUS_CHECK,
+            "Contratação encerrada sem cobrança",
+            "Os dois lados informaram que o trabalho no projeto \"" + projectTitle + "\" não aconteceu. A contratação foi encerrada sem cobrança.",
+            "/matches/" + matchId
+        );
+    }
+
+    // Reconciliação manual pelo Admin (Prompt 3).
+    @Async
+    public void notifyConfirmationValueSetByAdmin(User user, java.math.BigDecimal amount,
+                                                  String projectTitle, Long matchId) {
+        notify(
+            user,
+            NotificationType.MATCH_STATUS_CHECK,
+            "Valor final definido pelo suporte",
+            "O suporte do Nexus revisou a confirmação da contratação no projeto \"" + projectTitle +
+            "\" e definiu o valor final em R$ " + amount + ".",
+            "/matches/" + matchId
+        );
+    }
+
+    // Chat de suporte (Prompt 4).
+    @Async
+    public void notifySupportConversationOpened(User user, String subject, Long conversationId) {
+        String tail = subject != null && !subject.isBlank()
+                ? " Assunto: \"" + subject + "\"." : "";
+        notify(
+            user,
+            NotificationType.SUPPORT_CONVERSATION_OPENED,
+            "O suporte do Nexus abriu uma conversa com você",
+            "Um administrador do Nexus iniciou uma conversa de suporte com você." + tail +
+            " Acesse a aba Suporte para responder.",
+            "/support/" + conversationId
+        );
+    }
+
+    // Chamado de suporte aberto pelo proprio usuario -- notifica cada Admin.
+    @Async
+    public void notifySupportConversationRequested(User admin, String requesterName,
+                                                   String subject, Long conversationId) {
+        String tail = subject != null && !subject.isBlank()
+                ? " Assunto: \"" + subject + "\"." : "";
+        notify(
+            admin,
+            NotificationType.SUPPORT_CONVERSATION_OPENED,
+            "Novo chamado de suporte",
+            requesterName + " abriu um chamado de suporte." + tail +
+            " Abra a aba Suporte para responder.",
+            "/admin/support/" + conversationId
+        );
+    }
+
+    // Cobrança de comissão (Mercado Pago, Prompt 5).
+    @Async
+    public void notifyCommissionPaid(User companyUser, java.math.BigDecimal amount, String projectTitle) {
         notify(
             companyUser,
+            NotificationType.COMMISSION_PAYMENT_CONFIRMED,
+            "Comissão cobrada com sucesso",
+            "A comissão de R$ " + amount + " referente à contratação no projeto \"" + projectTitle +
+            "\" foi cobrada no seu cartão.",
+            "/company/billing"
+        );
+    }
+
+    @Async
+    public void notifyCommissionChargeFailed(User companyUser, String reason) {
+        notify(
+            companyUser,
+            NotificationType.COMMISSION_PAYMENT_FAILED,
+            "Cobrança de comissão pendente — regularize seu pagamento",
+            reason + " Enquanto isso, você não consegue fechar novas contratações. " +
+            "Acesse Financeiro para atualizar o cartão e tentar a cobrança novamente.",
+            "/company/billing"
+        );
+    }
+
+    // NFS-e por comissão (eNotas, Prompt 6).
+    @Async
+    public void notifyNfseIssued(User companyUser, String projectTitle, String numero) {
+        notify(
+            companyUser,
+            NotificationType.NFSE_ISSUED,
+            "Nota fiscal emitida",
+            "A NFS-e" + (numero != null ? " nº " + numero : "") +
+            " da comissão referente ao projeto \"" + projectTitle + "\" foi emitida. Baixe o PDF em Financeiro.",
+            "/company/billing"
+        );
+    }
+
+    @Async
+    public void notifyNfseFailed(User companyUser, String reason) {
+        notify(
+            companyUser,
+            NotificationType.NFSE_FAILED,
+            "Não foi possível emitir a nota fiscal",
+            reason + " Confira seus dados fiscais em Financeiro — a emissão é retentada em seguida.",
+            "/company/billing"
+        );
+    }
+
+    // NFS-e da mensalidade da plataforma personalizada.
+    @Async
+    public void notifyNfsePortalIssued(User companyUser, String subdomain, String numero) {
+        notify(
+            companyUser,
+            NotificationType.NFSE_ISSUED,
+            "Nota fiscal emitida",
+            "A NFS-e" + (numero != null ? " nº " + numero : "") +
+            " da mensalidade da plataforma \"" + subdomain + "\" foi emitida. Baixe o PDF em Financeiro.",
+            "/company/billing"
+        );
+    }
+
+    @Async
+    public void notifyConfirmationMarkedUnresolved(User user, String projectTitle, Long matchId) {
+        notify(
+            user,
             NotificationType.MATCH_STATUS_CHECK,
-            "Como está indo o match?",
-            "Seu match com " + professionalName + " no projeto \"" + projectTitle + "\" completa 30 dias em 15 dias. Que tal nos contar como está sendo?",
-            "/matches/" + matchId + "/status-check"
+            "Confirmação encerrada sem valor",
+            "O suporte do Nexus não conseguiu confirmar a contratação no projeto \"" + projectTitle +
+            "\". Ela foi encerrada sem valor e sem cobrança.",
+            "/matches/" + matchId
         );
     }
     @Async
@@ -537,6 +694,53 @@ public class NotificationService {
             "Plataforma personalizada suspensa",
             "Sua plataforma personalizada foi suspensa por um administrador." + tail
                 + " Seu cadastro normal no Nexus continua ativo.",
+            "/company/custom-portal"
+        );
+    }
+
+    // Cobranca automatica da assinatura da plataforma personalizada.
+    @Async
+    public void notifyPortalSubscriptionCharged(User companyUser, java.math.BigDecimal amount) {
+        notify(
+            companyUser,
+            NotificationType.PORTAL_SUBSCRIPTION_CHARGED,
+            "Mensalidade da plataforma cobrada",
+            "A mensalidade de R$ " + amount + " da sua plataforma personalizada foi cobrada no cartão.",
+            "/company/custom-portal"
+        );
+    }
+
+    @Async
+    public void notifyPortalSubscriptionPaymentFailed(User companyUser, java.time.LocalDate graceUntil) {
+        notify(
+            companyUser,
+            NotificationType.PORTAL_SUBSCRIPTION_PAYMENT_FAILED,
+            "Falha na cobrança da plataforma — regularize o cartão",
+            "Não foi possível cobrar a mensalidade da sua plataforma personalizada. "
+                + "Atualize o cartão até " + graceUntil + " para não ter a plataforma suspensa.",
+            "/company/custom-portal"
+        );
+    }
+
+    @Async
+    public void notifyPortalSuspendedForNonPayment(User companyUser) {
+        notify(
+            companyUser,
+            NotificationType.CUSTOM_PORTAL_SUSPENDED,
+            "Plataforma personalizada suspensa por falta de pagamento",
+            "Sua plataforma personalizada saiu do ar porque a mensalidade não foi paga. "
+                + "Atualize o cartão para reativá-la automaticamente. Seu cadastro normal no Nexus continua ativo.",
+            "/company/custom-portal"
+        );
+    }
+
+    @Async
+    public void notifyPortalReactivatedAfterPayment(User companyUser) {
+        notify(
+            companyUser,
+            NotificationType.CUSTOM_PORTAL_REQUEST_APPROVED,
+            "Plataforma personalizada reativada",
+            "O pagamento foi confirmado e sua plataforma personalizada voltou a ficar no ar.",
             "/company/custom-portal"
         );
     }

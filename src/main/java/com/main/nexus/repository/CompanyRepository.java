@@ -16,6 +16,7 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     boolean existsByTaxId(String taxId);
     List<Company> findByStatus(CompanyStatus status);
     List<Company> findByType(CompanyType type);
+    List<Company> findByUnderObservationTrue();
 
     List<Company> findTop5ByStatusNotOrderByUserCreatedAtDesc(CompanyStatus status);
     Page<Company> findByStatusAndCompanyNameContainingIgnoreCase(

@@ -21,6 +21,9 @@ public record CustomPortalDTO(
         LocalDate subscriptionStartDate,
         LocalDate nextDueDate,
         String paymentStatus,
+        // Cobranca automatica (assinatura recorrente do Mercado Pago).
+        boolean subscriptionCardOnFile,
+        LocalDate paymentGraceUntil,
         boolean createdFromRequest,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
@@ -47,6 +50,8 @@ public record CustomPortalDTO(
                 p.getSubscriptionStartDate(),
                 p.getNextDueDate(),
                 p.getPaymentStatus().name(),
+                p.hasSubscriptionCard(),
+                p.getPaymentGraceUntil(),
                 p.getOriginRequest() != null,
                 p.getCreatedAt(),
                 p.getUpdatedAt(),

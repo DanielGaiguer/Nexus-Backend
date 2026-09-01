@@ -73,6 +73,23 @@ public class Company {
     @Column(length = 255)
     private String linkedinUrl;
 
+    // Contador de contratacoes fechadas com sucesso deste contratante -- as 3
+    // primeiras sao isentas de comissao; a partir da 4a a comissao se aplica
+    // (ver CommissionService). Persistido e incremental: uma contratacao que
+    // depois seja cancelada NAO devolve a vaga gratuita.
+    // Prompt 1 da camada financeira: o campo e a leitura ja existem. O Prompt 2
+    // liga o incremento a reconciliacao CONFIRMED da janela de confirmacao
+    // (CommissionService.registerClosedHire, chamado por MatchStatusCheckService).
+    // columnDefinition garante 0 para as empresas ja cadastradas no ALTER TABLE
+    // do ddl-auto (mesmo padrao de `type` acima).
+    @Column(nullable = false, columnDefinition = "INT DEFAULT 0")
+    private Integer successfulHiresCount = 0;
+
+    // Flag manual do Admin (Prompt 2 -- triagem das confirmacoes pos-contratacao).
+    // Puramente sinalizador: nao dispara bloqueio nem suspensao automatica.
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean underObservation = false;
+
     public Long getId() {
         return id;
     }
@@ -207,5 +224,21 @@ public class Company {
 
     public void setLinkedinUrl(String linkedinUrl) {
         this.linkedinUrl = linkedinUrl;
+    }
+
+    public Integer getSuccessfulHiresCount() {
+        return successfulHiresCount;
+    }
+
+    public void setSuccessfulHiresCount(Integer successfulHiresCount) {
+        this.successfulHiresCount = successfulHiresCount;
+    }
+
+    public Boolean getUnderObservation() {
+        return underObservation;
+    }
+
+    public void setUnderObservation(Boolean underObservation) {
+        this.underObservation = underObservation;
     }
 }

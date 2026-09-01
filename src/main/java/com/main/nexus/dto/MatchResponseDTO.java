@@ -27,5 +27,8 @@ public record MatchResponseDTO(
         // Tentativa(s) do profissional no questionário de triagem da vaga (0..N -- pode ter
         // mais de uma ao longo do tempo se recusou/expirou e tentou de novo). Lista vazia em
         // toda vaga sem questionário vinculado -- não muda nenhuma tela existente.
-        List<ScreeningInvitationSummaryDTO> screeningInvitations
+        List<ScreeningInvitationSummaryDTO> screeningInvitations,
+        // Janela de confirmação pós-contratação (Prompt 2). null enquanto a janela não abriu
+        // (não abre antes de 30 dias do fechamento, e nunca para match que não chegou a MATCHED).
+        MatchConfirmationDTO confirmation
 ) {}

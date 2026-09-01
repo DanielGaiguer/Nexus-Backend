@@ -29,6 +29,7 @@ import com.main.nexus.service.EmailService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchActionResult;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.MatchStatusCheckService;
 import com.main.nexus.service.NotificationService;
 import com.main.nexus.service.PreviousProjectService;
 import com.main.nexus.service.ProfessionalCredentialService;
@@ -72,6 +73,9 @@ public class ProfessionalController {
 
     @Autowired
     private MatchService matchService;
+
+    @Autowired
+    private MatchStatusCheckService matchStatusCheckService;
 
     @Autowired
     private ProposalService proposalService;
@@ -428,7 +432,8 @@ public class ProfessionalController {
                 matchService.getRejectionReasonNames(feedback),
                 feedback != null ? feedback.getDescription() : null,
                 m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null,
-                screeningInvitationService.getSummariesForMatch(m)
+                screeningInvitationService.getSummariesForMatch(m),
+                matchStatusCheckService.buildConfirmationDTO(m, com.main.nexus.model.enums.AuthorType.PROFESSIONAL)
         );
     }
 

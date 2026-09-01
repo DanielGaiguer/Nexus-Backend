@@ -1,8 +1,12 @@
 package com.main.nexus.scheduler;
 
+import com.main.nexus.service.BillingService;
 import com.main.nexus.service.CustomPortalService;
 import com.main.nexus.service.MatchExpirationService;
+import com.main.nexus.service.MatchStatusCheckService;
+import com.main.nexus.service.NfseService;
 import com.main.nexus.service.NotificationService;
+import com.main.nexus.service.PortalSubscriptionService;
 import com.main.nexus.service.ProfessionalInactivityService;
 import com.main.nexus.service.ProposalService;
 import com.main.nexus.service.ScreeningInvitationService;
@@ -32,16 +36,37 @@ public class NexusScheduler {
     @Autowired
     private CustomPortalService customPortalService;
 
+    @Autowired
+    private MatchStatusCheckService matchStatusCheckService;
+
+    @Autowired
+    private BillingService billingService;
+
+    @Autowired
+    private NfseService nfseService;
+
+    @Autowired
+    private PortalSubscriptionService portalSubscriptionService;
+
     // segundo minuto hora dia-do-mês mês dia-da-semana
     @Scheduled(cron = "0 0 0 * * *") //meia-noite, todo dia. Roda checkAndExpireMatches (a checagem de expiração de 30 dias)   
     public void runMatchExpirationCheck() { // Nao precisa de atencao imediata da empresa, por isso a escolha do horario
         matchExpirationService.checkAndExpireMatches();
     }
 
-    // E avisado 8 horas pois e o horario de inicio do expediente, maximizando a chance de resposta no mesmo dia
-    @Scheduled(cron = "0 0 8 * * *")// 8h da manhã, todo dia. Roda checkAndNotifyApproaching (o aviso de status check de ~15 dias)
-    public void runMatchApproachingCheck() {
-        matchExpirationService.checkAndNotifyApproaching();
+    // 8h da manhã, todo dia — início do expediente, maximiza a chance de resposta no mesmo dia.
+    // Abre a janela de confirmação pós-contratação para matches cujo fechamento completou 30 dias
+    // (camada financeira, Prompt 2). Substituiu o antigo aviso de status check de ~15 dias.
+    @Scheduled(cron = "0 0 8 * * *")
+    public void runConfirmationWindowOpen() {
+        matchStatusCheckService.openDueConfirmationWindows();
+    }
+
+    // 8h30, todo dia. Move para revisão do Admin as janelas de confirmação cujo prazo de 7 dias
+    // estourou sem os dois lados responderem (PENDING_ADMIN_REVIEW / NO_RESPONSE).
+    @Scheduled(cron = "0 30 8 * * *")
+    public void runConfirmationWindowExpiry() {
+        matchStatusCheckService.closeOverdueConfirmationWindows();
     }
 
     // 3h da manhã, todo dia — horário de baixo tráfego. Remove notificações lidas com
@@ -83,5 +108,31 @@ public class NexusScheduler {
     @Scheduled(cron = "0 0 9 * * *")
     public void runCustomPortalRenewalCheck() {
         customPortalService.notifyUpcomingRenewals();
+    }
+
+    // 9h05, todo dia. Cobrança automática da assinatura da plataforma personalizada:
+    // no modo simulado gera a mensalidade do ciclo vencido (o Admin decide o
+    // resultado em /admin/portal-subscription-charges); suspende os portais cuja
+    // carência de 7 dias após uma falha já passou; e, no modo real, re-consulta o
+    // Mercado Pago sobre cobranças presas em PROCESSING.
+    @Scheduled(cron = "0 5 9 * * *")
+    public void runPortalSubscriptionBilling() {
+        portalSubscriptionService.runBillingCycle();
+    }
+
+    // A cada 20 min — rede de segurança da cobrança de comissão (Prompt 5): tenta de
+    // novo as cobranças PENDING de quem já tem cartão e re-consulta o Mercado Pago
+    // sobre as que ficaram PROCESSING (caso o webhook não tenha chegado).
+    @Scheduled(cron = "0 */20 * * * *")
+    public void runCommissionChargeSweep() {
+        billingService.processStuckCharges();
+    }
+
+    // A cada 30 min: re-tenta as NFS-e PENDING e re-consulta o eNotas sobre as
+    // que ficaram PROCESSING (caso o webhook não tenha chegado). Rede de
+    // segurança da emissão automática de nota por comissão paga (Prompt 6).
+    @Scheduled(cron = "0 */30 * * * *")
+    public void runNfseSweep() {
+        nfseService.processStuckInvoices();
     }
 }

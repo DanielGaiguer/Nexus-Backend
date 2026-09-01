@@ -61,6 +61,7 @@ class CustomPortalServiceTest {
     @Mock private EmailService emailService;
     @Mock private EmailTemplateService emailTemplate;
     @Mock private SupabaseStorageService supabaseStorageService;
+    @Mock private PortalSubscriptionService portalSubscriptionService;
 
     @InjectMocks private CustomPortalService service;
 

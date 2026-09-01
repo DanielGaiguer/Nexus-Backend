@@ -100,6 +100,9 @@ public class CustomPortalService {
     @Autowired
     private SupabaseStorageService supabaseStorageService;
 
+    @Autowired
+    private PortalSubscriptionService portalSubscriptionService;
+
     // ═══════════════════════ Lado do contratante ═══════════════════════
 
     public CustomPortalOverviewDTO getOverviewForUser(Long userId) {
@@ -321,6 +324,7 @@ public class CustomPortalService {
                     "Only an active custom portal can be suspended.");
         }
         applyStatusChange(portal, CustomPortalStatus.SUSPENDED, adminById(adminUserId), note);
+        portalSubscriptionService.onPortalSuspended(portal); // pausa a assinatura no MP
 
         Company company = portal.getCompany();
         notificationService.notifyCustomPortalSuspended(company.getUser(), note);
@@ -345,6 +349,7 @@ public class CustomPortalService {
                     "Only a suspended custom portal can be reactivated.");
         }
         applyStatusChange(portal, CustomPortalStatus.ACTIVE, adminById(adminUserId), note);
+        portalSubscriptionService.onPortalReactivated(portal); // retoma a assinatura no MP
 
         Company company = portal.getCompany();
         notificationService.notify(company.getUser(),
@@ -373,6 +378,9 @@ public class CustomPortalService {
         applyStatusChange(portal, CustomPortalStatus.CANCELED, adminById(adminUserId), note);
         portal.setPaymentStatus(CustomPortalPaymentStatus.CANCELED);
         customPortalRepository.save(portal);
+        // Descontinuar = encerrar a assinatura no MP e as cobrancas em aberto.
+        // Sem cobranca final nem reembolso.
+        portalSubscriptionService.onPortalCanceled(portal);
 
         Company company = portal.getCompany();
         notificationService.notify(company.getUser(),
@@ -407,18 +415,26 @@ public class CustomPortalService {
         }
 
         boolean dueDateChanged = !body.nextDueDate().equals(portal.getNextDueDate());
+        BigDecimal previousPrice = portal.getPlanPrice();
         portal.setPlanName(body.planName().trim());
         portal.setPlanPrice(body.planPrice());
         portal.setNextDueDate(body.nextDueDate());
-        if (body.paymentStatus() != null) {
+        if (body.paymentStatus() != null && body.paymentStatus() != portal.getPaymentStatus()) {
+            // Override manual do Admin -- zera o relógio de carência da automação
+            // (se ele quiser suspender, usa a ação Suspender diretamente).
             portal.setPaymentStatus(body.paymentStatus());
+            portal.setPaymentGraceUntil(null);
         }
         if (dueDateChanged) {
             // Novo ciclo -> permite o lembrete de vencimento disparar de novo.
             portal.setLastRenewalReminderFor(null);
         }
         portal.setUpdatedAt(LocalDateTime.now());
-        return CustomPortalDTO.from(customPortalRepository.save(portal));
+        CustomPortal saved = customPortalRepository.save(portal);
+        // Propaga o novo valor mensal para a assinatura recorrente do MP (vale no
+        // proximo ciclo). Best-effort -- nao quebra a acao do Admin.
+        portalSubscriptionService.onSubscriptionAmountChanged(saved, previousPrice);
+        return CustomPortalDTO.from(saved);
     }
 
     // ═══════════════════════ Customização visual (Prompt 2) ════════════

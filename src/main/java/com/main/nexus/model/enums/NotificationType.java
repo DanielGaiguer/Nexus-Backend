@@ -37,5 +37,18 @@ public enum NotificationType {
     CUSTOM_PORTAL_REQUEST_APPROVED,  // Admin aprovou a solicitação -> plataforma criada
     CUSTOM_PORTAL_REQUEST_REJECTED,  // Admin recusou a solicitação (com motivo)
     CUSTOM_PORTAL_RENEWAL_DUE,       // assinatura da plataforma personalizada perto do vencimento
-    CUSTOM_PORTAL_SUSPENDED          // plataforma personalizada suspensa pelo Admin (ex.: inadimplência)
+    CUSTOM_PORTAL_SUSPENDED,         // plataforma personalizada suspensa (pelo Admin ou por inadimplência)
+    PORTAL_SUBSCRIPTION_CHARGED,     // mensalidade da plataforma cobrada com sucesso
+    PORTAL_SUBSCRIPTION_PAYMENT_FAILED, // falha ao cobrar a mensalidade -> carência antes da suspensão
+
+    // ── Chat de suporte (Admin <-> usuário) ───────────────────────────
+    SUPPORT_CONVERSATION_OPENED,     // conversa de suporte aberta (pelo Admin com o usuário, ou pelo usuário -> notifica os Admins)
+
+    // ── Cobrança de comissão (Mercado Pago, Prompt 5) ────────────────
+    COMMISSION_PAYMENT_CONFIRMED,    // a comissão de uma contratação foi cobrada com sucesso
+    COMMISSION_PAYMENT_FAILED,       // a cobrança falhou / sem cartão -> contratante bloqueado
+
+    // ── NFS-e por comissão (eNotas, Prompt 6) ───────────────────────
+    NFSE_ISSUED,                     // a nota fiscal da comissão foi emitida
+    NFSE_FAILED                      // a emissão falhou (ex.: dados fiscais incompletos)
 }

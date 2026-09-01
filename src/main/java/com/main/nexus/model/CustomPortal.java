@@ -74,6 +74,25 @@ public class CustomPortal {
     @Column(nullable = false, length = 20)
     private CustomPortalPaymentStatus paymentStatus = CustomPortalPaymentStatus.UP_TO_DATE;
 
+    // ── Cobranca automatica (assinatura recorrente do Mercado Pago) ───
+    // Id da assinatura (/preapproval) no Mercado Pago. Nulo enquanto o contratante
+    // nao cadastrou o cartao da plataforma. No modo simulado fica "SIM-<portalId>".
+    @Column(name = "mp_preapproval_id", length = 80)
+    private String mpPreapprovalId;
+
+    // Resumo do cartao amarrado a assinatura (so exibicao). Separado do cartao de
+    // comissao (CompanyBillingProfile) -- cada preapproval do MP tem o seu.
+    @Column(length = 40)
+    private String subscriptionCardBrand;
+
+    @Column(length = 4)
+    private String subscriptionCardLast4;
+
+    // Quando uma cobranca falha, ate quando o portal fica no ar antes da suspensao
+    // automatica por inadimplencia (job diario). Nulo = sem carencia pendente.
+    @Column
+    private LocalDate paymentGraceUntil;
+
     // ── Customizacao visual (Prompt 2) ───────────────────────────────
     // Tudo opcional — portais criados no Prompt 1 seguem validos sem nada disso.
     // Vale so dentro da pagina publica da plataforma (Prompt 3) / preview; nao
@@ -209,6 +228,42 @@ public class CustomPortal {
 
     public void setPaymentStatus(CustomPortalPaymentStatus paymentStatus) {
         this.paymentStatus = paymentStatus;
+    }
+
+    public String getMpPreapprovalId() {
+        return mpPreapprovalId;
+    }
+
+    public void setMpPreapprovalId(String mpPreapprovalId) {
+        this.mpPreapprovalId = mpPreapprovalId;
+    }
+
+    public String getSubscriptionCardBrand() {
+        return subscriptionCardBrand;
+    }
+
+    public void setSubscriptionCardBrand(String subscriptionCardBrand) {
+        this.subscriptionCardBrand = subscriptionCardBrand;
+    }
+
+    public String getSubscriptionCardLast4() {
+        return subscriptionCardLast4;
+    }
+
+    public void setSubscriptionCardLast4(String subscriptionCardLast4) {
+        this.subscriptionCardLast4 = subscriptionCardLast4;
+    }
+
+    public boolean hasSubscriptionCard() {
+        return subscriptionCardLast4 != null && !subscriptionCardLast4.isBlank();
+    }
+
+    public LocalDate getPaymentGraceUntil() {
+        return paymentGraceUntil;
+    }
+
+    public void setPaymentGraceUntil(LocalDate paymentGraceUntil) {
+        this.paymentGraceUntil = paymentGraceUntil;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -18,6 +18,7 @@ import com.main.nexus.model.enums.UserType;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.MatchStatusCheckService;
 import com.main.nexus.service.ProjectAiExtractionService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProjectService;
@@ -54,6 +55,9 @@ public class ProjectController {
 
     @Autowired
     private MatchService matchService;
+
+    @Autowired
+    private MatchStatusCheckService matchStatusCheckService;
 
     @Autowired
     private SkillService skillService;
@@ -348,7 +352,8 @@ public class ProjectController {
                 matchService.getRejectionReasonNames(feedback),
                 feedback != null ? feedback.getDescription() : null,
                 m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null,
-                screeningInvitationService.getSummariesForMatch(m)
+                screeningInvitationService.getSummariesForMatch(m),
+                matchStatusCheckService.buildConfirmationDTO(m, com.main.nexus.model.enums.AuthorType.COMPANY)
         );
     }
 

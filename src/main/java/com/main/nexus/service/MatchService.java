@@ -72,6 +72,9 @@ public class MatchService {
     @Autowired
     private ScreeningInvitationService screeningInvitationService;
 
+    @Autowired
+    private BillingService billingService;
+
     // SCORE ENGINE — fórmula principal
     // ScoreMatch = (Skills*0.39) + (Budget*0.28) + (History*0.22) + (Reputation*0.11)
     // ou, para ONSITE/HYBRID:
@@ -1680,7 +1683,11 @@ public class MatchService {
     // Efeito cascata de pausar projeto
     // Package-private pelo mesmo motivo de assertProjectIsOpen -- reaproveitado por ProposalService
     // ao aceitar uma proposta (também preenche uma posição).
+    // É o funil único de "acabou de virar MATCHED" (os 5 caminhos de fechamento passam por aqui),
+    // então é aqui que a camada financeira (Prompt 5) barra um contratante bloqueado por
+    // pendência de pagamento -- lançar aqui aborta a transação antes de qualquer persistência.
     void incrementFilledPositions(Project project) {
+        billingService.assertCanCloseNewHire(project.getCompany());
         // UPDATE atomico no banco
         projectRepository.incrementFilledPositions(project.getId());
         // a query acima é um bulk update — sincroniza o objeto em memória pra que a checagem

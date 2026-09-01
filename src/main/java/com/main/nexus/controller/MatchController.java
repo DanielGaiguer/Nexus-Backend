@@ -16,10 +16,12 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
+import com.main.nexus.model.enums.AuthorType;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.MatchActionResult;
 import com.main.nexus.service.MatchService;
+import com.main.nexus.service.MatchStatusCheckService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ProjectResponseAssembler;
 import com.main.nexus.service.ProposalService;
@@ -59,6 +61,9 @@ public class MatchController {
 
     @Autowired
     private ScreeningInvitationService screeningInvitationService;
+
+    @Autowired
+    private MatchStatusCheckService matchStatusCheckService;
 
     @GetMapping("/{matchId}")
     public ResponseEntity<MatchResponseDTO> findById(@PathVariable Long matchId) {
@@ -248,8 +253,17 @@ public class MatchController {
                 matchService.getRejectionReasonNames(feedback),
                 feedback != null ? feedback.getDescription() : null,
                 m.getAcceptedProposal() != null ? proposalService.toResponseDTO(m.getAcceptedProposal()) : null,
-                screeningInvitationService.getSummariesForMatch(m)
+                screeningInvitationService.getSummariesForMatch(m),
+                matchStatusCheckService.buildConfirmationDTO(m, viewerSide())
         );
+    }
+
+    // Lado de quem está olhando, para o campo viewerAnswered do MatchConfirmationDTO.
+    private AuthorType viewerSide() {
+        String role = getLoggedUser().role();
+        if ("COMPANY".equals(role)) return AuthorType.COMPANY;
+        if ("PROFESSIONAL".equals(role)) return AuthorType.PROFESSIONAL;
+        return null;
     }
 
     private ProjectResponseDTO toProjectResponseDTO(Project p) {

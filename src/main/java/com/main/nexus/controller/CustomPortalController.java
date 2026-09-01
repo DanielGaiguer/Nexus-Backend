@@ -5,12 +5,20 @@ import com.main.nexus.dto.CustomPortalAnalyticsDTO;
 import com.main.nexus.dto.CustomPortalDTO;
 import com.main.nexus.dto.CustomPortalOverviewDTO;
 import com.main.nexus.dto.CustomPortalRequestDTO;
+import com.main.nexus.dto.PortalSubscriptionChargeDTO;
+import com.main.nexus.dto.PortalSubscriptionStatusDTO;
+import com.main.nexus.dto.SaveCardRequestDTO;
 import com.main.nexus.dto.UpdateCustomPortalBrandingDTO;
 import com.main.nexus.dto.UserDTO;
+import com.main.nexus.model.Company;
 import com.main.nexus.model.enums.BrandingImageKind;
+import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.CustomPortalAnalyticsService;
 import com.main.nexus.service.CustomPortalService;
+import com.main.nexus.service.PortalSubscriptionService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 // Lado do contratante da plataforma personalizada. Protegido por
 // hasRole("COMPANY") em SecurityConfig (regra generica /api/company/**).
@@ -34,6 +43,12 @@ public class CustomPortalController {
 
     @Autowired
     private CustomPortalAnalyticsService customPortalAnalyticsService;
+
+    @Autowired
+    private PortalSubscriptionService portalSubscriptionService;
+
+    @Autowired
+    private CompanyService companyService;
 
     // Estado da plataforma personalizada do contratante logado: ultima
     // solicitacao, portal (se ja existir) e se ele pode abrir nova solicitacao.
@@ -77,6 +92,27 @@ public class CustomPortalController {
                 customPortalService.clearBrandingImageForUser(loggedUserId(), kind));
     }
 
+    // ── Assinatura & cobrança (mensalidade da plataforma) ────────────
+
+    @GetMapping("/subscription")
+    public ResponseEntity<PortalSubscriptionStatusDTO> subscriptionStatus() {
+        return ResponseEntity.ok(portalSubscriptionService.getStatus(loggedCompany()));
+    }
+
+    // O cartão da assinatura é tokenizado no frontend (Card Brick) -- aqui só
+    // chega o token. O backend nunca vê número/CVV/validade.
+    @PostMapping("/subscription/card")
+    public ResponseEntity<PortalSubscriptionStatusDTO> saveSubscriptionCard(
+            @RequestBody SaveCardRequestDTO body) {
+        return ResponseEntity.ok(portalSubscriptionService.saveCard(
+                loggedCompany(), body != null ? body.cardToken() : null));
+    }
+
+    @GetMapping("/subscription/charges")
+    public ResponseEntity<List<PortalSubscriptionChargeDTO>> subscriptionCharges() {
+        return ResponseEntity.ok(portalSubscriptionService.chargesForCompany(loggedCompany()));
+    }
+
     // ── Análises (dashboard do contratante) ──────────────────────────
 
     @GetMapping("/analytics")
@@ -90,5 +126,11 @@ public class CustomPortalController {
         UserDTO logged = (UserDTO) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
         return logged.id();
+    }
+
+    private Company loggedCompany() {
+        return companyService.findByUserId(loggedUserId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatusCode.valueOf(404), "Company profile not found"));
     }
 }
