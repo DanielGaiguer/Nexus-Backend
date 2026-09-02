@@ -1554,6 +1554,31 @@ public class MatchService {
         return received;
     }
 
+    // ─── Contagens leves para o badge da sidebar ──────────────────────────
+    // Mesmas regras de getPendingInvitesForProfessional / getReceivedInterestsForCompany,
+    // mas sem recalcular/salvar o matchScore (refreshMatchScore) -- o badge só precisa
+    // do número, e isto roda a cada carga da sidebar.
+
+    @Transactional
+    public long countPendingInvitesForProfessional(Long professionalId) {
+        List<Match> invites = matchRepository.findByProfessionalId(professionalId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.COMPANY_INTERESTED)
+                .filter(this::isActionablePending)
+                .toList();
+        Set<Long> inScreening = activeScreeningMatchIds(invites);
+        return invites.stream().filter(m -> !inScreening.contains(m.getId())).count();
+    }
+
+    @Transactional
+    public long countReceivedInterestsForCompany(Long companyId) {
+        return matchRepository.findByProjectCompanyId(companyId)
+                .stream()
+                .filter(m -> m.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED)
+                .filter(this::isActionablePending)
+                .count();
+    }
+
     // Espelho de getSentInterestsForProfessional: convites que a empresa enviou (a partir
     // do ranking) e que ainda aguardam resposta do profissional.
     @Transactional

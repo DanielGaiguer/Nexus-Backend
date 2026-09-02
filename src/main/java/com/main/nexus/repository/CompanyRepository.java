@@ -15,6 +15,8 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     Optional<Company> findByUserId(Long userId);
     boolean existsByTaxId(String taxId);
     List<Company> findByStatus(CompanyStatus status);
+    // Badge de sidebar (Padrão A) do Admin: contratantes aguardando aprovação.
+    long countByStatus(CompanyStatus status);
     List<Company> findByType(CompanyType type);
     List<Company> findByUnderObservationTrue();
 

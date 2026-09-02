@@ -167,4 +167,26 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
            "            AND c.outcome <> com.main.nexus.model.enums.MatchOutcome.NO_CONTACT_YET) " +
            "ORDER BY m.createdAt ASC")
     List<Match> findPendingReviewsForCompany(@Param("companyId") Long companyId);
+
+    // Badge do "Dashboard" (Padrão A) -- só a contagem das mesmas avaliações
+    // pendentes de findPendingReviewsForProfessional/ForCompany, sem carregar os
+    // matches (roda a cada carga da sidebar).
+    @Query("SELECT COUNT(m) FROM Match m WHERE m.professional.id = :professionalId " +
+           "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
+           "AND m.active = false " +
+           "AND NOT EXISTS (SELECT 1 FROM Review r WHERE r.match = m " +
+           "                AND r.authorType = com.main.nexus.model.enums.AuthorType.PROFESSIONAL) " +
+           "AND NOT EXISTS (SELECT 1 FROM MatchStatusCheck c WHERE c.match = m " +
+           "                AND c.outcome = com.main.nexus.model.enums.MatchOutcome.NO_CONTACT_YET)")
+    long countPendingReviewsForProfessional(@Param("professionalId") Long professionalId);
+
+    @Query("SELECT COUNT(m) FROM Match m WHERE m.project.company.id = :companyId " +
+           "AND m.status = com.main.nexus.model.enums.StatusMatch.MATCHED " +
+           "AND m.active = false " +
+           "AND NOT EXISTS (SELECT 1 FROM Review r WHERE r.match = m " +
+           "                AND r.authorType = com.main.nexus.model.enums.AuthorType.COMPANY) " +
+           "AND EXISTS (SELECT 1 FROM MatchStatusCheck c WHERE c.match = m " +
+           "            AND c.answeredBy = com.main.nexus.model.enums.AuthorType.COMPANY " +
+           "            AND c.outcome <> com.main.nexus.model.enums.MatchOutcome.NO_CONTACT_YET)")
+    long countPendingReviewsForCompany(@Param("companyId") Long companyId);
 }

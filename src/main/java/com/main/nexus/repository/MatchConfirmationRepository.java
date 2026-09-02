@@ -48,6 +48,23 @@ public interface MatchConfirmationRepository extends JpaRepository<MatchConfirma
             @Param("professionalId") Long professionalId,
             @Param("answeredBy") com.main.nexus.model.enums.AuthorType answeredBy);
 
+    // Badge de sidebar (Padrão A): quantas janelas de confirmacao abertas em que
+    // este lado (companyId OU professionalId) ainda nao respondeu -- mesmo
+    // criterio de findPendingForParty, so a contagem.
+    @Query("""
+            SELECT COUNT(c) FROM MatchConfirmation c
+            WHERE c.status = com.main.nexus.model.enums.MatchConfirmationStatus.AWAITING_RESPONSES
+              AND (:companyId IS NULL OR c.match.project.company.id = :companyId)
+              AND (:professionalId IS NULL OR c.match.professional.id = :professionalId)
+              AND NOT EXISTS (
+                  SELECT 1 FROM MatchStatusCheck s
+                  WHERE s.match = c.match AND s.answeredBy = :answeredBy)
+            """)
+    long countPendingForParty(
+            @Param("companyId") Long companyId,
+            @Param("professionalId") Long professionalId,
+            @Param("answeredBy") com.main.nexus.model.enums.AuthorType answeredBy);
+
     // Painel do Admin -- lista filtravel por status e/ou empresa.
     @Query("""
             SELECT c FROM MatchConfirmation c

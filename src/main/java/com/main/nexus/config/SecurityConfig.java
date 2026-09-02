@@ -61,6 +61,10 @@ public class SecurityConfig {
                     
                 .requestMatchers("/api/notifications/**").authenticated()
 
+                // Badges da sidebar -- vale para os 3 papéis; o service decide o
+                // conteúdo pelo papel do usuário logado.
+                .requestMatchers("/api/sidebar/**").authenticated()
+
                 .requestMatchers("/api/chat/**").authenticated()
 
                 // Chat de suporte -- lado do usuário (profissional/contratante); o service

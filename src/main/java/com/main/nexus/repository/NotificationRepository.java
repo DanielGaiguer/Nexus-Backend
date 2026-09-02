@@ -21,6 +21,14 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // Contagem de não lidas — usada no badge do sino
     long countByUserIdAndReadFalse(Long userId);
 
+    // Badge de sidebar do "Padrão B": quantos eventos (destes tipos) chegaram
+    // para o usuário depois que ele viu a seção pela última vez. Usa o feed de
+    // notificações só como log de eventos -- o "visto" fica em SectionView, não
+    // no flag `read` (que é do sino). Ver SidebarBadgeService.
+    long countByUserIdAndTypeInAndCreatedAtAfter(
+            Long userId, java.util.Collection<NotificationType> types,
+            java.time.LocalDateTime after);
+
     // Verifica se já existe notificação desse tipo
     boolean existsByUserIdAndTypeAndActionUrl(Long userId, NotificationType type, String actionUrl);
 

@@ -56,4 +56,13 @@ public interface ScreeningInvitationRepository extends JpaRepository<ScreeningIn
     // usado por MatchService pra separar, dentre os matches WAITING/COMPANY_INTERESTED, quais
     // têm mesmo um processo seletivo em andamento por trás (aba "Em processo").
     List<ScreeningInvitation> findByPendingMatchIdIn(List<Long> matchIds);
+
+    // ─── Badges de sidebar (Padrão A) ──────────────────────────────────
+    // Profissional: convites de teste técnico ainda não respondidos (SENT/IN_PROGRESS).
+    long countByProfessionalIdAndStatusIn(
+            Long professionalId, java.util.Collection<ScreeningInvitationStatus> statuses);
+
+    // Contratante: testes já respondidos aguardando a avaliação da empresa (SUBMITTED).
+    long countByScreeningStageScreeningQuestionnaireProjectCompanyIdAndStatus(
+            Long companyId, ScreeningInvitationStatus status);
 }
