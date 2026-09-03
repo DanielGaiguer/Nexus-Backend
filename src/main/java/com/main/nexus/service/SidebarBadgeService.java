@@ -1,7 +1,6 @@
 package com.main.nexus.service;
 
 import com.main.nexus.dto.UserDTO;
-import com.main.nexus.model.SectionView;
 import com.main.nexus.model.enums.AuthorType;
 import com.main.nexus.model.enums.CommissionChargeStatus;
 import com.main.nexus.model.enums.CompanyStatus;
@@ -84,6 +83,9 @@ public class SidebarBadgeService {
     @Autowired private CustomPortalRequestRepository customPortalRequestRepository;
 
     // href do item da sidebar -> contagem. Só entram os itens com contagem > 0.
+    // readOnly=true: são ~9-13 contagens por chamada (a cada montagem da sidebar
+    // + a cada poll); sem isto cada uma abria a sua própria transação autocommit.
+    @Transactional(readOnly = true)
     public Map<String, Long> badgesFor(UserDTO logged) {
         Map<String, Long> badges = new LinkedHashMap<>();
         String role = logged.role();
@@ -197,11 +199,10 @@ public class SidebarBadgeService {
     }
 
     // Padrão B: eventos daquela seção mais novos que o último "visto" do usuário.
+    // Uma query só -- o seenAt (ou EPOCH, se ainda não houver SectionView) é
+    // resolvido por subquery em countUnseenForSection.
     private long countUnseen(Long userId, SidebarSection section, List<NotificationType> types) {
-        LocalDateTime since = sectionViewRepository.findByUserIdAndSection(userId, section)
-                .map(SectionView::getSeenAt)
-                .orElse(EPOCH);
-        return notificationRepository.countByUserIdAndTypeInAndCreatedAtAfter(userId, types, since);
+        return notificationRepository.countUnseenForSection(userId, types, section, EPOCH);
     }
 
     // Chamado quando o usuário abre/sai de uma seção do Padrão B -- zera o badge.

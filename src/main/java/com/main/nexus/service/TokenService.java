@@ -36,7 +36,7 @@ public class TokenService {
                 .claim("email", user.email())
                 .claim("role", user.role())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 3_600_000))
+                .expiration(new Date(System.currentTimeMillis() + 28_800_000)) // 8h
                 .signWith(this.getKeySign())
                 .compact();
     }

@@ -34,12 +34,17 @@ public class ReputationService {
     @Autowired 
     private ReputationMetricsRepository reputationMetricsRepository;
     
-    @Autowired 
+    @Autowired
     private ProfessionalRepository professionalRepository;
-    
-    @Autowired 
+
+    @Autowired
     private CompanyRepository companyRepository;
-    
+
+    // Memo por request -- ver RequestReputationCache. Colapsa os ~3N SELECTs
+    // repetidos em tb_reputation_metrics ao montar listas de match/proposta.
+    @Autowired
+    private RequestReputationCache requestReputationCache;
+
 
     // Constantes de configuração
     private static final double RECENT_WEIGHT = 0.70;
@@ -136,6 +141,9 @@ public class ReputationService {
 
         metrics.setLastCalculatedAt(LocalDateTime.now());
         reputationMetricsRepository.save(metrics);
+        // Invalida o memo por request: se este mesmo request reler a reputação
+        // deste profissional, pega o valor recalculado agora (não o de antes).
+        cacheEvict("P:" + professionalId);
 
         // Nota simples de estrelas (0-5) exibida em cards/perfil — independente do
         // ReputationMetrics analítico acima, que é usado só pro ajuste de score.
@@ -177,6 +185,8 @@ public class ReputationService {
 
         metrics.setLastCalculatedAt(LocalDateTime.now());
         reputationMetricsRepository.save(metrics);
+        // Invalida o memo por request (ver mesma nota em recalculateForProfessional).
+        cacheEvict("C:" + companyId);
 
         // Nota simples de estrelas (0-5) exibida em cards/perfil — independente do
         // ReputationMetrics analítico acima, que é usado só pro ajuste de score.
@@ -211,19 +221,59 @@ public class ReputationService {
     // Helpers de leitura
 
     private ReputationMetrics getOrCalculateForProfessional(Long professionalId) {
-        return reputationMetricsRepository.findByProfessionalId(professionalId)
+        String key = "P:" + professionalId;
+        ReputationMetrics cached = cacheGet(key);
+        if (cached != null) {
+            return cached;
+        }
+        ReputationMetrics metrics = reputationMetricsRepository.findByProfessionalId(professionalId)
                 .orElseGet(() -> {
                     recalculateForProfessional(professionalId);
                     return reputationMetricsRepository.findByProfessionalId(professionalId).orElseThrow();
                 });
+        cachePut(key, metrics);
+        return metrics;
     }
 
     private ReputationMetrics getOrCalculateForCompany(Long companyId) {
-        return reputationMetricsRepository.findByCompanyId(companyId)
+        String key = "C:" + companyId;
+        ReputationMetrics cached = cacheGet(key);
+        if (cached != null) {
+            return cached;
+        }
+        ReputationMetrics metrics = reputationMetricsRepository.findByCompanyId(companyId)
                 .orElseGet(() -> {
                     recalculateForCompany(companyId);
                     return reputationMetricsRepository.findByCompanyId(companyId).orElseThrow();
                 });
+        cachePut(key, metrics);
+        return metrics;
+    }
+
+    // Acesso ao memo por request tolerante a "não há request ativo" (jobs
+    // @Scheduled): nesse caso o memo é ignorado e o comportamento é o de antes.
+    private ReputationMetrics cacheGet(String key) {
+        try {
+            return requestReputationCache.get(key);
+        } catch (RuntimeException noActiveRequest) {
+            return null;
+        }
+    }
+
+    private void cachePut(String key, ReputationMetrics metrics) {
+        try {
+            requestReputationCache.put(key, metrics);
+        } catch (RuntimeException noActiveRequest) {
+            // fora de um request HTTP -- segue sem memo
+        }
+    }
+
+    private void cacheEvict(String key) {
+        try {
+            requestReputationCache.evict(key);
+        } catch (RuntimeException noActiveRequest) {
+            // fora de um request HTTP -- nada a fazer
+        }
     }
 
     // CÁLCULO — PROFISSIONAL

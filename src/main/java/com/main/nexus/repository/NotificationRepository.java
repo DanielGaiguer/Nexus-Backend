@@ -29,6 +29,24 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             Long userId, java.util.Collection<NotificationType> types,
             java.time.LocalDateTime after);
 
+    // Mesma contagem do método acima, mas resolvendo o "visto" da seção
+    // (SectionView.seenAt, ou :epoch se ainda não houver linha) na própria
+    // query -- antes eram 2 idas ao banco por seção em SidebarBadgeService.
+    @Query("""
+            SELECT COUNT(n) FROM Notification n
+            WHERE n.user.id = :userId
+              AND n.type IN :types
+              AND n.createdAt > COALESCE(
+                    (SELECT sv.seenAt FROM SectionView sv
+                     WHERE sv.user.id = :userId AND sv.section = :section),
+                    :epoch)
+            """)
+    long countUnseenForSection(
+            @Param("userId") Long userId,
+            @Param("types") java.util.Collection<NotificationType> types,
+            @Param("section") com.main.nexus.model.enums.SidebarSection section,
+            @Param("epoch") java.time.LocalDateTime epoch);
+
     // Verifica se já existe notificação desse tipo
     boolean existsByUserIdAndTypeAndActionUrl(Long userId, NotificationType type, String actionUrl);
 
