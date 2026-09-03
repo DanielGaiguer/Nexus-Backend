@@ -14,6 +14,10 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     // Busca as mensagens pelo id do match e ordena em ordem cronologica
     List<Message> findByMatchIdOrderBySentAtAsc(Long matchId);
 
+    // LGPD -- exportação de dados: só as mensagens que o próprio usuário escreveu
+    // (o conteúdo das mensagens da outra parte não entra no export).
+    List<Message> findBySenderIdOrderBySentAtAsc(Long senderId);
+
     // uma mensagem só conta como "não lida por mim" se eu não fui quem a enviou, porque sem esse filtro contariam/marcariam as próprias 
     // mensagens que a pessoa mandou (que nascem com read = false por padrão) como se fossem pendências dela mesma
     List<Message> findByMatchIdAndReadFalseAndSenderIdNot(Long matchId, Long senderId);

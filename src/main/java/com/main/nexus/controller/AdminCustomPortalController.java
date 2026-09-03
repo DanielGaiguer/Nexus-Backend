@@ -1,5 +1,7 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.config.AuditDataAccess;
+import com.main.nexus.model.enums.AuditTargetType;
 import com.main.nexus.dto.AdminCustomPortalAnalyticsDTO;
 import com.main.nexus.dto.ApproveCustomPortalRequestDTO;
 import com.main.nexus.dto.CreateCustomPortalDTO;
@@ -52,6 +54,8 @@ public class AdminCustomPortalController {
         return ResponseEntity.ok(customPortalService.listRequests(status));
     }
 
+    @AuditDataAccess(action = "Aprovou a solicitação de plataforma personalizada do contratante",
+            target = AuditTargetType.CUSTOM_PORTAL_REQUEST, param = "requestId")
     @PostMapping("/custom-portal-requests/{requestId}/approve")
     public ResponseEntity<CustomPortalDTO> approveRequest(
             @PathVariable Long requestId,
@@ -60,6 +64,8 @@ public class AdminCustomPortalController {
                 customPortalService.approveRequest(loggedUserId(), requestId, body));
     }
 
+    @AuditDataAccess(action = "Rejeitou a solicitação de plataforma personalizada do contratante",
+            target = AuditTargetType.CUSTOM_PORTAL_REQUEST, param = "requestId")
     @PostMapping("/custom-portal-requests/{requestId}/reject")
     public ResponseEntity<CustomPortalRequestDTO> rejectRequest(
             @PathVariable Long requestId,
@@ -83,12 +89,16 @@ public class AdminCustomPortalController {
         return ResponseEntity.ok(customPortalAnalyticsService.getSystemAnalytics(days));
     }
 
+    @AuditDataAccess(action = "Visualizou os detalhes da plataforma personalizada do contratante",
+            target = AuditTargetType.CUSTOM_PORTAL, param = "portalId")
     @GetMapping("/custom-portals/{portalId}")
     public ResponseEntity<CustomPortalDetailDTO> portalDetail(@PathVariable Long portalId) {
         return ResponseEntity.ok(customPortalService.getPortalDetail(portalId));
     }
 
     // Mesmo dashboard "Análises" do contratante, para uma plataforma qualquer.
+    @AuditDataAccess(action = "Visualizou os analytics da plataforma personalizada do contratante",
+            target = AuditTargetType.CUSTOM_PORTAL, param = "portalId")
     @GetMapping("/custom-portals/{portalId}/analytics")
     public ResponseEntity<CustomPortalAnalyticsDTO> portalAnalytics(
             @PathVariable Long portalId,

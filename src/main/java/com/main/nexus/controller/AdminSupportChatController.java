@@ -1,5 +1,7 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.config.AuditDataAccess;
+import com.main.nexus.model.enums.AuditTargetType;
 import com.main.nexus.dto.OpenSupportConversationRequestDTO;
 import com.main.nexus.dto.SupportConversationDTO;
 import com.main.nexus.dto.SupportMessageDTO;
@@ -39,16 +41,22 @@ public class AdminSupportChatController {
                 loggedUserId(), body.userId(), body.subject(), body.message()));
     }
 
+    @AuditDataAccess(action = "Abriu uma conversa de suporte do usuário",
+            target = AuditTargetType.SUPPORT_CONVERSATION, param = "id")
     @GetMapping("/conversations/{id}")
     public ResponseEntity<SupportConversationDTO> get(@PathVariable Long id) {
         return ResponseEntity.ok(supportChatService.getForAdmin(id));
     }
 
+    @AuditDataAccess(action = "Leu as mensagens de suporte do usuário",
+            target = AuditTargetType.SUPPORT_CONVERSATION, param = "id")
     @GetMapping("/conversations/{id}/messages")
     public ResponseEntity<List<SupportMessageDTO>> messages(@PathVariable Long id) {
         return ResponseEntity.ok(supportChatService.messagesForAdmin(id, loggedUserId()));
     }
 
+    @AuditDataAccess(action = "Encerrou uma conversa de suporte do usuário",
+            target = AuditTargetType.SUPPORT_CONVERSATION, param = "id")
     @PostMapping("/conversations/{id}/close")
     public ResponseEntity<SupportConversationDTO> close(@PathVariable Long id) {
         return ResponseEntity.ok(supportChatService.close(loggedUserId(), id));

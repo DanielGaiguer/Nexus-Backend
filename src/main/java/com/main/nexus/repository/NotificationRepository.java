@@ -64,4 +64,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying
     @Query("DELETE FROM Notification n WHERE n.read = true AND n.createdAt < :before")
     void deleteAllOldReadNotifications(@Param("before") java.time.LocalDateTime before);
+
+    // LGPD -- exclusão de conta: notificações são dado pessoal do próprio
+    // usuário, sem função de integridade para terceiros -> apagadas.
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }

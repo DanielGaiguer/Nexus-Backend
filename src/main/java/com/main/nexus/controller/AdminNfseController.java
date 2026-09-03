@@ -1,5 +1,7 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.config.AuditDataAccess;
+import com.main.nexus.model.enums.AuditTargetType;
 import com.main.nexus.dto.NfseInvoiceDTO;
 import com.main.nexus.dto.NfseModeDTO;
 import com.main.nexus.dto.SimulateNfseRequestDTO;
@@ -24,6 +26,7 @@ public class AdminNfseController {
     @Autowired
     private NfseService nfseService;
 
+    @AuditDataAccess(action = "Consultou a fila de notas fiscais", target = AuditTargetType.NONE)
     @GetMapping
     public ResponseEntity<List<NfseInvoiceDTO>> list(
             @RequestParam(required = false) String status) {

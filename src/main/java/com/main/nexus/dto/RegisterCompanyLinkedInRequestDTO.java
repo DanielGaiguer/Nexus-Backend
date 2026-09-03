@@ -9,5 +9,10 @@ public record RegisterCompanyLinkedInRequestDTO(
         String phone,
         String cep,
         String description,
-        CompanyType type
+        CompanyType type,
+        // Consentimento LGPD. acceptedTermsOfUse obrigatório (true); os outros
+        // dois são opcionais e não bloqueiam o cadastro.
+        Boolean acceptedTermsOfUse,
+        Boolean acceptedMarketingCommunications,
+        Boolean acceptedAlgorithmImprovement
 ) {}

@@ -1,5 +1,7 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.config.AuditDataAccess;
+import com.main.nexus.model.enums.AuditTargetType;
 import com.main.nexus.dto.AdminCompanyConfirmationOverviewDTO;
 import com.main.nexus.dto.AdminCompanyObservationRequestDTO;
 import com.main.nexus.dto.AdminConfirmationQueueItemDTO;
@@ -52,6 +54,8 @@ public class AdminMatchConfirmationController {
     }
 
     // Panorama das confirmações de uma empresa (drill-down).
+    @AuditDataAccess(action = "Visualizou as confirmações do contratante",
+            target = AuditTargetType.COMPANY, param = "companyId")
     @GetMapping("/companies/{companyId}/confirmations")
     public ResponseEntity<AdminCompanyConfirmationOverviewDTO> companyOverview(
             @PathVariable Long companyId) {
@@ -86,6 +90,8 @@ public class AdminMatchConfirmationController {
     }
 
     // Liga/desliga o flag "empresa sob observação".
+    @AuditDataAccess(action = "Alterou o flag de observação do contratante",
+            target = AuditTargetType.COMPANY, param = "companyId")
     @PutMapping("/companies/{companyId}/observation")
     public ResponseEntity<AdminCompanyConfirmationOverviewDTO> setObservation(
             @PathVariable Long companyId,

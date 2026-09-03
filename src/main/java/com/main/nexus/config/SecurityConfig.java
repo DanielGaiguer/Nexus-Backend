@@ -24,6 +24,9 @@ public class SecurityConfig {
     @Autowired
     private RateLimitFilter rateLimitFilter;
 
+    @Autowired
+    private ConsentGateFilter consentGateFilter;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -63,7 +66,19 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/skills/suggest").hasAnyRole("PROFESSIONAL", "COMPANY")
 
                 .requestMatchers("/api/professional/profile/export").authenticated()
-                    
+
+                // Consentimento LGPD: leitura de status + re-aceite. Fica fora do
+                // ConsentGateFilter (e por aqui que o usuario retido se libera).
+                .requestMatchers("/api/legal/**").authenticated()
+
+                // Exclusao de conta (LGPD). A confirmacao e publica: o token do
+                // e-mail e a credencial (link aberto em outro dispositivo, sem
+                // sessao). O pedido em si exige o proprio titular logado.
+                .requestMatchers(HttpMethod.POST, "/api/users/me/deletion/confirm").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/api/users/me").authenticated()
+                // Portabilidade (LGPD) -- so o proprio titular logado.
+                .requestMatchers(HttpMethod.GET, "/api/users/me/export").authenticated()
+
                 .requestMatchers("/api/notifications/**").authenticated()
 
                 // Badges da sidebar -- vale para os 3 papéis; o service decide o
@@ -131,7 +146,11 @@ public class SecurityConfig {
             // Depois do JwtFilter: as politicas com chave por usuario precisam do
             // SecurityContext ja populado. Antes de qualquer regra de autorizacao
             // acima, para que um 429 nao seja mascarado por um 401/403.
-            .addFilterAfter(rateLimitFilter, JwtFilter.class);
+            .addFilterAfter(rateLimitFilter, JwtFilter.class)
+            // Depois do RateLimitFilter, mesma justificativa: precisa do
+            // SecurityContext e roda antes da autorizacao. Barra requisicao
+            // mutavel de quem nao aceitou a versao ativa dos Termos (LGPD).
+            .addFilterAfter(consentGateFilter, RateLimitFilter.class);
 
         return http.build();
     }
@@ -143,6 +162,16 @@ public class SecurityConfig {
     @Bean
     public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
         FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    // Mesmo motivo do acima: ConsentGateFilter e @Component, entao o Spring Boot
+    // o registraria tambem na cadeia do servlet container. Desliga esse
+    // auto-registro -- ele so participa da cadeia do Spring Security.
+    @Bean
+    public FilterRegistrationBean<ConsentGateFilter> consentGateFilterRegistration(ConsentGateFilter filter) {
+        FilterRegistrationBean<ConsentGateFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
     }

@@ -14,5 +14,10 @@ public record RegisterProfessionalRequestDTO(
         Double expectedSalaryCLT,
         Double expectedSalaryPJ,
         Double freelanceMinExpectation,
-        Double freelanceMaxExpectation
+        Double freelanceMaxExpectation,
+        // Consentimento LGPD. acceptedTermsOfUse é obrigatório (true) — sem ele
+        // o cadastro falha com 400. Os outros dois são opcionais e não bloqueiam.
+        Boolean acceptedTermsOfUse,
+        Boolean acceptedMarketingCommunications,
+        Boolean acceptedAlgorithmImprovement
 ) {}

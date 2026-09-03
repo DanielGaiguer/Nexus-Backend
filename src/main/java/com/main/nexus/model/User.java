@@ -49,6 +49,21 @@ public class User {
     @Column
     private LocalDateTime lastLoginAt;
 
+    // LGPD -- exclusão de conta (DELETE /api/users/me). O pedido não anonimiza
+    // na hora: grava aqui o instante do pedido, manda um e-mail com link de
+    // confirmação (válido 48h) para o endereço ORIGINAL, e só a confirmação
+    // dispara a anonimização. Um novo pedido sobrescreve este campo, invalidando
+    // tokens anteriores (o token carrega este timestamp e a confirmação compara).
+    @Column
+    private LocalDateTime deletionRequestedAt;
+
+    // Preenchido quando a anonimização foi de fato executada. Marca a conta como
+    // "removida": bloqueia novo pedido/confirmação e serve de sinal para
+    // telas/relatórios. A linha em tb_user NUNCA é apagada (é FK de match,
+    // review, mensagem, etc.) -- só anonimizada.
+    @Column
+    private LocalDateTime anonymizedAt;
+
     public Long getId() {
         return id;
     }
@@ -111,5 +126,21 @@ public class User {
 
     public void setLastLoginAt(LocalDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    public LocalDateTime getDeletionRequestedAt() {
+        return deletionRequestedAt;
+    }
+
+    public void setDeletionRequestedAt(LocalDateTime deletionRequestedAt) {
+        this.deletionRequestedAt = deletionRequestedAt;
+    }
+
+    public LocalDateTime getAnonymizedAt() {
+        return anonymizedAt;
+    }
+
+    public void setAnonymizedAt(LocalDateTime anonymizedAt) {
+        this.anonymizedAt = anonymizedAt;
     }
 }

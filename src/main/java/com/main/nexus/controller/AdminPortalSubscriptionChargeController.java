@@ -1,5 +1,7 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.config.AuditDataAccess;
+import com.main.nexus.model.enums.AuditTargetType;
 import com.main.nexus.dto.BillingModeDTO;
 import com.main.nexus.dto.PortalSubscriptionChargeDTO;
 import com.main.nexus.dto.SimulateChargeRequestDTO;
@@ -24,6 +26,8 @@ public class AdminPortalSubscriptionChargeController {
     @Autowired
     private PortalSubscriptionService portalSubscriptionService;
 
+    @AuditDataAccess(action = "Consultou a fila de mensalidades de plataforma",
+            target = AuditTargetType.NONE)
     @GetMapping
     public ResponseEntity<List<PortalSubscriptionChargeDTO>> list(
             @RequestParam(required = false) String status) {

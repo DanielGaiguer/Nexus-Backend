@@ -1,5 +1,7 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.config.AuditDataAccess;
+import com.main.nexus.model.enums.AuditTargetType;
 import com.main.nexus.dto.BillingModeDTO;
 import com.main.nexus.dto.CommissionChargeDTO;
 import com.main.nexus.dto.SimulateChargeRequestDTO;
@@ -23,6 +25,7 @@ public class AdminCommissionChargeController {
     @Autowired
     private BillingService billingService;
 
+    @AuditDataAccess(action = "Consultou a fila de cobranças de comissão", target = AuditTargetType.NONE)
     @GetMapping
     public ResponseEntity<List<CommissionChargeDTO>> list(
             @RequestParam(required = false) String status) {

@@ -27,4 +27,10 @@ public interface SectionViewRepository extends JpaRepository<SectionView, Long> 
     void upsertSeenAt(@Param("userId") Long userId,
                       @Param("section") String section,
                       @Param("seenAt") LocalDateTime seenAt);
+
+    // LGPD -- exclusão de conta: "visto" de seção da sidebar é dado do próprio
+    // usuário, sem função de integridade para terceiros -> apagado.
+    @Modifying
+    @Query("DELETE FROM SectionView sv WHERE sv.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }

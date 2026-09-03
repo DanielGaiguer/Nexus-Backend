@@ -13,6 +13,7 @@ import com.main.nexus.model.User;
 import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.CompanyType;
 import com.main.nexus.model.enums.UserType;
+import com.main.nexus.ratelimit.LoginAttemptService;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.UserRepository;
 import java.net.URLEncoder;
@@ -67,9 +68,19 @@ public class AuthService {
     @Autowired
     private GitHubService gitHubService;
 
+    @Autowired
+    private LoginAttemptService loginAttemptService;
+
+    @Autowired
+    private UserConsentService userConsentService;
+
     @Value("${nexus.frontend.base-url}")
     private String frontendBaseUrl;
 
+    // @Transactional: além do usuário + profissional, o cadastro agora grava as
+    // linhas de consentimento (LGPD). Se qualquer passo falhar, nada persiste --
+    // não pode sobrar um usuário sem registro de consentimento.
+    @Transactional
     public void registerProfessional(RegisterProfessionalRequestDTO request) {
         // Validações de campos obrigatórios
         if (request.email() == null || request.email().isBlank()) {
@@ -84,6 +95,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Name is required.");
         }
+        requireTermsAccepted(request.acceptedTermsOfUse());
 
         // Validação de unicidad
         if (userRepository.existsByEmail(request.email())) {
@@ -135,7 +147,14 @@ public class AuthService {
         }
         
         professionalService.save(professional);
-        
+
+        // Consentimento LGPD (Termos obrigatório + 2 finalidades opcionais).
+        userConsentService.recordRegistrationConsents(
+                savedUser,
+                request.acceptedTermsOfUse(),
+                request.acceptedMarketingCommunications(),
+                request.acceptedAlgorithmImprovement());
+
         List<String> missing = profileCompletionService.getMissingFields(professional);
         boolean incomplete = !missing.isEmpty();
         
@@ -173,6 +192,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Company name is required.");
         }
+        requireTermsAccepted(request.acceptedTermsOfUse());
 
         if (userRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -232,6 +252,13 @@ public class AuthService {
         company.setStatus(CompanyStatus.PENDING);
         Company savedCompany = companyService.save(company);
 
+        // Consentimento LGPD (Termos obrigatório + 2 finalidades opcionais).
+        userConsentService.recordRegistrationConsents(
+                savedUser,
+                request.acceptedTermsOfUse(),
+                request.acceptedMarketingCommunications(),
+                request.acceptedAlgorithmImprovement());
+
         emailService.send(
             savedUser.getEmail(),
             "Cadastro recebido — Nexus",
@@ -247,17 +274,26 @@ public class AuthService {
         }
     }
 
-    public LoginResponseDTO login(LoginRequestDTO request) {
-        if (request.email().isBlank() || request.password().isBlank()) {
+    public LoginResponseDTO login(LoginRequestDTO request, String clientIp) {
+        if (request.email() == null || request.email().isBlank()
+                || request.password() == null || request.password().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Email and password are required.");
         }
 
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "Invalid email or password."));
+        String email = request.email();
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        // Bloqueio temporario por falhas consecutivas (chave IP + e-mail). Antes
+        // de qualquer acesso ao banco: se ja esta bloqueado, nem confere a senha.
+        loginAttemptService.assertNotBlocked(clientIp, email);
+
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        // Ponto unico de "credenciais invalidas": e-mail inexistente OU senha
+        // errada. E so isto que conta para o bloqueio -- os 4xx de conta
+        // inativa/pendente/rejeitada abaixo NAO sao tentativa de adivinhar senha.
+        if (user == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
+            loginAttemptService.recordFailure(clientIp, email);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "Invalid email or password.");
         }
@@ -282,6 +318,9 @@ public class AuthService {
                         "Company registration was rejected.");
             }
         }
+
+        // Credenciais corretas e conta liberada: zera o contador de falhas do par.
+        loginAttemptService.recordSuccess(clientIp, email);
 
         String name = resolveName(user);
 
@@ -537,6 +576,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Company name is required.");
         }
+        requireTermsAccepted(request.acceptedTermsOfUse());
 
         if (userRepository.existsByEmail(ticket.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -603,6 +643,13 @@ public class AuthService {
             company.setProfilePhotoUrl(ticket.picture());
         }
         Company savedCompany = companyService.save(company);
+
+        // Consentimento LGPD (Termos obrigatório + 2 finalidades opcionais).
+        userConsentService.recordRegistrationConsents(
+                savedUser,
+                request.acceptedTermsOfUse(),
+                request.acceptedMarketingCommunications(),
+                request.acceptedAlgorithmImprovement());
 
         emailService.send(
             savedUser.getEmail(),
@@ -918,5 +965,13 @@ public class AuthService {
         return value == null ? "" : URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-
+    // LGPD: sem aceite explícito dos Termos de Uso, o cadastro não se conclui.
+    // Falha cedo (antes de qualquer persistência) além da checagem redundante
+    // dentro do UserConsentService.
+    private void requireTermsAccepted(Boolean acceptedTermsOfUse) {
+        if (!Boolean.TRUE.equals(acceptedTermsOfUse)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "You must accept the Terms of Use to register.");
+        }
+    }
 }

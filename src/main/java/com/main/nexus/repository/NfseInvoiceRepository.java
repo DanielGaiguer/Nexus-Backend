@@ -17,6 +17,9 @@ public interface NfseInvoiceRepository extends JpaRepository<NfseInvoice, Long> 
 
     Optional<NfseInvoice> findByPortalSubscriptionChargeId(Long portalSubscriptionChargeId);
 
+    // LGPD -- exclusão de conta: ver CommissionChargeRepository.existsByCompanyId.
+    boolean existsByCompanyId(Long companyId);
+
     Optional<NfseInvoice> findByEnotasId(String enotasId);
 
     List<NfseInvoice> findByCompanyIdOrderByCreatedAtDesc(Long companyId);

@@ -1,5 +1,7 @@
 package com.main.nexus.controller;
 
+import com.main.nexus.config.AuditDataAccess;
+import com.main.nexus.model.enums.AuditTargetType;
 import com.main.nexus.dto.AdminDashboardDTO;
 import com.main.nexus.dto.CompanyDashboardDTO;
 import com.main.nexus.dto.CompanyProfileDTO;
@@ -221,12 +223,16 @@ public class AdminController {
         return ResponseEntity.ok(companies);
     }
 
+    @AuditDataAccess(action = "Aprovou cadastro do contratante",
+            target = AuditTargetType.COMPANY, param = "id")
     @PostMapping("/companies/{id}/approve")
     public ResponseEntity<String> approveCompany(@PathVariable Long id) {
         companyService.approve(id);
         return ResponseEntity.ok("Company approved.");
     }
 
+    @AuditDataAccess(action = "Rejeitou cadastro do contratante",
+            target = AuditTargetType.COMPANY, param = "id")
     @PostMapping("/companies/{id}/reject")
     public ResponseEntity<String> rejectCompany(
             @PathVariable Long id, @RequestBody RejectCompanyRequestDTO request) {
@@ -251,6 +257,7 @@ public class AdminController {
         return ResponseEntity.ok("Skill deleted.");
     }
 
+    @AuditDataAccess(action = "Listou todos os usuários", target = AuditTargetType.NONE)
     @GetMapping("/users")
     public ResponseEntity<List<UserSummaryDTO>> listUsers() {
         List<UserSummaryDTO> users = userRepository.findAll()
@@ -315,6 +322,8 @@ public class AdminController {
         };
     }
 
+    @AuditDataAccess(action = "Ativou/desativou a conta do usuário",
+            target = AuditTargetType.USER, param = "id")
     @PostMapping("/users/{id}/toggle")
     public ResponseEntity<String> toggleUser(@PathVariable Long id) {
         userRepository.findById(id).ifPresent(user -> {
@@ -344,6 +353,8 @@ public class AdminController {
         return ResponseEntity.ok("User status updated.");
     }
 
+    @AuditDataAccess(action = "Visualizou os matches do profissional",
+            target = AuditTargetType.PROFESSIONAL, param = "id")
     @GetMapping("/professionals/{id}/matches")
     public ResponseEntity<List<MatchResponseDTO>> getProfessionalMatches(@PathVariable Long id) {
         List<MatchResponseDTO> matches = matchService.getMatchesByProfessional(id)
@@ -353,17 +364,23 @@ public class AdminController {
         return ResponseEntity.ok(matches);
     }
 
+    @AuditDataAccess(action = "Visualizou o perfil do profissional",
+            target = AuditTargetType.PROFESSIONAL, param = "id")
     @GetMapping("/professionals/{id}/profile")
     public ResponseEntity<ProfessionalProfileDTO> getProfessionalProfile(@PathVariable Long id) {
         Professional professional = professionalService.findById(id);
         return ResponseEntity.ok(toProfessionalProfileDTO(professional));
     }
 
+    @AuditDataAccess(action = "Visualizou o portfólio do profissional",
+            target = AuditTargetType.PROFESSIONAL, param = "id")
     @GetMapping("/professionals/{id}/projects")
     public ResponseEntity<List<PreviousProjectDTO>> getProfessionalProjects(@PathVariable Long id) {
         return ResponseEntity.ok(previousProjectService.findByProfessional(id));
     }
 
+    @AuditDataAccess(action = "Visualizou os analytics do profissional",
+            target = AuditTargetType.PROFESSIONAL, param = "id")
     @GetMapping("/professionals/{id}/dashboard")
     public ResponseEntity<ProfessionalDashboardDTO> getProfessionalDashboard(@PathVariable Long id) {
         Professional professional = professionalService.findById(id);
@@ -379,12 +396,16 @@ public class AdminController {
         ));
     }
 
+    @AuditDataAccess(action = "Visualizou o perfil do contratante",
+            target = AuditTargetType.COMPANY, param = "id")
     @GetMapping("/companies/{id}/profile")
     public ResponseEntity<CompanyProfileDTO> getCompanyProfile(@PathVariable Long id) {
         Company company = companyService.findById(id);
         return ResponseEntity.ok(toCompanyProfileDTO(company));
     }
 
+    @AuditDataAccess(action = "Visualizou os analytics do contratante",
+            target = AuditTargetType.COMPANY, param = "id")
     @GetMapping("/companies/{id}/dashboard")
     public ResponseEntity<CompanyDashboardDTO> getCompanyDashboard(@PathVariable Long id) {
         Company company = companyService.findById(id);
@@ -397,6 +418,8 @@ public class AdminController {
         ));
     }
 
+    @AuditDataAccess(action = "Visualizou as oportunidades do contratante",
+            target = AuditTargetType.COMPANY, param = "id")
     @GetMapping("/companies/{id}/projects")
     public ResponseEntity<List<ProjectResponseDTO>> getCompanyProjects(@PathVariable Long id) {
         List<ProjectResponseDTO> projects = projectRepository.findByCompanyId(id)
@@ -406,6 +429,8 @@ public class AdminController {
         return ResponseEntity.ok(projects);
     }
 
+    @AuditDataAccess(action = "Visualizou os matches do contratante",
+            target = AuditTargetType.COMPANY, param = "id")
     @GetMapping("/companies/{id}/matches")
     public ResponseEntity<List<MatchResponseDTO>> getCompanyMatches(@PathVariable Long id) {
         List<MatchResponseDTO> matches = matchService.getMatchesByCompany(id)

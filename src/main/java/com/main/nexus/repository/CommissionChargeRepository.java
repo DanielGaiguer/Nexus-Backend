@@ -31,6 +31,12 @@ public interface CommissionChargeRepository extends JpaRepository<CommissionChar
 
     boolean existsByCompanyIdAndStatusIn(Long companyId, List<CommissionChargeStatus> statuses);
 
+    // LGPD -- exclusão de conta: só há obrigação legal de retenção do
+    // CompanyFiscalProfile se existir cobrança/nota emitida referenciando a
+    // empresa (o fato gerador fiscal). Sem nenhuma, o perfil fiscal é
+    // anonimizado junto com o resto da Company.
+    boolean existsByCompanyId(Long companyId);
+
     // Cobrancas travadas em PROCESSING ha muito tempo -- o job re-consulta o MP.
     @Query("SELECT c FROM CommissionCharge c "
          + "WHERE c.status = com.main.nexus.model.enums.CommissionChargeStatus.PROCESSING "

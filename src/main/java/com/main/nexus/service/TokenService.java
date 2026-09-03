@@ -109,4 +109,46 @@ public class TokenService {
                 claims.get("picture", String.class)
         );
     }
+
+    // ── Token de confirmação de exclusão de conta (LGPD) ─────────────
+    // Capability de propósito único e curta duração (48h). O e-mail de
+    // confirmação vai para o endereço ORIGINAL do titular; só quem tem acesso a
+    // esse e-mail consegue concluir a exclusão. `requestedAt` amarra o token ao
+    // pedido corrente (User.deletionRequestedAt) -- um novo pedido invalida
+    // tokens antigos.
+
+    private static final String ACCOUNT_DELETION_PURPOSE = "account_deletion";
+    private static final long ACCOUNT_DELETION_TTL_MS = 172_800_000L; // 48h
+
+    // requestedAt: epoch-SEGUNDOS do pedido corrente (User.deletionRequestedAt).
+    public record AccountDeletionToken(Long userId, long requestedAt) {}
+
+    public String generateAccountDeletionToken(Long userId, long requestedAtEpochSecond) {
+        return Jwts.builder()
+                .subject(String.valueOf(userId))
+                .claim("uid", userId)
+                .claim("requestedAt", requestedAtEpochSecond)
+                .claim("purpose", ACCOUNT_DELETION_PURPOSE)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + ACCOUNT_DELETION_TTL_MS))
+                .signWith(this.getKeySign())
+                .compact();
+    }
+
+    public AccountDeletionToken extractAccountDeletionToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getKeySign())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        if (!ACCOUNT_DELETION_PURPOSE.equals(claims.get("purpose", String.class))) {
+            throw new JwtException("Invalid token purpose.");
+        }
+
+        return new AccountDeletionToken(
+                claims.get("uid", Long.class),
+                claims.get("requestedAt", Long.class)
+        );
+    }
 }
