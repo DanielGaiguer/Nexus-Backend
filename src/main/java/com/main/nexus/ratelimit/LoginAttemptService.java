@@ -9,11 +9,12 @@ import org.springframework.stereotype.Service;
  * tentado -- so por e-mail deixaria qualquer um bloquear a conta alheia de
  * proposito; so por IP nao protegeria uma conta atacada de varios IPs.
  *
- * <p>Modelado como um balde de 5 tokens que recarrega os 5 de uma vez a cada 15
- * min ({@link RateLimitPolicy#LOGIN_FAILURE_BLOCK}, refill intervally):
+ * <p>Modelado como um balde de 5 tokens que repoe 1 token a cada 15 min
+ * ({@link RateLimitPolicy#LOGIN_FAILURE_BLOCK}):
  * <ul>
  *   <li>cada falha de credencial consome 1 token;</li>
- *   <li>na 6a tentativa (0 tokens) o login e barrado por ate 15 min;</li>
+ *   <li>na 6a tentativa (0 tokens) o login e barrado -- ~15 min ate liberar
+ *       1 tentativa;</li>
  *   <li>um login bem-sucedido descarta o balde -- zera as falhas.</li>
  * </ul>
  *
@@ -62,7 +63,11 @@ public class LoginAttemptService {
 
     private String key(String clientIp, String attemptedEmail) {
         String email = attemptedEmail == null ? "" : attemptedEmail.trim().toLowerCase();
-        return RateLimitPolicy.LOGIN_FAILURE_BLOCK.name() + ":" + clientIp + ":" + email;
+        // Separador '|': um IPv6 tem ':' e o e-mail pode ter caracteres estranhos;
+        // com ':' entre os campos, (ip, email) diferentes poderiam gerar a mesma
+        // string. '|' nao aparece nem em IP nem em e-mail, entao a chave fica sem
+        // ambiguidade.
+        return RateLimitPolicy.LOGIN_FAILURE_BLOCK.name() + "|" + clientIp + "|" + email;
     }
 
     private long secondsUntil(long nanos) {

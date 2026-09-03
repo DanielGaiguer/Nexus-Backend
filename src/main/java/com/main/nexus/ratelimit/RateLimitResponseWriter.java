@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,17 +24,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class RateLimitResponseWriter {
 
-    private final ObjectMapper objectMapper;
-
-    public RateLimitResponseWriter(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+    // Instancia propria de proposito: o corpo aqui e um shape fixo de 4 campos
+    // (sem datas, sem tipos custom), entao nao ha nada da config Jackson do app
+    // para respeitar -- e nao amarrar este writer ao grafo de beans evita que um
+    // contexto de teste sem ObjectMapper derrube a aplicacao inteira.
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void writeTooManyRequests(HttpServletResponse response,
                                      long retryAfterSeconds,
                                      String errorCode,
                                      String message) throws IOException {
-        response.setStatus(HttpServletResponse.SC_TOO_MANY_REQUESTS);
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType("application/json;charset=UTF-8");
         response.setHeader("Retry-After", Long.toString(retryAfterSeconds));
 

@@ -60,30 +60,33 @@ public enum RateLimitPolicy {
     /**
      * Bloqueio por falhas consecutivas de login. Chave = IP + e-mail tentado
      * (ver {@link LoginAttemptService} e a justificativa no pedido da feature).
-     * Refill "intervally": os 5 tokens voltam todos de uma vez ao fim da janela,
-     * entao a 5a falha bloqueia por 15 min inteiros -- nao goteia 1 token a cada
-     * 3 min como seria com refill greedy.
+     *
+     * <p>{@code capacity 5}, mas refill de <b>1 token a cada 15 min</b> (nao 5):
+     * depois de esgotar as 5 falhas, o balde volta a liberar so na marca dos 15
+     * min contados a partir do momento em que zerou (refill greedy = continuo
+     * desde o consumo, nao ancorado na criacao do balde). E o "bloqueio de 15
+     * min" -- e nao 1 tentativa a cada 3 min, que seria refill de 5/15min. Um
+     * login bem-sucedido descarta o balde e zera tudo.
      */
-    LOGIN_FAILURE_BLOCK(5, Duration.ofMinutes(15), KeyType.IP_AND_EMAIL, RefillMode.INTERVALLY);
+    LOGIN_FAILURE_BLOCK(5, 1, Duration.ofMinutes(15), KeyType.IP_AND_EMAIL);
 
     public enum KeyType { IP, USER, IP_AND_EMAIL }
 
-    private enum RefillMode { GREEDY, INTERVALLY }
-
     private final long capacity;
+    /** Tokens repostos por {@link #window} (== capacity nas politicas normais). */
+    private final long refillTokens;
     private final Duration window;
     private final KeyType keyType;
-    private final RefillMode refillMode;
 
     RateLimitPolicy(long capacity, Duration window, KeyType keyType) {
-        this(capacity, window, keyType, RefillMode.GREEDY);
+        this(capacity, capacity, window, keyType);
     }
 
-    RateLimitPolicy(long capacity, Duration window, KeyType keyType, RefillMode refillMode) {
+    RateLimitPolicy(long capacity, long refillTokens, Duration window, KeyType keyType) {
         this.capacity = capacity;
+        this.refillTokens = refillTokens;
         this.window = window;
         this.keyType = keyType;
-        this.refillMode = refillMode;
     }
 
     public KeyType keyType() {
@@ -100,9 +103,10 @@ public enum RateLimitPolicy {
 
     /** Configuracao do balde Bucket4j para esta politica (uma unica bandwidth). */
     public BucketConfiguration toBucketConfiguration() {
-        Bandwidth bandwidth = refillMode == RefillMode.INTERVALLY
-                ? Bandwidth.builder().capacity(capacity).refillIntervally(capacity, window).build()
-                : Bandwidth.builder().capacity(capacity).refillGreedy(capacity, window).build();
+        Bandwidth bandwidth = Bandwidth.builder()
+                .capacity(capacity)
+                .refillGreedy(refillTokens, window)
+                .build();
         return BucketConfiguration.builder().addLimit(bandwidth).build();
     }
 }

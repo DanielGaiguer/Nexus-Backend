@@ -1,6 +1,8 @@
 package com.main.nexus.config;
 
+import com.main.nexus.ratelimit.RateLimitFilter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,6 +20,9 @@ public class SecurityConfig {
 
     @Autowired
     private JwtFilter jwtFilter;
+
+    @Autowired
+    private RateLimitFilter rateLimitFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -122,9 +127,24 @@ public class SecurityConfig {
 
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            // Depois do JwtFilter: as politicas com chave por usuario precisam do
+            // SecurityContext ja populado. Antes de qualquer regra de autorizacao
+            // acima, para que um 429 nao seja mascarado por um 401/403.
+            .addFilterAfter(rateLimitFilter, JwtFilter.class);
 
         return http.build();
+    }
+
+    // O RateLimitFilter e @Component, entao o Spring Boot o registraria tambem na
+    // cadeia do servlet container (posicao indefinida, cedo demais). Desliga esse
+    // auto-registro: ele so participa da cadeia do Spring Security, na posicao
+    // acima.
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
+        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

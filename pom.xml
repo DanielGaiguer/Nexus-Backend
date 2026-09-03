@@ -139,7 +139,7 @@
             </dependency>
 
             <!-- Rate limiting (Token Bucket). Contadores em memoria via Caffeine
-                 (bucket4j-caffeine) -- ver com.main.nexus.ratelimit.RateLimitStore.
+                 (bucket4j-caffeine); ver com.main.nexus.ratelimit.RateLimitStore.
                  O app roda como instancia unica; quando/se escalar para varias
                  instancias, trocar a impl Caffeine por bucket4j-redis e um
                  LettuceBasedProxyManager e uma mudanca pontual (uma classe). -->
@@ -152,6 +152,12 @@
                 <groupId>com.bucket4j</groupId>
                 <artifactId>bucket4j-caffeine</artifactId>
                 <version>8.10.1</version>
+            </dependency>
+            <!-- bucket4j-caffeine nao arrasta o caffeine em runtime; declara aqui.
+                 Sem versao: o BOM do Spring Boot gerencia (caffeine.version). -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
             </dependency>
        </dependencies>
 

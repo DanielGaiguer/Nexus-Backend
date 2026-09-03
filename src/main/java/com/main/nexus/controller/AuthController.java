@@ -5,7 +5,9 @@ import com.main.nexus.dto.LoginResponseDTO;
 import com.main.nexus.dto.RegisterCompanyLinkedInRequestDTO;
 import com.main.nexus.dto.RegisterCompanyRequestDTO;
 import com.main.nexus.dto.RegisterProfessionalRequestDTO;
+import com.main.nexus.ratelimit.ClientIpResolver;
 import com.main.nexus.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,9 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private ClientIpResolver clientIpResolver;
+
     @PostMapping("/register/professional")
     public ResponseEntity<String> registerProfessional(
             @RequestBody RegisterProfessionalRequestDTO request) {
@@ -40,8 +45,11 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(
-            @RequestBody LoginRequestDTO request) {
-        LoginResponseDTO response = authService.login(request);
+            @RequestBody LoginRequestDTO request,
+            HttpServletRequest httpRequest) {
+        // IP passado explicitamente: o bloqueio por falhas de login tem chave
+        // IP + e-mail, e o AuthService (um @Service) não enxerga o request.
+        LoginResponseDTO response = authService.login(request, clientIpResolver.resolve(httpRequest));
         return ResponseEntity.ok(response);
     }
 
