@@ -15,6 +15,7 @@ import com.main.nexus.model.enums.ContractType;
 import com.main.nexus.model.enums.Modality;
 import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.ProjectType;
+import com.main.nexus.ratelimit.CaffeineRateLimitStore;
 import com.main.nexus.repository.SkillRepository;
 import com.main.nexus.service.ai.FakeAiExtractionClient;
 import java.time.LocalDate;
@@ -42,6 +43,9 @@ class ProjectAiExtractionServiceTest {
         service = new ProjectAiExtractionService();
         ReflectionTestUtils.setField(service, "aiExtractionClient", fakeClient);
         ReflectionTestUtils.setField(service, "skillRepository", skillRepository);
+        // Store real em memoria (sem Spring) -- a cota de 10/h continua sendo
+        // exercitada de verdade por enforcesRateLimitPerCompany.
+        ReflectionTestUtils.setField(service, "rateLimitStore", new CaffeineRateLimitStore());
     }
 
     private Skill skill(Long id, String name) {

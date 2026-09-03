@@ -5,15 +5,16 @@ import com.main.nexus.dto.AiOpportunityExtractionDTO;
 import com.main.nexus.dto.AiSkillSuggestionDTO;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.OpportunityType;
+import com.main.nexus.ratelimit.RateLimitExceededException;
+import com.main.nexus.ratelimit.RateLimitPolicy;
+import com.main.nexus.ratelimit.RateLimitStore;
 import com.main.nexus.repository.SkillRepository;
 import com.main.nexus.service.ai.AiExtractionClient;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.ConsumptionProbe;
 import java.text.Normalizer;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,20 +35,19 @@ public class ProjectAiExtractionService {
     private static final int MIN_TEXT_LENGTH = 20;
     private static final int MAX_TEXT_LENGTH = 6000;
 
-    // Rate limit conservador por empresa — evita gasto descontrolado da cota gratuita do
-    // Gemini. Janela deslizante simples em memória; se o app rodar em múltiplas instâncias no
-    // futuro, isso precisa virar algo compartilhado (ex: tabela ou Redis), mas para o volume
-    // atual não vale a complexidade extra.
-    private static final int MAX_CALLS_PER_HOUR = 10;
-    // ele está guardado na memória da própria aplicação Java, e não no banco
-    // Esses horários estão simplesmente ocupando memória RAM
-    private final Map<Long, Deque<Instant>> callHistoryByCompany = new ConcurrentHashMap<>();
-
     @Autowired
     private AiExtractionClient aiExtractionClient;
 
     @Autowired
     private SkillRepository skillRepository;
+
+    // Rate limit conservador por empresa — evita gasto descontrolado da cota gratuita
+    // do Gemini. Antes era uma janela deslizante num Map local; agora reaproveita o
+    // RateLimitStore da aplicação (impl Caffeine hoje, troca pontual por Redis se
+    // escalar). A POLÍTICA continua sendo desta feature (AI_EXTRACT: 10/hora), não a
+    // dos endpoints "caros" — é orçamento de cota, não pico de tráfego.
+    @Autowired
+    private RateLimitStore rateLimitStore;
 
     public AiExtractionResponseDTO extract(Long companyId, String rawText) {
         validateRawText(rawText);
@@ -70,22 +70,18 @@ public class ProjectAiExtractionService {
     }
 
     private void enforceRateLimit(Long companyId) {
-        Instant now = Instant.now();
-                                                                // se não existir, crie uma ArrayDeque nova
-        Deque<Instant> history = callHistoryByCompany.computeIfAbsent(companyId, id -> new ArrayDeque<>());
-
-        // Enquanto uma thread estiver mexendo nesse history, outra thread não pode mexer nele ao mesmo tempo.
-        synchronized (history) {
-            // O primeiro horário da fila aconteceu antes de uma hora atrás
-            while (!history.isEmpty() && history.peekFirst().isBefore(now.minus(1, ChronoUnit.HOURS))) {
-                history.pollFirst();
-            }
-            if (history.size() >= MAX_CALLS_PER_HOUR) {
-                throw new ResponseStatusException(HttpStatusCode.valueOf(429),
-                        "Limite de autopreenchimentos por IA atingido. Tente novamente mais tarde "
-                        + "ou preencha o formulário manualmente.");
-            }
-            history.addLast(now);
+        // Chave por empresa (== usuário hoje, User↔Company 1:1). Namespaced pela
+        // política para não colidir com nenhum balde do RateLimitFilter.
+        String key = RateLimitPolicy.AI_EXTRACT.name() + ":company:" + companyId;
+        Bucket bucket = rateLimitStore.resolveBucket(key, RateLimitPolicy.AI_EXTRACT);
+        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+        if (!probe.isConsumed()) {
+            long retryAfter = Math.max(1, (long) Math.ceil(probe.getNanosToWaitForRefill() / 1_000_000_000.0));
+            throw new RateLimitExceededException(
+                    retryAfter,
+                    RateLimitExceededException.REQUESTS,
+                    "Limite de autopreenchimentos por IA atingido. Tente novamente mais tarde "
+                    + "ou preencha o formulário manualmente.");
         }
     }
 
