@@ -11,7 +11,7 @@ import com.main.nexus.model.ScreeningInvitation;
 import com.main.nexus.model.enums.CompanyRejectionReason;
 import com.main.nexus.model.enums.PendingIntentType;
 import com.main.nexus.model.enums.ScreeningInvitationStatus;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ScreeningInvitationService;
@@ -39,7 +39,7 @@ public class ScreeningInvitationController {
     private ProfessionalService professionalService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     // Só pra retomar a ação que ficou pendente depois da última etapa ser aprovada, e pra
     // encerrar o match quando uma etapa é reprovada (ver PendingIntentType) -- não cria
@@ -214,11 +214,13 @@ public class ScreeningInvitationController {
     }
 
     private Long getLoggedCompanyId() {
-        UserDTO logged = getLoggedUser();
-        return companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found"))
-                .getId();
+        return getLoggedCompanyAccess().company().getId();
+    }
+
+    // Empresa + papel (OWNER/MEMBER) do usuário logado. O papel ainda não é lido
+    // por ninguém -- disponível para o guard de papel da etapa seguinte.
+    private CompanyAccessService.CompanyAccess getLoggedCompanyAccess() {
+        return companyAccessService.resolve(getLoggedUser());
     }
 
     private Long getLoggedProfessionalId() {

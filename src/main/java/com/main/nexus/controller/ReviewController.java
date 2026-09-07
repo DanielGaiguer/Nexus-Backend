@@ -8,7 +8,7 @@ import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Review;
 import com.main.nexus.model.enums.AuthorType;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ReviewService;
@@ -39,7 +39,7 @@ public class ReviewController {
     private ProfessionalService professionalService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     @PostMapping("/{matchId}")
     public ResponseEntity<String> submitReview(
@@ -49,7 +49,10 @@ public class ReviewController {
         UserDTO logged = getLoggedUser();
         Match match = matchService.findById(matchId);
 
-        boolean isCompany = match.getProject().getCompany().getUser().getId().equals(logged.id());
+        // Lado empresa = qualquer membro ACTIVE da empresa dona do match (não só
+        // o OWNER/company.getUser()) — mesma regra de participação do ChatService.
+        boolean isCompany = companyAccessService.isActiveMember(
+                match.getProject().getCompany().getId(), logged.id());
         boolean isProfessional = match.getProfessional().getUser().getId().equals(logged.id());
 
         if (!isCompany && !isProfessional) {
@@ -128,10 +131,12 @@ public class ReviewController {
     }
 
     private Long getLoggedCompanyId() {
-        UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found"));
-        return company.getId();
+        return getLoggedCompanyAccess().company().getId();
+    }
+
+    // Empresa + papel (OWNER/MEMBER) do usuário logado. O papel ainda não é lido
+    // por ninguém -- disponível para o guard de papel da etapa seguinte.
+    private CompanyAccessService.CompanyAccess getLoggedCompanyAccess() {
+        return companyAccessService.resolve(getLoggedUser());
     }
 }

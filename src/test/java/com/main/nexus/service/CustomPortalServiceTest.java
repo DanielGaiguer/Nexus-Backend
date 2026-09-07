@@ -26,6 +26,7 @@ import com.main.nexus.model.enums.BrandingImageKind;
 import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.CustomPortalPaymentStatus;
 import com.main.nexus.model.enums.CustomPortalRequestStatus;
+import com.main.nexus.model.enums.CompanyMemberRole;
 import com.main.nexus.model.enums.CustomPortalStatus;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
@@ -56,6 +57,7 @@ class CustomPortalServiceTest {
     @Mock private CustomPortalRequestRepository requestRepository;
     @Mock private CustomPortalStatusHistoryRepository historyRepository;
     @Mock private CompanyRepository companyRepository;
+    @Mock private CompanyAccessService companyAccessService;
     @Mock private UserRepository userRepository;
     @Mock private NotificationService notificationService;
     @Mock private EmailService emailService;
@@ -92,7 +94,8 @@ class CustomPortalServiceTest {
         when(requestRepository.save(any(CustomPortalRequest.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.findById(99L)).thenReturn(Optional.of(admin));
-        when(companyRepository.findByUserId(5L)).thenReturn(Optional.of(company));
+        when(companyAccessService.resolve(5L)).thenReturn(
+                new CompanyAccessService.CompanyAccess(company, CompanyMemberRole.OWNER));
         when(userRepository.findByType(UserType.ADMIN)).thenReturn(List.of(admin));
     }
 

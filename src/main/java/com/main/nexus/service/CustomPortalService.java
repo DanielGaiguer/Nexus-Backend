@@ -86,6 +86,9 @@ public class CustomPortalService {
     private CompanyRepository companyRepository;
 
     @Autowired
+    private CompanyAccessService companyAccessService;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -760,9 +763,7 @@ public class CustomPortalService {
     }
 
     private Company companyByUser(Long userId) {
-        return companyRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Company profile not found"));
+        return companyAccessService.resolve(userId).company();
     }
 
     private CustomPortal portalById(Long portalId) {

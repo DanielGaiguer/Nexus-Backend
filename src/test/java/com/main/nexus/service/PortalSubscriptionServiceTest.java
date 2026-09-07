@@ -48,6 +48,7 @@ class PortalSubscriptionServiceTest {
     @Mock private CustomPortalStatusHistoryRepository historyRepository;
     @Mock private PortalSubscriptionChargeRepository chargeRepository;
     @Mock private NotificationService notificationService;
+    @Mock private CompanyAccessService companyAccessService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private PortalSubscriptionService service;
@@ -71,6 +72,8 @@ class PortalSubscriptionServiceTest {
         company.setId(1L);
         company.setCompanyName("Acme");
         company.setUser(user);
+        // Notificação de assinatura vai só para OWNER -- com 1 membro é o company.getUser().
+        when(companyAccessService.ownerRecipients(any())).thenReturn(List.of(user));
 
         portal = new CustomPortal();
         portal.setId(9L);

@@ -6,7 +6,7 @@ import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
 import com.main.nexus.service.CandidateComparisonService;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.ProfessionalService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -27,7 +27,7 @@ public class CandidateComparisonController {
     private CandidateComparisonService comparisonService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private ProfessionalService professionalService;
@@ -37,9 +37,8 @@ public class CandidateComparisonController {
             @RequestBody CandidateComparisonRequestDTO request) {
 
         UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found."));
+        CompanyAccessService.CompanyAccess access = companyAccessService.resolve(logged);
+        Company company = access.company();
 
         return ResponseEntity.ok(
                 comparisonService.compare(request, company.getId()));

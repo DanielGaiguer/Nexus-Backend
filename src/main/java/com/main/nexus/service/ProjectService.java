@@ -27,6 +27,9 @@ public class ProjectService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private CompanyAccessService companyAccessService;
+
     public Project save(Project project) {
         validateByType(project);
         Project saved = projectRepository.save(project);
@@ -138,14 +141,16 @@ public class ProjectService {
         Project project = findById(id);
         closeProjectInternal(project);
 
-        User companyUser = project.getCompany().getUser();
-        notificationService.notifyProjectClosedByAdmin(companyUser, project.getTitle());
-        emailService.send(
-            companyUser.getEmail(),
-            "Oportunidade encerrada — Nexus",
-            "Olá,\n\nA sua oportunidade \"" + project.getTitle() + "\" foi encerrada por um Administrador. " +
-            "Para mais informações, entre em contato com admin@gmail.com.\n\nEquipe Nexus"
-        );
+        // Encerramento de vaga = evento operacional -> todos os membros da empresa.
+        for (User companyMember : companyAccessService.operationalRecipients(project.getCompany())) {
+            notificationService.notifyProjectClosedByAdmin(companyMember, project.getTitle());
+            emailService.send(
+                companyMember.getEmail(),
+                "Oportunidade encerrada — Nexus",
+                "Olá,\n\nA sua oportunidade \"" + project.getTitle() + "\" foi encerrada por um Administrador. " +
+                "Para mais informações, entre em contato com admin@gmail.com.\n\nEquipe Nexus"
+            );
+        }
     }
 
     private void closeProjectInternal(Project project) {

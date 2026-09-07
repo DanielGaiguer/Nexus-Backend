@@ -67,6 +67,9 @@ public class BillingService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private CompanyAccessService companyAccessService;
+
     // Dispara a emissão da NFS-e (Prompt 6) quando uma cobrança vira PAID, via
     // CommissionChargePaidEvent consumido APÓS o commit (NfseEventListener) --
     // uma falha fiscal nunca desfaz a cobrança já confirmada.
@@ -216,9 +219,9 @@ public class BillingService {
         p.setBlockReason(reason);
         p.setBlockedAt(LocalDateTime.now());
         p.setUpdatedAt(LocalDateTime.now());
-        if (p.getCompany().getUser() != null) {
+        for (User owner : companyAccessService.ownerRecipients(p.getCompany())) {
             notificationService.notifyCommissionChargeFailed(
-                    p.getCompany().getUser(),
+                    owner,
                     (extra != null ? extra + " " : "") + blockMessage(reason));
         }
     }
@@ -463,10 +466,9 @@ public class BillingService {
                 unblock(p);
                 profileRepository.save(p);
             }
-            User u = charge.getCompany().getUser();
-            if (u != null) {
+            for (User owner : companyAccessService.ownerRecipients(charge.getCompany())) {
                 notificationService.notifyCommissionPaid(
-                        u, charge.getAmount(),
+                        owner, charge.getAmount(),
                         charge.getMatchConfirmation().getMatch().getProject().getTitle());
             }
             // Emissão automática da NFS-e (Prompt 6) -- após o commit desta cobrança.

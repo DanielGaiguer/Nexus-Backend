@@ -9,6 +9,7 @@ import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.enums.NotificationType;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.CompanyService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
@@ -44,6 +45,9 @@ public class CompanyController {
     private CompanyService companyService;
 
     @Autowired
+    private CompanyAccessService companyAccessService;
+
+    @Autowired
     private ProjectService projectService;
 
     @Autowired
@@ -70,7 +74,8 @@ public class CompanyController {
     @GetMapping("/profile")
     public ResponseEntity<CompanyProfileDTO> getProfile() {
         UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
+        Company company = companyAccessService.tryResolve(logged)
+                .map(CompanyAccessService.CompanyAccess::company)
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
 
         return ResponseEntity.ok(toProfileDTO(company));
@@ -80,8 +85,10 @@ public class CompanyController {
     public ResponseEntity<CompanyProfileDTO> updateProfile(
             @RequestBody CompanyProfileDTO request) {
         UserDTO logged = getLoggedUser();
-        Company existing = companyService.findByUserId(logged.id())
+        CompanyAccessService.CompanyAccess access = companyAccessService.tryResolve(logged)
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
+        companyAccessService.requireOwner(access.role()); // dados cadastrais = OWNER-only
+        Company existing = access.company();
 
         if (!existing.getTaxId().equals(request.taxId()) && companyService.existsByTaxId(request.taxId())) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(409), "Tax ID already in use.");
@@ -130,10 +137,7 @@ public class CompanyController {
 
     @GetMapping("/dashboard")
     public ResponseEntity<CompanyDashboardDTO> dashboard() {
-        UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company not found"));
+        Company company = getLoggedCompany();
 
         return ResponseEntity.ok(new CompanyDashboardDTO(
                 toProfileDTO(company),
@@ -165,10 +169,19 @@ public class CompanyController {
     }
 
     private Company getLoggedCompany() {
-        UserDTO logged = getLoggedUser();
-        return companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company not found"));
+        return getLoggedCompanyAccess().company();
+    }
+
+    // Resolve empresa + papel (OWNER/MEMBER) do usuário logado num único ponto.
+    private CompanyAccessService.CompanyAccess getLoggedCompanyAccess() {
+        return companyAccessService.resolve(getLoggedUser());
+    }
+
+    // Endpoints que gerenciam a identidade/cadastro da conta (foto, ...) exigem OWNER.
+    private Company ownerOnlyCompany() {
+        CompanyAccessService.CompanyAccess access = getLoggedCompanyAccess();
+        companyAccessService.requireOwner(access.role());
+        return access.company();
     }
 
     private PublicCompanyDTO toPublicCompanyDTO(Company c) {
@@ -212,10 +225,7 @@ public class CompanyController {
     public ResponseEntity<String> uploadProfilePhoto(
             @RequestParam("file") MultipartFile file) {
 
-        UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company not found"));
+        Company company = ownerOnlyCompany(); // foto = identidade da conta -> OWNER
 
         supabaseStorageService.deleteProfilePhoto(company.getProfilePhotoUrl());
 
@@ -230,10 +240,7 @@ public class CompanyController {
 
     @DeleteMapping("/profile/photo")
     public ResponseEntity<String> deleteProfilePhoto() {
-        UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company not found"));
+        Company company = ownerOnlyCompany(); // foto = identidade da conta -> OWNER
 
         supabaseStorageService.deleteProfilePhoto(company.getProfilePhotoUrl());
         company.setProfilePhotoUrl(null);

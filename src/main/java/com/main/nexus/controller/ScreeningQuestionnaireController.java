@@ -4,10 +4,9 @@ import com.main.nexus.dto.ScreeningQuestionnaireRequestDTO;
 import com.main.nexus.dto.ScreeningQuestionnaireResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.ScreeningQuestionnaire;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.ScreeningQuestionnaireService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +16,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/screening-questionnaires")
@@ -27,7 +25,7 @@ public class ScreeningQuestionnaireController {
     private ScreeningQuestionnaireService screeningQuestionnaireService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     @PostMapping
     public ResponseEntity<ScreeningQuestionnaireResponseDTO> create(
@@ -67,10 +65,12 @@ public class ScreeningQuestionnaireController {
     }
 
     private Long getLoggedCompanyId() {
-        UserDTO logged = getLoggedUser();
-        return companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found"))
-                .getId();
+        return getLoggedCompanyAccess().company().getId();
+    }
+
+    // Empresa + papel (OWNER/MEMBER) do usuário logado. O papel ainda não é lido
+    // por ninguém -- disponível para o guard de papel da etapa seguinte.
+    private CompanyAccessService.CompanyAccess getLoggedCompanyAccess() {
+        return companyAccessService.resolve(getLoggedUser());
     }
 }

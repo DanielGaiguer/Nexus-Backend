@@ -151,4 +151,52 @@ public class TokenService {
                 claims.get("requestedAt", Long.class)
         );
     }
+
+    // ── Token de convite de membro de empresa (multi-usuário) ────────
+    // Mesma capability de propósito único do token de exclusão / do ticket do
+    // LinkedIn. O link vai por e-mail para o endereço convidado; quem tem acesso
+    // a esse e-mail conclui a entrada. TTL configurável (nexus.company-invite.
+    // ttl-days, padrão 7 dias). A CompanyInvitation no banco carrega o mesmo
+    // expiresAt e o status PENDING -- o aceite confere os dois.
+
+    private static final String COMPANY_INVITE_PURPOSE = "company_invite";
+    private static final long DAY_MS = 86_400_000L;
+
+    @Value("${nexus.company-invite.ttl-days:7}")
+    private long companyInviteTtlDays;
+
+    public record CompanyInviteToken(Long invitationId, String email) {}
+
+    public String generateCompanyInviteToken(Long invitationId, String email) {
+        return Jwts.builder()
+                .subject(String.valueOf(invitationId))
+                .claim("invitationId", invitationId)
+                .claim("email", email)
+                .claim("purpose", COMPANY_INVITE_PURPOSE)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + companyInviteTtlDays * DAY_MS))
+                .signWith(this.getKeySign())
+                .compact();
+    }
+
+    public CompanyInviteToken extractCompanyInviteToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getKeySign())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        if (!COMPANY_INVITE_PURPOSE.equals(claims.get("purpose", String.class))) {
+            throw new JwtException("Invalid token purpose.");
+        }
+
+        return new CompanyInviteToken(
+                claims.get("invitationId", Long.class),
+                claims.get("email", String.class)
+        );
+    }
+
+    public long getCompanyInviteTtlDays() {
+        return companyInviteTtlDays;
+    }
 }

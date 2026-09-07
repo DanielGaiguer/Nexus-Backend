@@ -67,7 +67,7 @@ public class SidebarBadgeService {
     private static final LocalDateTime EPOCH = LocalDateTime.of(1970, 1, 1, 0, 0);
 
     @Autowired private ProfessionalService professionalService;
-    @Autowired private CompanyService companyService;
+    @Autowired private CompanyAccessService companyAccessService;
     @Autowired private MatchService matchService;
 
     @Autowired private SectionViewRepository sectionViewRepository;
@@ -134,8 +134,8 @@ public class SidebarBadgeService {
     }
 
     private void companyBadges(UserDTO logged, Map<String, Long> badges) {
-        Long companyId = companyService.findByUserId(logged.id())
-                .map(c -> c.getId()).orElse(null);
+        Long companyId = companyAccessService.tryResolve(logged.id())
+                .map(access -> access.company().getId()).orElse(null);
         if (companyId == null) {
             return;
         }

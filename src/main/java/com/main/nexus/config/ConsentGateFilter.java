@@ -47,6 +47,9 @@ public class ConsentGateFilter extends OncePerRequestFilter {
             // Exclusão de conta (LGPD): não se pode condicionar o exercício do
             // direito de eliminação ao aceite de novos Termos.
             "/api/users/me",
+            // Aceite de convite de membro: rota pública, o próprio request já
+            // grava o consentimento dos Termos (não há usuário "retido" ainda).
+            "/api/company/invitations/accept",
             "/api/payments/mercadopago/webhook",
             "/api/invoices/enotas/webhook"
     );

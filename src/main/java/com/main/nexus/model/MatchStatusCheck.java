@@ -40,6 +40,13 @@ public class MatchStatusCheck {
     @Column(name = "answered_by", nullable = false, length = 20)
     private AuthorType answeredBy;
 
+    // Qual usuário de fato respondeu (membro da empresa, do lado COMPANY, ou o
+    // próprio profissional). answeredBy só diz o lado -- este campo diz quem.
+    // Opcional: linhas gravadas antes deste campo ficam nulas.
+    @ManyToOne
+    @JoinColumn(name = "acted_by_user_id")
+    private User actedByUser;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private MatchOutcome outcome;
@@ -75,6 +82,14 @@ public class MatchStatusCheck {
 
     public void setAnsweredBy(AuthorType answeredBy) {
         this.answeredBy = answeredBy;
+    }
+
+    public User getActedByUser() {
+        return actedByUser;
+    }
+
+    public void setActedByUser(User actedByUser) {
+        this.actedByUser = actedByUser;
     }
 
     public MatchOutcome getOutcome() {

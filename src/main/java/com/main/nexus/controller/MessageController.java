@@ -8,11 +8,11 @@ import com.main.nexus.model.Match;
 import com.main.nexus.model.Message;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.enums.StatusMatch;
-import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.MessageRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.service.ChatService;
+import com.main.nexus.service.CompanyAccessService;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
@@ -46,7 +46,7 @@ public class MessageController {
     private ProfessionalRepository professionalRepository;
 
     @Autowired
-    private CompanyRepository companyRepository;
+    private CompanyAccessService companyAccessService;
 
     @GetMapping("/matches")
     public List<ChatSummaryDTO> listChats() {
@@ -74,7 +74,8 @@ public class MessageController {
         if (professional.isPresent()) {
             matches = matchRepository.findByProfessionalId(professional.get().getId());
         } else {
-            Company company = companyRepository.findByUserId(userId)
+            Company company = companyAccessService.tryResolve(userId)
+                    .map(CompanyAccessService.CompanyAccess::company)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatusCode.valueOf(404), "User profile not found."));
             matches = matchRepository.findByProjectCompanyId(company.getId());

@@ -1,6 +1,7 @@
 package com.main.nexus.service;
 
 import com.main.nexus.model.Match;
+import com.main.nexus.model.User;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
 import jakarta.transaction.Transactional;
@@ -20,6 +21,9 @@ public class MatchExpirationService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private CompanyAccessService companyAccessService;
+
     @Transactional
     public void checkAndExpireMatches() {
         LocalDateTime threshold = LocalDateTime.now().minusDays(EXPIRATION_DAYS);
@@ -30,11 +34,13 @@ public class MatchExpirationService {
         for (Match match : expiredMatches) {
             match.setActive(false);
 
-            notificationService.notifyMatchExpiredForCompany(
-                    match.getProject().getCompany().getUser(),
-                    match.getProfessional().getName(),
-                    match.getProject().getTitle(),
-                    match.getId());
+            for (User companyMember : companyAccessService.operationalRecipients(match.getProject().getCompany())) {
+                notificationService.notifyMatchExpiredForCompany(
+                        companyMember,
+                        match.getProfessional().getName(),
+                        match.getProject().getTitle(),
+                        match.getId());
+            }
 
             notificationService.notifyMatchExpiredForProfessional(
                     match.getProfessional().getUser(),

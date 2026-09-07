@@ -14,7 +14,7 @@ import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +40,7 @@ public class MapController {
     private ProjectRepository projectRepository;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     @GetMapping("/professionals")
     public ResponseEntity<List<MapProfessionalDTO>> getProfessionals(
@@ -198,7 +198,9 @@ public class MapController {
         if (!UserType.COMPANY.name().equals(logged.role())) {
             return null;
         }
-        return companyService.findByUserId(logged.id()).map(Company::getId).orElse(null);
+        return companyAccessService.tryResolve(logged.id())
+                .map(access -> access.company().getId())
+                .orElse(null);
     }
 
     // Indica se quem está olhando o mapa é o admin — usado para liberar empresas

@@ -4,7 +4,7 @@ import com.main.nexus.dto.ScorePreviewResponseDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.Professional;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ScorePreviewService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ public class ScorePreviewController {
     private ScorePreviewService scorePreviewService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private ProfessionalService professionalService;
@@ -37,9 +37,7 @@ public class ScorePreviewController {
             @RequestParam Long projectId) {
 
         UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found."));
+        Company company = companyAccessService.resolve(logged).company();
 
         return ResponseEntity.ok(
                 scorePreviewService.previewForCompany(company.getId(), professionalId, projectId));

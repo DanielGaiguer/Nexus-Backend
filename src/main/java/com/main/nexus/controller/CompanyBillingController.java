@@ -10,11 +10,10 @@ import com.main.nexus.dto.UpdateCompanyFiscalProfileDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.service.BillingService;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.NfseService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,7 +23,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 // Pagamento do contratante (camada financeira, Prompt 5). /api/company/** já é
 // hasRole("COMPANY"). O cartão é tokenizado no frontend -- aqui só chega o token.
@@ -39,7 +37,7 @@ public class CompanyBillingController {
     private NfseService nfseService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     // Config para o frontend inicializar o SDK do MP (sem NEXT_PUBLIC_*).
     @GetMapping("/config")
@@ -90,11 +88,17 @@ public class CompanyBillingController {
         return ResponseEntity.ok(nfseService.invoicesFor(loggedCompany()));
     }
 
+    // Todo endpoint de billing/fiscal deste controller é OWNER-only (dados
+    // financeiros/fiscais da conta) -- o guard fica aqui, num ponto só.
     private Company loggedCompany() {
+        CompanyAccessService.CompanyAccess access = loggedCompanyAccess();
+        companyAccessService.requireOwner(access.role());
+        return access.company();
+    }
+
+    private CompanyAccessService.CompanyAccess loggedCompanyAccess() {
         UserDTO logged = (UserDTO) SecurityContextHolder.getContext()
                 .getAuthentication().getPrincipal();
-        return companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found"));
+        return companyAccessService.resolve(logged);
     }
 }

@@ -66,6 +66,9 @@ public class MatchConfirmationAdminService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private CompanyAccessService companyAccessService;
+
     // ─── Lista geral (fila completa, filtrável) ──────────────────────
 
     public List<AdminMatchConfirmationDTO> list(String status, Long companyId) {
@@ -269,18 +272,24 @@ public class MatchConfirmationAdminService {
 
     private void notifyBothSides(MatchConfirmation confirmation, boolean valueSet) {
         Match match = confirmation.getMatch();
-        User companyUser = match.getProject().getCompany().getUser();
         User professionalUser = match.getProfessional().getUser();
         String projectTitle = match.getProject().getTitle();
+        // Lado da empresa = evento operacional (acompanhamento da contratação) -> todos os membros.
+        List<User> companyMembers =
+                companyAccessService.operationalRecipients(match.getProject().getCompany());
 
         if (valueSet) {
-            notificationService.notifyConfirmationValueSetByAdmin(
-                    companyUser, confirmation.getConfirmedAmount(), projectTitle, match.getId());
+            for (User companyMember : companyMembers) {
+                notificationService.notifyConfirmationValueSetByAdmin(
+                        companyMember, confirmation.getConfirmedAmount(), projectTitle, match.getId());
+            }
             notificationService.notifyConfirmationValueSetByAdmin(
                     professionalUser, confirmation.getConfirmedAmount(), projectTitle, match.getId());
         } else {
-            notificationService.notifyConfirmationMarkedUnresolved(
-                    companyUser, projectTitle, match.getId());
+            for (User companyMember : companyMembers) {
+                notificationService.notifyConfirmationMarkedUnresolved(
+                        companyMember, projectTitle, match.getId());
+            }
             notificationService.notifyConfirmationMarkedUnresolved(
                     professionalUser, projectTitle, match.getId());
         }

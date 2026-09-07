@@ -29,6 +29,7 @@ import com.main.nexus.repository.FiscalConfigRepository;
 import com.main.nexus.repository.NfseInvoiceRepository;
 import com.main.nexus.repository.UserRepository;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,7 @@ class NfseServiceTest {
     @Mock private CommissionChargeRepository chargeRepository;
     @Mock private UserRepository userRepository;
     @Mock private NotificationService notificationService;
+    @Mock private CompanyAccessService companyAccessService;
 
     @InjectMocks private NfseService service;
 
@@ -85,6 +87,8 @@ class NfseServiceTest {
         company.setCity("São Paulo");
         company.setUf("SP");
         company.setCep("01000-000");
+        // NFS-e vai só para OWNER -- com 1 membro é o próprio company.getUser().
+        when(companyAccessService.ownerRecipients(any())).thenReturn(List.of(user));
 
         Professional prof = new Professional();
         prof.setId(3L);

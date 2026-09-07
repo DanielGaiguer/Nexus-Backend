@@ -100,6 +100,12 @@ public class SecurityConfig {
                 .requestMatchers("/api/professional/*/contact").hasRole("COMPANY")
                 .requestMatchers("/api/company/*/contact").hasRole("PROFESSIONAL")
 
+                // Aceite de convite de membro: publico -- o token do e-mail e a
+                // credencial (link aberto sem sessao). Mesmo padrao de
+                // /api/users/me/deletion/confirm. Precede a regra generica
+                // /api/company/** abaixo.
+                .requestMatchers(HttpMethod.POST, "/api/company/invitations/accept").permitAll()
+
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/company/**").hasRole("COMPANY")
                 .requestMatchers("/api/projects/**").hasRole("COMPANY")

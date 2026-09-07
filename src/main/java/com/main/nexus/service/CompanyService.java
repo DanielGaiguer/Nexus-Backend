@@ -16,12 +16,15 @@ public class CompanyService {
 
     @Autowired
     private CompanyRepository companyRepository;
-    
+
     @Autowired
     private NotificationService notificationService;
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private CompanyAccessService companyAccessService;
 
     public Company save(Company company) {
         return companyRepository.save(company);
@@ -63,16 +66,16 @@ public class CompanyService {
         
         Company saved = companyRepository.save(company);
 
-        // Notifica o contratante
-        notificationService.notifyCompanyApproved(
-            company.getUser(), company.getCompanyName());
-
-        emailService.send(
-            company.getUser().getEmail(),
-            "Cadastro aprovado! — Nexus",
-            "Olá " + company.getCompanyName() + ",\n\nSeu cadastro foi aprovado pelo administrador. " +
-            "Você já pode publicar vagas e encontrar profissionais no Nexus.\n\nEquipe Nexus"
-        );
+        // Aprovação da conta = evento de conta -> só OWNER.
+        for (User owner : companyAccessService.ownerRecipients(company)) {
+            notificationService.notifyCompanyApproved(owner, company.getCompanyName());
+            emailService.send(
+                owner.getEmail(),
+                "Cadastro aprovado! — Nexus",
+                "Olá " + company.getCompanyName() + ",\n\nSeu cadastro foi aprovado pelo administrador. " +
+                "Você já pode publicar vagas e encontrar profissionais no Nexus.\n\nEquipe Nexus"
+            );
+        }
 
         return saved;
     }
@@ -94,17 +97,17 @@ public class CompanyService {
         company.setRejectionReason(reason);
         Company saved = companyRepository.save(company);
 
-        // Notifica o contratante
-        notificationService.notifyCompanyRejected(
-            company.getUser(), company.getCompanyName());
-
-        emailService.send(
-            company.getUser().getEmail(),
-            "Cadastro não aprovado — Nexus",
-            "Olá " + company.getCompanyName() + ",\n\nSeu cadastro não foi aprovado pelo administrador.\n\n" +
-            "Motivo: " + reason + "\n\n" +
-            "Se tiver dúvidas, entre em contato com o suporte.\n\nEquipe Nexus"
-        );
+        // Rejeição da conta = evento de conta -> só OWNER.
+        for (User owner : companyAccessService.ownerRecipients(company)) {
+            notificationService.notifyCompanyRejected(owner, company.getCompanyName());
+            emailService.send(
+                owner.getEmail(),
+                "Cadastro não aprovado — Nexus",
+                "Olá " + company.getCompanyName() + ",\n\nSeu cadastro não foi aprovado pelo administrador.\n\n" +
+                "Motivo: " + reason + "\n\n" +
+                "Se tiver dúvidas, entre em contato com o suporte.\n\nEquipe Nexus"
+            );
+        }
 
         return saved;
     }

@@ -3,17 +3,16 @@ package com.main.nexus.controller;
 import com.main.nexus.dto.CompanyDashboardAnalyticsDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.CompanyAnalyticsService;
 import com.main.nexus.service.CompanyService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/analytics")
@@ -23,6 +22,9 @@ public class CompanyAnalyticsController {
     private CompanyAnalyticsService analyticsService;
 
     @Autowired
+    private CompanyAccessService companyAccessService;
+
+    @Autowired
     private CompanyService companyService;
 
     // Dashboard da empresa autenticada
@@ -30,9 +32,7 @@ public class CompanyAnalyticsController {
     @GetMapping("/company/dashboard")
     public ResponseEntity<CompanyDashboardAnalyticsDTO> getMyDashboard() {
         UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found."));
+        Company company = companyAccessService.resolve(logged).company();
 
         return ResponseEntity.ok(analyticsService.buildDashboard(company.getId()));
     }

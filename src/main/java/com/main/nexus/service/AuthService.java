@@ -8,12 +8,15 @@ import com.main.nexus.dto.RegisterCompanyRequestDTO;
 import com.main.nexus.dto.RegisterProfessionalRequestDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
+import com.main.nexus.model.CompanyMember;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.User;
+import com.main.nexus.model.enums.CompanyMemberRole;
 import com.main.nexus.model.enums.CompanyStatus;
 import com.main.nexus.model.enums.CompanyType;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.ratelimit.LoginAttemptService;
+import com.main.nexus.repository.CompanyMemberRepository;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.UserRepository;
 import java.net.URLEncoder;
@@ -46,6 +49,12 @@ public class AuthService {
     
     @Autowired
     private CompanyRepository companyRepository;
+
+    @Autowired
+    private CompanyMemberRepository companyMemberRepository;
+
+    @Autowired
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private TokenService tokenService;
@@ -252,6 +261,9 @@ public class AuthService {
         company.setStatus(CompanyStatus.PENDING);
         Company savedCompany = companyService.save(company);
 
+        // Quem cadastra a empresa é o OWNER dela (mesma transação).
+        createOwnerMembership(savedCompany, savedUser);
+
         // Consentimento LGPD (Termos obrigatório + 2 finalidades opcionais).
         userConsentService.recordRegistrationConsents(
                 savedUser,
@@ -304,7 +316,11 @@ public class AuthService {
         }
 
         if (user.getType() == UserType.COMPANY) {
-            Company company = companyService.findByUserId(user.getId())
+            // Resolve a empresa pelo vínculo de membro ACTIVE (cobre OWNER e MEMBER);
+            // o gate de status vale para todos os membros -- empresa pendente/rejeitada
+            // barra o login de qualquer um deles.
+            Company company = companyAccessService.tryResolve(user.getId())
+                    .map(CompanyAccessService.CompanyAccess::company)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.INTERNAL_SERVER_ERROR,
                             "Company profile missing for this user."));
@@ -346,9 +362,9 @@ public class AuthService {
                     .findByUserId(user.getId())
                     .map(Professional::getName) // No Type, seria feito assim: professional ? professional.getName() : user.getEmail()
                     .orElse(user.getEmail());
-            case COMPANY -> companyService
-                    .findByUserId(user.getId())
-                    .map(Company::getCompanyName)
+            case COMPANY -> companyAccessService
+                    .tryResolve(user.getId())
+                    .map(access -> access.company().getCompanyName())
                     .orElse(user.getEmail());
             case ADMIN -> "Admin";
         };
@@ -643,6 +659,9 @@ public class AuthService {
             company.setProfilePhotoUrl(ticket.picture());
         }
         Company savedCompany = companyService.save(company);
+
+        // Quem cadastra a empresa é o OWNER dela (mesma transação).
+        createOwnerMembership(savedCompany, savedUser);
 
         // Consentimento LGPD (Termos obrigatório + 2 finalidades opcionais).
         userConsentService.recordRegistrationConsents(
@@ -973,5 +992,15 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "You must accept the Terms of Use to register.");
         }
+    }
+
+    // Vínculo de membro OWNER do usuário que acabou de cadastrar a empresa.
+    // status ("ACTIVE") e createdAt (now) usam os defaults de CompanyMember.
+    private void createOwnerMembership(Company company, User user) {
+        CompanyMember membership = new CompanyMember();
+        membership.setCompany(company);
+        membership.setUser(user);
+        membership.setRole(CompanyMemberRole.OWNER);
+        companyMemberRepository.save(membership);
     }
 }

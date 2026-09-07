@@ -50,6 +50,7 @@ class BillingServiceTest {
     @Mock private CommissionChargeRepository chargeRepository;
     @Mock private CompanyRepository companyRepository;
     @Mock private NotificationService notificationService;
+    @Mock private CompanyAccessService companyAccessService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private BillingService service;
@@ -73,6 +74,8 @@ class BillingServiceTest {
         company.setId(1L);
         company.setCompanyName("Acme");
         company.setUser(user);
+        // Notificação financeira vai só para OWNER -- com 1 membro é o próprio company.getUser().
+        when(companyAccessService.ownerRecipients(any())).thenReturn(List.of(user));
 
         Professional prof = new Professional();
         prof.setId(3L);

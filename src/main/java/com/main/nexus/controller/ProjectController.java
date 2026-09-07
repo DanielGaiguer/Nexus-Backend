@@ -15,7 +15,7 @@ import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.model.enums.UserType;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.MatchStatusCheckService;
@@ -51,7 +51,7 @@ public class ProjectController {
     private ProjectService projectService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private MatchService matchService;
@@ -364,9 +364,12 @@ public class ProjectController {
     }
 
     private Company getLoggedCompany() {
-        UserDTO logged = getLoggedUser();
-        return companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company not found"));
+        return getLoggedCompanyAccess().company();
+    }
+
+    // Empresa + papel (OWNER/MEMBER) do usuário logado. O papel ainda não é lido
+    // por ninguém -- disponível para o guard de papel da etapa seguinte.
+    private CompanyAccessService.CompanyAccess getLoggedCompanyAccess() {
+        return companyAccessService.resolve(getLoggedUser());
     }
 }

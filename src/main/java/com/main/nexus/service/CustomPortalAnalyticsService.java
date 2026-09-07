@@ -16,7 +16,6 @@ import com.main.nexus.model.enums.CustomPortalEventType;
 import com.main.nexus.model.enums.CustomPortalPaymentStatus;
 import com.main.nexus.model.enums.CustomPortalRequestStatus;
 import com.main.nexus.model.enums.CustomPortalStatus;
-import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.CustomPortalRepository;
 import com.main.nexus.repository.CustomPortalRequestRepository;
 import com.main.nexus.repository.CustomPortalVisitEventRepository;
@@ -70,7 +69,7 @@ public class CustomPortalAnalyticsService {
     private CustomPortalRequestRepository customPortalRequestRepository;
 
     @Autowired
-    private CompanyRepository companyRepository;
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private ProjectRepository projectRepository;
@@ -309,10 +308,7 @@ public class CustomPortalAnalyticsService {
     // ── Internos ────────────────────────────────────────────────────
 
     private CustomPortal portalByUser(Long userId) {
-        Long companyId = companyRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Company profile not found"))
-                .getId();
+        Long companyId = companyAccessService.resolve(userId).company().getId();
         return customPortalRepository.findByCompanyId(companyId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Custom portal not found for this company."));

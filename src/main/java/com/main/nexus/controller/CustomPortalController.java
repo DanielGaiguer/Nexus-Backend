@@ -12,13 +12,12 @@ import com.main.nexus.dto.UpdateCustomPortalBrandingDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Company;
 import com.main.nexus.model.enums.BrandingImageKind;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.CustomPortalAnalyticsService;
 import com.main.nexus.service.CustomPortalService;
 import com.main.nexus.service.PortalSubscriptionService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,7 +29,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 // Lado do contratante da plataforma personalizada. Protegido por
 // hasRole("COMPANY") em SecurityConfig (regra generica /api/company/**).
@@ -48,7 +46,7 @@ public class CustomPortalController {
     private PortalSubscriptionService portalSubscriptionService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     // Estado da plataforma personalizada do contratante logado: ultima
     // solicitacao, portal (se ja existir) e se ele pode abrir nova solicitacao.
@@ -63,6 +61,7 @@ public class CustomPortalController {
     @PostMapping("/requests")
     public ResponseEntity<CustomPortalRequestDTO> createRequest(
             @RequestBody(required = false) CreateCustomPortalRequestDTO body) {
+        companyAccessService.requireOwner(loggedCompanyAccess().role()); // contratar plataforma = OWNER
         String message = body != null ? body.message() : null;
         return ResponseEntity.ok(
                 customPortalService.createRequest(loggedUserId(), message));
@@ -128,9 +127,16 @@ public class CustomPortalController {
         return logged.id();
     }
 
+    // Só os endpoints de assinatura/cobrança usam isto, e todos são OWNER-only.
+    // Branding, overview e analytics ficam liberados para qualquer membro (usam
+    // loggedUserId() direto).
     private Company loggedCompany() {
-        return companyService.findByUserId(loggedUserId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found"));
+        CompanyAccessService.CompanyAccess access = loggedCompanyAccess();
+        companyAccessService.requireOwner(access.role());
+        return access.company();
+    }
+
+    private CompanyAccessService.CompanyAccess loggedCompanyAccess() {
+        return companyAccessService.resolve(loggedUserId());
     }
 }

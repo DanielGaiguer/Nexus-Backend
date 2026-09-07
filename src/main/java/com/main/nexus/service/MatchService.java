@@ -9,6 +9,7 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.RejectionFeedback;
 import com.main.nexus.model.Skill;
+import com.main.nexus.model.User;
 import com.main.nexus.model.enums.AuthorType;
 import com.main.nexus.model.enums.CompanyRejectionReason;
 import com.main.nexus.model.enums.ExperienceLevel;
@@ -65,6 +66,9 @@ public class MatchService {
     
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private ProfileCompletionService profileCompletionService;
@@ -527,21 +531,23 @@ public class MatchService {
                     project.getId()
                 );
 
-                emailService.send(
-                    project.getCompany().getUser().getEmail(),
-                    "Novo candidato muito compatível com seu projeto!",
-                    "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
-                    professional.getName() + " tem " + String.format("%.0f", score) + "% de compatibilidade com o seu projeto:\n\n" +
-                    "\"" + project.getTitle() + "\"\n\n" +
-                    "Acesse o Nexus para ver o ranking e demonstrar interesse.\n\nEquipe Nexus"
-                );
-                notificationService.notifyHighScoreCandidate(
-                    project.getCompany().getUser(),
-                    professional.getName(),
-                    project.getTitle(),
-                    score,
-                    project.getId()
-                );
+                for (User companyMember : companyAccessService.operationalRecipients(project.getCompany())) {
+                    emailService.send(
+                        companyMember.getEmail(),
+                        "Novo candidato muito compatível com seu projeto!",
+                        "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
+                        professional.getName() + " tem " + String.format("%.0f", score) + "% de compatibilidade com o seu projeto:\n\n" +
+                        "\"" + project.getTitle() + "\"\n\n" +
+                        "Acesse o Nexus para ver o ranking e demonstrar interesse.\n\nEquipe Nexus"
+                    );
+                    notificationService.notifyHighScoreCandidate(
+                        companyMember,
+                        professional.getName(),
+                        project.getTitle(),
+                        score,
+                        project.getId()
+                    );
+                }
             }
         }
         
@@ -905,11 +911,13 @@ public class MatchService {
         screeningInvitationService.cancelPendingForProfessionalProject(saved.getProject(), saved.getProfessional());
 
         saveProfessionalRejection(match, reasons, description);
-        notificationService.notifyInviteRejected(
-            match.getProject().getCompany().getUser(),
-            match.getProfessional().getName(),
-            match.getProject().getTitle()
-        );
+        for (User companyMember : companyAccessService.operationalRecipients(match.getProject().getCompany())) {
+            notificationService.notifyInviteRejected(
+                companyMember,
+                match.getProfessional().getName(),
+                match.getProject().getTitle()
+            );
+        }
         return saved;
     }
 
@@ -1051,24 +1059,26 @@ public class MatchService {
                 );
             }
         } else {
-            if (wasMatched) {
-                notificationService.notifyMatchCancelled(
-                    match.getProject().getCompany().getUser(), professionalName, projectTitle);
-                emailService.send(
-                    match.getProject().getCompany().getUser().getEmail(),
-                    "Match cancelado — Nexus",
-                    "Olá " + companyName + ",\n\n" +
-                    professionalName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
-                );
-            } else {
-                notificationService.notifyInterestWithdrawn(
-                    match.getProject().getCompany().getUser(), professionalName, projectTitle);
-                emailService.send(
-                    match.getProject().getCompany().getUser().getEmail(),
-                    "Interesse retirado — Nexus",
-                    "Olá " + companyName + ",\n\n" +
-                    professionalName + " retirou o interesse demonstrado no projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
-                );
+            for (User companyMember : companyAccessService.operationalRecipients(match.getProject().getCompany())) {
+                if (wasMatched) {
+                    notificationService.notifyMatchCancelled(
+                        companyMember, professionalName, projectTitle);
+                    emailService.send(
+                        companyMember.getEmail(),
+                        "Match cancelado — Nexus",
+                        "Olá " + companyName + ",\n\n" +
+                        professionalName + " cancelou o match confirmado para o projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+                    );
+                } else {
+                    notificationService.notifyInterestWithdrawn(
+                        companyMember, professionalName, projectTitle);
+                    emailService.send(
+                        companyMember.getEmail(),
+                        "Interesse retirado — Nexus",
+                        "Olá " + companyName + ",\n\n" +
+                        professionalName + " retirou o interesse demonstrado no projeto \"" + projectTitle + "\".\n\nEquipe Nexus"
+                    );
+                }
             }
         }
     }
@@ -1292,12 +1302,14 @@ public class MatchService {
         matchHistoryService.record(saved, fromStatus, saved.getStatus().name(), "PROFESSIONAL");
 
         if (!wasAlreadyCompanyInterested) {
-            notificationService.notifyNewInterestReceived(
-                saved.getProject().getCompany().getUser(),
-                saved.getProfessional().getName(),
-                saved.getProject().getTitle(),
-                saved.getId()
-            );
+            for (User companyMember : companyAccessService.operationalRecipients(saved.getProject().getCompany())) {
+                notificationService.notifyNewInterestReceived(
+                    companyMember,
+                    saved.getProfessional().getName(),
+                    saved.getProject().getTitle(),
+                    saved.getId()
+                );
+            }
             // Retomado depois de aprovar todas as etapas de triagem (strict=false só acontece
             // nesse caminho) -- o profissional não recebe nenhum aviso de "avançou de etapa" pra
             // essa última (não existe próxima), então avisa aqui que o processo terminou e agora
@@ -1656,15 +1668,12 @@ public class MatchService {
 
     private void notifyMutualMatch(Match match) {
         String professionalEmail = match.getProfessional().getUser().getEmail();
-        String companyEmail = match.getProject().getCompany().getUser().getEmail();
         String professionalName = match.getProfessional().getName();
         String companyName = match.getProject().getCompany().getCompanyName();
         String projectTitle = match.getProject().getTitle();
 
         notificationService.notifyMatchConfirmed(
             match.getProfessional().getUser(), companyName, projectTitle, match.getId());
-        notificationService.notifyMatchConfirmed(
-            match.getProject().getCompany().getUser(), professionalName, projectTitle, match.getId());
 
         emailService.send(
             professionalEmail,
@@ -1674,13 +1683,18 @@ public class MatchService {
             "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
         );
 
-        emailService.send(
-            companyEmail,
-            "Match confirmado! — Nexus",
-            "Olá " + companyName + ",\n\n" +
-            professionalName + " também demonstrou interesse no projeto \"" + projectTitle + "\".\n\n" +
-            "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
-        );
+        // Lado da empresa: match confirmado é evento operacional -> todos os membros.
+        for (User companyMember : companyAccessService.operationalRecipients(match.getProject().getCompany())) {
+            notificationService.notifyMatchConfirmed(
+                companyMember, professionalName, projectTitle, match.getId());
+            emailService.send(
+                companyMember.getEmail(),
+                "Match confirmado! — Nexus",
+                "Olá " + companyName + ",\n\n" +
+                professionalName + " também demonstrou interesse no projeto \"" + projectTitle + "\".\n\n" +
+                "O match foi confirmado e os contatos já estão disponíveis no Nexus.\n\nEquipe Nexus"
+            );
+        }
     }
     
     // Barra novo engajamento (convite, interesse ou confirmação) numa oportunidade que não
@@ -1746,19 +1760,21 @@ public class MatchService {
         project.setStatus(ProjectStatus.PAUSED);
         projectRepository.save(project);
 
-        // Notifica e manda um email para empresa, falando que o porjeto foi pausado
+        // Notifica e manda um email para a empresa (evento operacional -> todos os membros)
         Company company = project.getCompany();
-        notificationService.notifyProjectPositionsFull( 
-                company.getUser(), project.getTitle(), project.getId());
+        for (User companyMember : companyAccessService.operationalRecipients(company)) {
+            notificationService.notifyProjectPositionsFull(
+                    companyMember, project.getTitle(), project.getId());
 
-        emailService.send(
-                company.getUser().getEmail(),
-                "Limite de vagas atingido — Nexus",
-                "Olá " + company.getCompanyName() + ",\n\n" +
-                "O projeto \"" + project.getTitle() + "\" atingiu o limite de " + project.getMaxPositions() +
-                " vaga(s) e foi pausado automaticamente. Ele não aparecerá mais para novos profissionais " +
-                "até que você encerre a oportunidade ou reabra com mais vagas.\n\n" +
-                "Acesse o Nexus em Meus Projetos para decidir.\n\nEquipe Nexus"
-        );
+            emailService.send(
+                    companyMember.getEmail(),
+                    "Limite de vagas atingido — Nexus",
+                    "Olá " + company.getCompanyName() + ",\n\n" +
+                    "O projeto \"" + project.getTitle() + "\" atingiu o limite de " + project.getMaxPositions() +
+                    " vaga(s) e foi pausado automaticamente. Ele não aparecerá mais para novos profissionais " +
+                    "até que você encerre a oportunidade ou reabra com mais vagas.\n\n" +
+                    "Acesse o Nexus em Meus Projetos para decidir.\n\nEquipe Nexus"
+            );
+        }
     }
 }

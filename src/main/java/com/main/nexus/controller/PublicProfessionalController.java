@@ -26,7 +26,7 @@ import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.ProfessionalRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.CustomPortalAnalyticsService;
 import com.main.nexus.service.CustomPortalService;
 import com.main.nexus.service.MatchService;
@@ -73,7 +73,7 @@ public class PublicProfessionalController {
     private MatchService matchService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private ProjectResponseAssembler projectResponseAssembler;
@@ -99,8 +99,8 @@ public class PublicProfessionalController {
 
         UserType type = UserType.valueOf(logged.role());
         if (type == UserType.COMPANY) {
-            return companyService.findByUserId(logged.id())
-                    .map(c -> ProjectResponseAssembler.Viewer.company(c.getId()))
+            return companyAccessService.tryResolve(logged.id())
+                    .map(access -> ProjectResponseAssembler.Viewer.company(access.company().getId()))
                     .orElse(ProjectResponseAssembler.Viewer.ANONYMOUS);
         }
         if (type == UserType.ADMIN) {

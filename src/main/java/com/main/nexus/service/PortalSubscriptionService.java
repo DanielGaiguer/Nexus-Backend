@@ -79,6 +79,9 @@ public class PortalSubscriptionService {
     private NotificationService notificationService;
 
     @Autowired
+    private CompanyAccessService companyAccessService;
+
+    @Autowired
     private ApplicationEventPublisher eventPublisher;
 
     // ─── Modo ────────────────────────────────────────────────────
@@ -208,7 +211,8 @@ public class PortalSubscriptionService {
         c.setMpStatusDetail(detail);
         c.setUpdatedAt(LocalDateTime.now());
         CustomPortal portal = c.getCustomPortal();
-        User companyUser = portal.getCompany().getUser();
+        // Cobrança de assinatura = evento financeiro -> só OWNER.
+        List<User> owners = companyAccessService.ownerRecipients(portal.getCompany());
 
         if ("approved".equals(status)) {
             c.setStatus(PortalSubscriptionChargeStatus.PAID);
@@ -229,10 +233,10 @@ public class PortalSubscriptionService {
             portal.setUpdatedAt(LocalDateTime.now());
             customPortalRepository.save(portal);
 
-            if (companyUser != null) {
-                notificationService.notifyPortalSubscriptionCharged(companyUser, c.getAmount());
+            for (User owner : owners) {
+                notificationService.notifyPortalSubscriptionCharged(owner, c.getAmount());
                 if (wasSuspendedForNonPayment) {
-                    notificationService.notifyPortalReactivatedAfterPayment(companyUser);
+                    notificationService.notifyPortalReactivatedAfterPayment(owner);
                 }
             }
             eventPublisher.publishEvent(new PortalSubscriptionChargePaidEvent(c.getId()));
@@ -249,9 +253,9 @@ public class PortalSubscriptionService {
             portal.setUpdatedAt(LocalDateTime.now());
             customPortalRepository.save(portal);
 
-            if (companyUser != null) {
+            for (User owner : owners) {
                 notificationService.notifyPortalSubscriptionPaymentFailed(
-                        companyUser, portal.getPaymentGraceUntil());
+                        owner, portal.getPaymentGraceUntil());
             }
         } else {
             c.setStatus(PortalSubscriptionChargeStatus.PROCESSING);
@@ -401,9 +405,9 @@ public class PortalSubscriptionService {
                     portal.setPaymentGraceUntil(today.plusDays(PAYMENT_GRACE_DAYS));
                     portal.setUpdatedAt(LocalDateTime.now());
                     customPortalRepository.save(portal);
-                    if (portal.getCompany().getUser() != null) {
+                    for (User owner : companyAccessService.ownerRecipients(portal.getCompany())) {
                         notificationService.notifyPortalSubscriptionPaymentFailed(
-                                portal.getCompany().getUser(), portal.getPaymentGraceUntil());
+                                owner, portal.getPaymentGraceUntil());
                     }
                 }
                 continue;
@@ -430,8 +434,8 @@ public class PortalSubscriptionService {
                 portal.setUpdatedAt(LocalDateTime.now());
                 customPortalRepository.save(portal);
                 pausePreapproval(portal);
-                if (portal.getCompany().getUser() != null) {
-                    notificationService.notifyPortalSuspendedForNonPayment(portal.getCompany().getUser());
+                for (User owner : companyAccessService.ownerRecipients(portal.getCompany())) {
+                    notificationService.notifyPortalSuspendedForNonPayment(owner);
                 }
             }
         }

@@ -24,7 +24,7 @@ import com.main.nexus.model.enums.NotificationType;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.PreviousProjectRepository;
 import com.main.nexus.repository.ReputationMetricsRepository;
-import com.main.nexus.service.CompanyService;
+import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.EmailService;
 import com.main.nexus.service.GeolocationService;
 import com.main.nexus.service.MatchActionResult;
@@ -69,7 +69,7 @@ public class ProfessionalController {
     private ProfessionalService professionalService;
 
     @Autowired
-    private CompanyService companyService;
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private MatchService matchService;
@@ -556,7 +556,8 @@ public class ProfessionalController {
         boolean isOwner = professional.getUser().getId().equals(logged.id());
 
         if (!isOwner) {
-            Company company = companyService.findByUserId(logged.id())
+            Company company = companyAccessService.tryResolve(logged)
+                    .map(CompanyAccessService.CompanyAccess::company)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatusCode.valueOf(403),
                             "Resume is only available to the professional or a company with a confirmed match."));
@@ -585,9 +586,7 @@ public class ProfessionalController {
     @GetMapping("/{professionalId}/contact")
     public ResponseEntity<ContactInfoDTO> getContact(@PathVariable Long professionalId) {
         UserDTO logged = getLoggedUser();
-        Company company = companyService.findByUserId(logged.id())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatusCode.valueOf(404), "Company profile not found"));
+        Company company = companyAccessService.resolve(logged).company();
 
         Professional professional = professionalService.findById(professionalId);
 

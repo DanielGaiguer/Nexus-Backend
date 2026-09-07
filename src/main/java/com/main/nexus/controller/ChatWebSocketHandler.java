@@ -12,6 +12,7 @@ import com.main.nexus.repository.UserRepository;
 import com.main.nexus.service.ChatService;
 import java.security.Principal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -89,13 +90,18 @@ public class ChatWebSocketHandler {
             // Mas se o destinatário não estiver com aquele chat aberto (tá em outra página do sistema, ou só logado sem estar na tela de chat),
             // ele não está inscrito em /topic/chat/{matchId},  então não recebe nada por esse canal. É aí que entra o outro
 
-            User otherParty = chatService.getOtherParty(match, userId);
-            long unreadTotal = chatService.countUnreadTotalForUser(otherParty.getId());
-            
-            simpMessagingTemplate.convertAndSendToUser(
-                    otherParty.getId().toString(),
-                    "/queue/chat-notification",
-                    Map.of("matchId", matchId, "unreadCount", unreadTotal));
+            // Lado empresa = todos os membros ACTIVE (não só o OWNER primário);
+            // lado profissional = 1 pessoa. Um ping por destinatário porque o
+            // total de não lidas é por usuário. A lista é limitada ao nº de
+            // membros da empresa (tipicamente 1–poucos).
+            List<User> pingRecipients = chatService.chatNotificationRecipients(match, userId);
+            for (User recipient : pingRecipients) {
+                long unreadTotal = chatService.countUnreadTotalForUser(recipient.getId());
+                simpMessagingTemplate.convertAndSendToUser(
+                        recipient.getId().toString(),
+                        "/queue/chat-notification",
+                        Map.of("matchId", matchId, "unreadCount", unreadTotal));
+            }
             //  não é o conteúdo da mensagem, é só um sinal leve de "você tem mensagem nova nesse match". Serve pra atualizar um badge/contador de não-lidas na UI
         } catch (Exception e) {
             // genérico, publicando em /user/queue/errors: qualquer falha durante todo o processo (match inválido, conteúdo vazio, erro de banco) é capturada 

@@ -18,6 +18,7 @@ import com.main.nexus.model.ScreeningInvitation;
 import com.main.nexus.model.ScreeningQuestion;
 import com.main.nexus.model.ScreeningQuestionnaire;
 import com.main.nexus.model.ScreeningStage;
+import com.main.nexus.model.User;
 import com.main.nexus.model.enums.PendingIntentType;
 import com.main.nexus.model.enums.ScreeningInvitationStatus;
 import com.main.nexus.model.enums.ScreeningQuestionType;
@@ -70,6 +71,9 @@ public class ScreeningInvitationService {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private CompanyAccessService companyAccessService;
 
     // GATE — chamado por MatchService.professionalShowsInterest/professionalAccepts e por
     // ProposalService.submitProposal antes de aplicar a ação de verdade.
@@ -232,9 +236,11 @@ public class ScreeningInvitationService {
         ScreeningInvitation saved = screeningInvitationRepository.save(invitation);
 
         Project project = invitation.getScreeningStage().getScreeningQuestionnaire().getProject();
-        notificationService.notifyScreeningDeclined(
-                project.getCompany().getUser(), invitation.getProfessional().getName(),
-                project.getTitle(), invitation.getScreeningStage().getTitle());
+        for (User companyMember : companyAccessService.operationalRecipients(project.getCompany())) {
+            notificationService.notifyScreeningDeclined(
+                    companyMember, invitation.getProfessional().getName(),
+                    project.getTitle(), invitation.getScreeningStage().getTitle());
+        }
 
         return saved;
     }
@@ -309,17 +315,19 @@ public class ScreeningInvitationService {
         ScreeningInvitation saved = screeningInvitationRepository.save(invitation);
 
         Project project = stage.getScreeningQuestionnaire().getProject();
-        notificationService.notifyScreeningSubmitted(
-                project.getCompany().getUser(), saved.getProfessional().getName(),
-                project.getTitle(), stage.getTitle(), saved.getId());
-        emailService.send(
-                project.getCompany().getUser().getEmail(),
-                "Etapa do processo seletivo respondida — Nexus",
-                "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
-                saved.getProfessional().getName() + " respondeu a etapa \"" + stage.getTitle() +
-                "\" do projeto \"" + project.getTitle() + "\".\n\n" +
-                "Acesse o Nexus para aprovar ou reprovar o avanço.\n\nEquipe Nexus"
-        );
+        for (User companyMember : companyAccessService.operationalRecipients(project.getCompany())) {
+            notificationService.notifyScreeningSubmitted(
+                    companyMember, saved.getProfessional().getName(),
+                    project.getTitle(), stage.getTitle(), saved.getId());
+            emailService.send(
+                    companyMember.getEmail(),
+                    "Etapa do processo seletivo respondida — Nexus",
+                    "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
+                    saved.getProfessional().getName() + " respondeu a etapa \"" + stage.getTitle() +
+                    "\" do projeto \"" + project.getTitle() + "\".\n\n" +
+                    "Acesse o Nexus para aprovar ou reprovar o avanço.\n\nEquipe Nexus"
+            );
+        }
 
         return saved;
     }
@@ -491,9 +499,11 @@ public class ScreeningInvitationService {
 
             ScreeningStage stage = invitation.getScreeningStage();
             Project project = stage.getScreeningQuestionnaire().getProject();
-            notificationService.notifyScreeningExpiredForCompany(
-                    project.getCompany().getUser(), invitation.getProfessional().getName(),
-                    project.getTitle(), stage.getTitle());
+            for (User companyMember : companyAccessService.operationalRecipients(project.getCompany())) {
+                notificationService.notifyScreeningExpiredForCompany(
+                        companyMember, invitation.getProfessional().getName(),
+                        project.getTitle(), stage.getTitle());
+            }
             notificationService.notifyScreeningExpiredForProfessional(
                     invitation.getProfessional().getUser(), project.getTitle(), stage.getTitle());
         }

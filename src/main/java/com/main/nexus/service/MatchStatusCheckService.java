@@ -3,7 +3,6 @@ package com.main.nexus.service;
 import com.main.nexus.dto.MatchConfirmationDTO;
 import com.main.nexus.dto.PendingStatusCheckDTO;
 import com.main.nexus.dto.UserDTO;
-import com.main.nexus.model.Company;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.MatchConfirmation;
 import com.main.nexus.model.MatchStatusCheck;
@@ -19,13 +18,13 @@ import com.main.nexus.model.enums.MatchConfirmationStatus;
 import com.main.nexus.model.enums.MatchOutcome;
 import com.main.nexus.model.enums.OpportunityType;
 import com.main.nexus.model.enums.StatusMatch;
-import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.MatchConfirmationRepository;
 import com.main.nexus.repository.MatchHistoryRepository;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.MatchStatusCheckRepository;
 import com.main.nexus.repository.PreviousProjectRepository;
 import com.main.nexus.repository.ProfessionalRepository;
+import com.main.nexus.repository.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -77,10 +76,13 @@ public class MatchStatusCheckService {
     private PreviousProjectRepository previousProjectRepository;
 
     @Autowired
-    private CompanyRepository companyRepository;
+    private CompanyAccessService companyAccessService;
 
     @Autowired
     private ProfessionalRepository professionalRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private NotificationService notificationService;
@@ -187,6 +189,9 @@ public class MatchStatusCheckService {
         MatchStatusCheck answer = new MatchStatusCheck();
         answer.setMatch(match);
         answer.setAnsweredBy(side);
+        // Quem de fato respondeu (membro da empresa ou o profissional) -- opcional,
+        // não bloqueia o fluxo se por algum motivo o usuário não for encontrado.
+        answer.setActedByUser(userRepository.findById(caller.id()).orElse(null));
         answer.setOutcome(outcome);
         answer.setFinalAmount(amount);
         answer.setAnsweredAt(LocalDateTime.now());
@@ -281,7 +286,8 @@ public class MatchStatusCheckService {
         AuthorType side;
 
         if ("COMPANY".equals(caller.role())) {
-            companyId = companyRepository.findByUserId(caller.id()).map(Company::getId).orElse(null);
+            companyId = companyAccessService.tryResolve(caller.id())
+                    .map(access -> access.company().getId()).orElse(null);
             side = AuthorType.COMPANY;
         } else if ("PROFESSIONAL".equals(caller.role())) {
             professionalId = professionalRepository.findByUserId(caller.id())
@@ -353,10 +359,7 @@ public class MatchStatusCheckService {
 
     private AuthorType resolveSideOrThrow(Match match, UserDTO caller) {
         if ("COMPANY".equals(caller.role())) {
-            Long companyId = companyRepository.findByUserId(caller.id())
-                    .map(Company::getId)
-                    .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatusCode.valueOf(404), "Company profile not found"));
+            Long companyId = companyAccessService.resolve(caller.id()).company().getId();
             if (!match.getProject().getCompany().getId().equals(companyId)) {
                 throw new ResponseStatusException(HttpStatusCode.valueOf(403),
                         "This match does not belong to your company.");
@@ -400,18 +403,20 @@ public class MatchStatusCheckService {
     }
 
     private void notifyWindowOpened(Match match) {
-        User companyUser = match.getProject().getCompany().getUser();
         User professionalUser = match.getProfessional().getUser();
         String companyName = match.getProject().getCompany().getCompanyName();
         String professionalName = match.getProfessional().getName();
         String projectTitle = match.getProject().getTitle();
 
-        notificationService.notifyConfirmationWindowOpened(
-                companyUser, professionalName, projectTitle, match.getId());
+        // Janela de confirmação = evento operacional (a empresa precisa responder) -> todos os membros.
+        for (User companyMember : companyAccessService.operationalRecipients(match.getProject().getCompany())) {
+            notificationService.notifyConfirmationWindowOpened(
+                    companyMember, professionalName, projectTitle, match.getId());
+            sendWindowEmail(companyMember.getEmail(), professionalName, projectTitle, match.getId());
+        }
+
         notificationService.notifyConfirmationWindowOpened(
                 professionalUser, companyName, projectTitle, match.getId());
-
-        sendWindowEmail(companyUser.getEmail(), professionalName, projectTitle, match.getId());
         sendWindowEmail(professionalUser.getEmail(), companyName, projectTitle, match.getId());
     }
 
@@ -436,21 +441,29 @@ public class MatchStatusCheckService {
 
     private void notifyResolved(MatchConfirmation confirmation) {
         Match match = confirmation.getMatch();
-        User companyUser = match.getProject().getCompany().getUser();
         User professionalUser = match.getProfessional().getUser();
         String projectTitle = match.getProject().getTitle();
+        // Desfecho da confirmação = evento operacional -> todos os membros da empresa.
+        List<User> companyMembers =
+                companyAccessService.operationalRecipients(match.getProject().getCompany());
 
         switch (confirmation.getStatus()) {
             case CONFIRMED -> {
-                notificationService.notifyConfirmationConfirmed(companyUser, projectTitle, match.getId());
+                for (User companyMember : companyMembers) {
+                    notificationService.notifyConfirmationConfirmed(companyMember, projectTitle, match.getId());
+                }
                 notificationService.notifyConfirmationConfirmed(professionalUser, projectTitle, match.getId());
             }
             case CLOSED_NO_CHARGE -> {
-                notificationService.notifyConfirmationClosedNoCharge(companyUser, projectTitle, match.getId());
+                for (User companyMember : companyMembers) {
+                    notificationService.notifyConfirmationClosedNoCharge(companyMember, projectTitle, match.getId());
+                }
                 notificationService.notifyConfirmationClosedNoCharge(professionalUser, projectTitle, match.getId());
             }
             case PENDING_ADMIN_REVIEW -> {
-                notificationService.notifyConfirmationPendingReview(companyUser, projectTitle, match.getId());
+                for (User companyMember : companyMembers) {
+                    notificationService.notifyConfirmationPendingReview(companyMember, projectTitle, match.getId());
+                }
                 notificationService.notifyConfirmationPendingReview(professionalUser, projectTitle, match.getId());
             }
             default -> { /* AWAITING_RESPONSES nao gera aviso de resolucao */ }

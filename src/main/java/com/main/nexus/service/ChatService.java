@@ -5,6 +5,7 @@ import com.main.nexus.model.User;
 import com.main.nexus.model.enums.StatusMatch;
 import com.main.nexus.repository.MatchRepository;
 import com.main.nexus.repository.MessageRepository;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,17 @@ public class ChatService {
     @Autowired
     private MessageRepository messageRepository;
 
+    @Autowired
+    private CompanyAccessService companyAccessService;
+
+    // Lado da empresa no chat = qualquer membro ACTIVE da empresa dona do match
+    // (antes: só o companyUserId de company.getUser()).
+    private boolean isParticipant(Match match, Long userId) {
+        return userId.equals(match.getProfessional().getUser().getId())
+                || companyAccessService.isActiveMember(
+                        match.getProject().getCompany().getId(), userId);
+    }
+
     // Faz todas as validacoes se a pessoa tem acesso aquela chat
     // Usado no envio de mensagem e consulta de contagem por match
     public Match validateChatAccess(Long matchId, Long userId) {
@@ -26,10 +38,7 @@ public class ChatService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatusCode.valueOf(404),
                         "Match not found."));
 
-        Long professionalUserId = match.getProfessional().getUser().getId();
-        Long companyUserId = match.getProject().getCompany().getUser().getId();
-
-        if (!userId.equals(professionalUserId) && !userId.equals(companyUserId)) {
+        if (!isParticipant(match, userId)) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(403),
                     "You are not a participant of this match.");
         }
@@ -58,10 +67,7 @@ public class ChatService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatusCode.valueOf(404),
                         "Match not found"));
 
-        boolean isParticipant = match.getProfessional().getUser().getId().equals(userId)
-                || match.getProject().getCompany().getUser().getId().equals(userId);
-
-        if (!isParticipant) {
+        if (!isParticipant(match, userId)) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(403),
                     "You are not a participant of this match.");
         }
@@ -69,17 +75,19 @@ public class ChatService {
         return match;
     }
 
-    // Dado um match, verifica quem e o usuario e retorna o user do outro lado do chat, usado para notificat a pessoa certa via WebSocket
-    public User getOtherParty(Match match, Long myUserId) {
-        Long professionalUserId = match.getProfessional().getUser().getId();
-        Long companyUserId = match.getProject().getCompany().getUser().getId();
-
-        if (myUserId.equals(professionalUserId)) {
-            return match.getProject().getCompany().getUser();
+    // Destinatários do "ping" leve de mensagem nova (contador de não lidas) via
+    // WebSocket, dado quem enviou. Se o remetente é o profissional, o outro lado
+    // é a EMPRESA — e o ping vai para TODOS os membros ACTIVE (mesmo fan-out das
+    // notificações operacionais), não só o OWNER primário. Se o remetente é um
+    // membro da empresa, o outro lado é só o profissional (sempre 1 pessoa).
+    public List<User> chatNotificationRecipients(Match match, Long senderUserId) {
+        if (senderUserId.equals(match.getProfessional().getUser().getId())) {
+            return companyAccessService.operationalRecipients(match.getProject().getCompany());
         }
 
-        if (myUserId.equals(companyUserId)) {
-            return match.getProfessional().getUser();
+        if (companyAccessService.isActiveMember(
+                match.getProject().getCompany().getId(), senderUserId)) {
+            return List.of(match.getProfessional().getUser());
         }
 
         throw new ResponseStatusException(HttpStatusCode.valueOf(403),

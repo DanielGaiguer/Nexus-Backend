@@ -7,12 +7,15 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.ProposalAttachment;
 import com.main.nexus.model.User;
+import com.main.nexus.model.enums.CompanyMemberRole;
+import com.main.nexus.model.enums.CompanyMemberStatus;
 import com.main.nexus.model.enums.CompanyType;
 import com.main.nexus.model.enums.ProjectStatus;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CommissionChargeRepository;
 import com.main.nexus.repository.CompanyBillingProfileRepository;
 import com.main.nexus.repository.CompanyFiscalProfileRepository;
+import com.main.nexus.repository.CompanyMemberRepository;
 import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.NfseInvoiceRepository;
 import com.main.nexus.repository.NotificationRepository;
@@ -70,6 +73,7 @@ public class AccountDeletionService {
     @Autowired private UserRepository userRepository;
     @Autowired private ProfessionalRepository professionalRepository;
     @Autowired private CompanyRepository companyRepository;
+    @Autowired private CompanyMemberRepository companyMemberRepository;
     @Autowired private PreviousProjectRepository previousProjectRepository;
     @Autowired private ProfessionalCredentialRepository professionalCredentialRepository;
     @Autowired private NotificationRepository notificationRepository;
@@ -105,6 +109,7 @@ public class AccountDeletionService {
         if (user.getAnonymizedAt() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This account has already been deleted.");
         }
+        assertOwnerCanSelfDelete(user);
 
         LocalDateTime requestedAt = LocalDateTime.now();
         user.setDeletionRequestedAt(requestedAt);
@@ -156,8 +161,32 @@ public class AccountDeletionService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "This confirmation link is no longer valid (a newer request was made).");
         }
+        // Re-checa: outro membro pode ter entrado entre o pedido e a confirmação.
+        assertOwnerCanSelfDelete(user);
 
         anonymize(user);
+    }
+
+    // Um OWNER só pode excluir a própria conta se for o ÚNICO membro ACTIVE da
+    // empresa. Havendo MEMBERs, a titularidade precisa ser transferida antes
+    // (POST /api/company/members/{id}/transfer-ownership) -- senão a empresa
+    // ficaria sem dono. Se ele for o único membro, o comportamento é o de sempre
+    // (a empresa é anonimizada junto).
+    private void assertOwnerCanSelfDelete(User user) {
+        if (user.getType() != UserType.COMPANY) {
+            return;
+        }
+        companyMemberRepository.findByUserId(user.getId()).ifPresent(membership -> {
+            if (membership.getRole() != CompanyMemberRole.OWNER) {
+                return;
+            }
+            long activeMembers = companyMemberRepository.countByCompanyIdAndStatus(
+                    membership.getCompany().getId(), CompanyMemberStatus.ACTIVE);
+            if (activeMembers > 1) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Transfer account ownership to another member before deleting your account.");
+            }
+        });
     }
 
     // ── 3. anonimização ───────────────────────────────────────────────

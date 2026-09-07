@@ -11,6 +11,7 @@ import com.main.nexus.model.Proposal;
 import com.main.nexus.model.ProposalAttachment;
 import com.main.nexus.model.ReputationMetrics;
 import com.main.nexus.model.Skill;
+import com.main.nexus.model.User;
 import com.main.nexus.model.enums.InitiatedBy;
 import com.main.nexus.model.enums.InterestStatus;
 import com.main.nexus.model.enums.OpportunityType;
@@ -74,6 +75,9 @@ public class ProposalService {
     private EmailService emailService;
 
     @Autowired
+    private CompanyAccessService companyAccessService;
+
+    @Autowired
     private ScreeningInvitationService screeningInvitationService;
 
     // ENVIO E EDIÇÃO
@@ -127,15 +131,18 @@ public class ProposalService {
     private void sendProposalReceivedNotification(Proposal proposal) {
         Project project = proposal.getProject();
         Professional professional = proposal.getProfessional();
-        notificationService.notifyProposalReceived(
-                project.getCompany().getUser(), professional.getName(), project.getTitle(), project.getId());
-        emailService.send(
-                project.getCompany().getUser().getEmail(),
-                "Nova proposta recebida — Nexus",
-                "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
-                professional.getName() + " enviou uma proposta para o seu projeto \"" + project.getTitle() + "\".\n\n" +
-                "Acesse o Nexus para ver os detalhes e comparar com os demais candidatos.\n\nEquipe Nexus"
-        );
+        // Proposta recebida = evento operacional -> todos os membros da empresa.
+        for (User companyMember : companyAccessService.operationalRecipients(project.getCompany())) {
+            notificationService.notifyProposalReceived(
+                    companyMember, professional.getName(), project.getTitle(), project.getId());
+            emailService.send(
+                    companyMember.getEmail(),
+                    "Nova proposta recebida — Nexus",
+                    "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
+                    professional.getName() + " enviou uma proposta para o seu projeto \"" + project.getTitle() + "\".\n\n" +
+                    "Acesse o Nexus para ver os detalhes e comparar com os demais candidatos.\n\nEquipe Nexus"
+            );
+        }
     }
 
     @Transactional

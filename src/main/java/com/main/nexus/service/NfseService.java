@@ -82,6 +82,9 @@ public class NfseService {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private CompanyAccessService companyAccessService;
+
     // ─── Modo ────────────────────────────────────────────────────
 
     public boolean isLive() {
@@ -375,7 +378,8 @@ public class NfseService {
     private void reconcile(NfseInvoice inv, EnotasClient.EnotasNfe nfe) {
         String s = nfe.status() == null ? "" : nfe.status().toLowerCase();
         inv.setUpdatedAt(LocalDateTime.now());
-        User companyUser = inv.getCompany().getUser();
+        // NFS-e = evento fiscal -> só OWNER.
+        List<User> owners = companyAccessService.ownerRecipients(inv.getCompany());
         String projectTitle = notifyLabel(inv);
 
         if (s.contains("autorizada")) {
@@ -388,13 +392,13 @@ public class NfseService {
             inv.setFailureReason(null);
             inv.setIssuedAt(LocalDateTime.now());
             invoiceRepository.save(inv);
-            if (companyUser != null) {
+            for (User owner : owners) {
                 if (inv.getKind() == NfseInvoiceKind.PORTAL_SUBSCRIPTION) {
-                    notificationService.notifyNfsePortalIssued(companyUser,
+                    notificationService.notifyNfsePortalIssued(owner,
                             inv.getPortalSubscriptionCharge().getCustomPortal().getSubdomain(),
                             inv.getNumero());
                 } else {
-                    notificationService.notifyNfseIssued(companyUser, projectTitle, inv.getNumero());
+                    notificationService.notifyNfseIssued(owner, projectTitle, inv.getNumero());
                 }
             }
         } else if (s.contains("negada") || s.contains("cancelada") || s.contains("erro")) {
@@ -410,9 +414,8 @@ public class NfseService {
         inv.setFailureReason(reason);
         inv.setUpdatedAt(LocalDateTime.now());
         invoiceRepository.save(inv);
-        User u = inv.getCompany().getUser();
-        if (u != null) {
-            notificationService.notifyNfseFailed(u, reason);
+        for (User owner : companyAccessService.ownerRecipients(inv.getCompany())) {
+            notificationService.notifyNfseFailed(owner, reason);
         }
     }
 

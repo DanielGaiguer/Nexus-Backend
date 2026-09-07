@@ -18,10 +18,10 @@ import com.main.nexus.model.CustomPortal;
 import com.main.nexus.model.CustomPortalVisitEvent;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.User;
+import com.main.nexus.model.enums.CompanyMemberRole;
 import com.main.nexus.model.enums.CustomPortalEventType;
 import com.main.nexus.model.enums.CustomPortalRequestStatus;
 import com.main.nexus.model.enums.CustomPortalStatus;
-import com.main.nexus.repository.CompanyRepository;
 import com.main.nexus.repository.CustomPortalRepository;
 import com.main.nexus.repository.CustomPortalRequestRepository;
 import com.main.nexus.repository.CustomPortalVisitEventRepository;
@@ -49,7 +49,7 @@ class CustomPortalAnalyticsServiceTest {
     @Mock private CustomPortalVisitEventRepository eventRepository;
     @Mock private CustomPortalRepository customPortalRepository;
     @Mock private CustomPortalRequestRepository customPortalRequestRepository;
-    @Mock private CompanyRepository companyRepository;
+    @Mock private CompanyAccessService companyAccessService;
     @Mock private ProjectRepository projectRepository;
 
     @InjectMocks private CustomPortalAnalyticsService service;
@@ -70,7 +70,8 @@ class CustomPortalAnalyticsServiceTest {
         portal.setStatus(CustomPortalStatus.ACTIVE);
         portal.setSubdomain("acme");
 
-        when(companyRepository.findByUserId(5L)).thenReturn(Optional.of(company));
+        when(companyAccessService.resolve(5L)).thenReturn(
+                new CompanyAccessService.CompanyAccess(company, CompanyMemberRole.OWNER));
         when(customPortalRepository.findByCompanyId(1L)).thenReturn(Optional.of(portal));
         when(customPortalRepository.findBySubdomainIgnoreCase("acme")).thenReturn(Optional.of(portal));
     }
