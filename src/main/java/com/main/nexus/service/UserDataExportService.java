@@ -114,6 +114,14 @@ public class UserDataExportService {
                 root.put("proposalsSent", professionalProposals(p.getId()));
                 root.put("reviews", reviewsForProfessional(p.getId()));
                 root.put("screeningInvitations", screeningForProfessional(p.getId()));
+                // PENDENTE DE REVISÃO JURÍDICA -- omissão INTENCIONAL (não é esquecimento):
+                // as CompanyCandidateNote (notas internas de recrutador sobre o profissional,
+                // Passo 2 do Kanban de contratação) NÃO entram neste export. São opinião sobre
+                // uma pessoa física, então PODEM cair no direito de acesso/portabilidade da LGPD
+                // (art. 18) -- mas incluí-las expõe qual membro da empresa escreveu o quê, o que
+                // conflita com a minimização de dado de terceiro (Rule 2). A decisão de incluir
+                // ou não ainda NÃO foi tomada: fica na mesma lista de pendências jurídicas da
+                // minuta de Termos/Política. Ver o comentário espelho em CompanyCandidateNoteService.
             });
         } else if (user.getType() == UserType.COMPANY) {
             companyService.findByUserId(user.getId()).ifPresent(c -> {

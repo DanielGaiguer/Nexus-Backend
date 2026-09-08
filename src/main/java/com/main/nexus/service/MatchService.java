@@ -79,6 +79,9 @@ public class MatchService {
     @Autowired
     private BillingService billingService;
 
+    @Autowired
+    private PipelineService pipelineService;
+
     // SCORE ENGINE — fórmula principal
     // ScoreMatch = (Skills*0.39) + (Budget*0.28) + (History*0.22) + (Reputation*0.11)
     // ou, para ONSITE/HYBRID:
@@ -754,8 +757,22 @@ public class MatchService {
             );
         }
 
+        // Auto-entrada no Kanban de contratação: se o match acabou de virar COMPANY_INTERESTED
+        // (interesse mútuo/em avaliação) e ainda não está no board, entra na primeira coluna ativa.
+        assignInitialPipelineStage(saved);
+
         // Retorna o match salvo
         return saved;
+    }
+
+    // Só entra no board quando o match está num estado "em avaliação" (COMPANY_INTERESTED/
+    // PROFESSIONAL_INTERESTED) -- os ~centenas de matches WAITING gerados pelo ranking não devem
+    // virar card. MATCHED/REJECTED têm coluna terminal derivada e não dependem deste campo.
+    private void assignInitialPipelineStage(Match match) {
+        if (match.getStatus() == StatusMatch.COMPANY_INTERESTED
+                || match.getStatus() == StatusMatch.PROFESSIONAL_INTERESTED) {
+            pipelineService.assignInitialStageIfAbsent(match);
+        }
     }
 
     // E a confirmacao explicita de convite
@@ -1329,6 +1346,10 @@ public class MatchService {
         } else {
             notifyMutualMatch(saved);
         }
+
+        // Auto-entrada no Kanban: se o match acabou de virar PROFESSIONAL_INTERESTED e ainda não
+        // está no board, entra na primeira coluna ativa (ver assignInitialPipelineStage).
+        assignInitialPipelineStage(saved);
 
         return saved;
     }

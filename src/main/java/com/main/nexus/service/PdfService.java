@@ -38,6 +38,9 @@ public class PdfService {
     private static final DeviceGray GRAY_LIGHT = new DeviceGray(0.9f);
     private static final DeviceGray GRAY_TEXT = new DeviceGray(0.4f);
 
+    // Currículo/perfil público do profissional em PDF. Recebe só perfil + portfólio + reputação --
+    // NÃO tem acesso a CompanyCandidateNote (notas internas de recrutador), e isso é intencional:
+    // essas notas são company-only. Ver CompanyCandidateNoteService.
     public byte[] generateProfessionalProfile(Professional professional,
                                                List<PreviousProject> projects,
                                                ReputationMetrics reputation) {

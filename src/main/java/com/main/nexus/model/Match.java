@@ -65,12 +65,31 @@ public class Match {
     @JoinColumn(name = "accepted_proposal_id")
     private Proposal acceptedProposal;
 
+    // Coluna intermediária do Kanban de contratação em que este candidato está. Null enquanto o
+    // match não entrou no board (ex.: WAITING recém-pontuado pelo ranking). Atribuído
+    // automaticamente à primeira etapa ativa quando o match vira COMPANY_INTERESTED/
+    // PROFESSIONAL_INTERESTED (ver MatchService), e reposicionado manualmente pelo recrutador
+    // (ver PipelineService.moveCard). Puramente organizacional -- mover entre etapas NÃO toca em
+    // StatusMatch. As colunas terminais "Contratado"/"Reprovado" são derivadas do estado real do
+    // match, não deste campo (ver PipelineService.deriveColumn).
+    @ManyToOne
+    @JoinColumn(name = "pipeline_stage_id")
+    private PipelineStage pipelineStage;
+
     public Proposal getAcceptedProposal() {
         return acceptedProposal;
     }
 
     public void setAcceptedProposal(Proposal acceptedProposal) {
         this.acceptedProposal = acceptedProposal;
+    }
+
+    public PipelineStage getPipelineStage() {
+        return pipelineStage;
+    }
+
+    public void setPipelineStage(PipelineStage pipelineStage) {
+        this.pipelineStage = pipelineStage;
     }
 
     public Boolean getActive() {

@@ -29,6 +29,10 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
             @Param("createdAtBefore") java.time.LocalDateTime createdAtBefore);
     Optional<Match> findByProjectIdAndProfessionalId(Long projectId, Long professionalId);
 
+    // Algum card ainda está parado nesta coluna do Kanban? -- decide se uma PipelineStage omitida
+    // num replaceStages vira active=false (soft-delete) em vez de ser apagada.
+    long countByPipelineStageId(Long pipelineStageId);
+
     // Mesmo motivo do findByProfessionalId acima.
     @Query("SELECT m FROM Match m WHERE m.project.company.id = :companyId ORDER BY m.createdAt DESC")
     List<Match> findByProjectCompanyId(@Param("companyId") Long companyId);
