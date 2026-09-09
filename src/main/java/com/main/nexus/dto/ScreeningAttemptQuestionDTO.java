@@ -9,5 +9,9 @@ public record ScreeningAttemptQuestionDTO(
         Long id,
         ScreeningQuestionType type,
         String prompt,
-        List<String> options
+        List<String> options,
+        // VIDEO_RESPONSE: se o candidato já subiu um vídeo pra esta questão nesta tentativa --
+        // é o que faz a tela oferecer "regravar" em vez de "gravar", e o que deixa ele fechar a
+        // aba no meio sem perder o que já subiu.
+        boolean videoUploaded
 ) {}

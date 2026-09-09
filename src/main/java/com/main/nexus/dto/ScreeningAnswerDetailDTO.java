@@ -24,5 +24,10 @@ public record ScreeningAnswerDetailDTO(
         // ESSAY
         String essayText,
 
+        // VIDEO_RESPONSE -- a URL do objeto NUNCA sai daqui. Quem quer assistir pede um link
+        // assinado de curta validade em /video/{questionId}/playback, que passa pelo guard.
+        boolean hasVideo,
+        Integer videoDurationSeconds,
+
         Integer timeSpentSeconds
 ) {}

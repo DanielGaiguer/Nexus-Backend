@@ -6,11 +6,14 @@ import com.main.nexus.dto.ScreeningQuestionnaireRequestDTO;
 import com.main.nexus.dto.ScreeningQuestionnaireResponseDTO;
 import com.main.nexus.dto.ScreeningStageRequestDTO;
 import com.main.nexus.dto.ScreeningStageResponseDTO;
+import com.main.nexus.model.BehavioralItem;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.ScreeningQuestion;
 import com.main.nexus.model.ScreeningQuestionnaire;
 import com.main.nexus.model.ScreeningStage;
 import com.main.nexus.model.enums.ScreeningQuestionType;
+import com.main.nexus.model.enums.ScreeningStageKind;
+import com.main.nexus.repository.BehavioralItemRepository;
 import com.main.nexus.repository.ProjectRepository;
 import com.main.nexus.repository.ScreeningInvitationRepository;
 import com.main.nexus.repository.ScreeningQuestionnaireRepository;
@@ -44,6 +47,9 @@ public class ScreeningQuestionnaireService {
 
     @Autowired
     private ScreeningInvitationRepository screeningInvitationRepository;
+
+    @Autowired
+    private BehavioralItemRepository behavioralItemRepository;
 
     @Transactional
     public ScreeningQuestionnaire create(ScreeningQuestionnaireRequestDTO request, Long companyId) {
@@ -115,6 +121,9 @@ public class ScreeningQuestionnaireService {
             } else {
                 stage = new ScreeningStage();
                 stage.setScreeningQuestionnaire(questionnaire);
+                // Procedência só na criação -- editar a etapa depois não reescreve de onde ela
+                // veio (ver ScreeningStage.sourceTemplateId).
+                stage.setSourceTemplateId(req.sourceTemplateId());
             }
 
             if (req.title() == null || req.title().isBlank()) {
@@ -125,12 +134,30 @@ public class ScreeningQuestionnaireService {
                         "Stage 'responseDeadlineDays' must be a positive number.");
             }
 
+            ScreeningStageKind requestedKind =
+                    req.kind() != null ? req.kind() : ScreeningStageKind.QUESTIONS;
+            // O tipo e definido na criacao e nunca muda: trocar o tipo de uma etapa que ja tem
+            // gente respondendo trocaria o instrumento debaixo dela, e as respostas antigas
+            // (que continuam apontando pras questoes antigas) passariam a ser lidas com outra
+            // regua. Editar titulo/instrucoes/prazo continua livre, como sempre foi.
+            if (stage.getId() != null && stage.getKind() != requestedKind) {
+                throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                        "A stage type cannot be changed after the stage is created. "
+                      + "Remove the stage and add a new one instead.");
+            }
+            stage.setKind(requestedKind);
+
             stage.setOrderIndex(i);
             stage.setTitle(req.title());
             stage.setInstructions(req.instructions());
             stage.setResponseDeadlineDays(req.responseDeadlineDays());
             stage.setActive(true);
-            mergeQuestions(stage, req.questions());
+
+            if (requestedKind == ScreeningStageKind.BEHAVIORAL) {
+                populateBehavioralQuestions(stage, req.questions());
+            } else {
+                mergeQuestions(stage, req.questions());
+            }
 
             merged.add(stage);
         }
@@ -147,6 +174,55 @@ public class ScreeningQuestionnaireService {
 
         questionnaire.getStages().clear();
         questionnaire.getStages().addAll(merged);
+    }
+
+    // Etapa BEHAVIORAL nao tem edicao de conteudo: os itens vem do banco fixo de plataforma
+    // (BehavioralItem, semeado por BehavioralItemSeed) e sao COPIADOS pra ca uma unica vez, na
+    // criacao da etapa. A empresa so liga ou desliga a etapa -- decisao de produto confirmada
+    // com o usuario: um inventario psicometrico so se sustenta se o conjunto de itens for fixo.
+    //
+    // Copia e nao referencia, e so na primeira vez: uma etapa que ja tem itens NUNCA e
+    // repopulada, senao salvar a vaga de novo depois de um item ser aposentado do banco mudaria
+    // o instrumento debaixo de quem esta respondendo. Mesmo espirito do resto do modulo (editar
+    // nao tem efeito retroativo).
+    private void populateBehavioralQuestions(
+            ScreeningStage stage, List<ScreeningQuestionRequestDTO> requestedQuestions) {
+
+        // Defesa no backend, independente do que o editor ofereca (o front do Prompt 4/7 nem
+        // mostra a opcao): questao customizada numa etapa comportamental e rejeitada.
+        if (requestedQuestions != null && !requestedQuestions.isEmpty()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "A behavioral stage uses a fixed platform question set and does not "
+                  + "accept custom questions.");
+        }
+
+        if (!stage.getQuestions().isEmpty()) {
+            return;
+        }
+
+        List<BehavioralItem> items = behavioralItemRepository.findByActiveTrueOrderByOrderIndexAsc();
+        if (items.isEmpty()) {
+            // Banco de itens nao semeado (ver BehavioralItemSeed). Falhar aqui e melhor que
+            // criar uma etapa comportamental vazia, que so apareceria como bug pro candidato.
+            throw new ResponseStatusException(HttpStatusCode.valueOf(503),
+                    "The behavioral assessment item bank is not available. Try again later.");
+        }
+
+        for (int i = 0; i < items.size(); i++) {
+            BehavioralItem item = items.get(i);
+            ScreeningQuestion question = new ScreeningQuestion();
+            question.setScreeningStage(stage);
+            question.setType(ScreeningQuestionType.LIKERT_SCALE);
+            question.setPrompt(item.getPrompt());
+            question.setTraitDimension(item.getDimension());
+            question.setReverseScored(item.getReverseScored());
+            question.setOrderIndex(i);
+            question.setActive(true);
+            // Sem gabarito: nao existe resposta certa num inventario de personalidade.
+            question.setOptions(new ArrayList<>());
+            question.setCorrectOptionIndex(null);
+            stage.getQuestions().add(question);
+        }
     }
 
     // Mesmo raciocínio de mergeStages, um nível abaixo: casa por id, remove de verdade só quem
@@ -182,6 +258,7 @@ public class ScreeningQuestionnaireService {
                 question.setScreeningStage(stage);
             }
 
+            assertTypeMatchesStage(stage, req.type());
             applyQuestionFields(question, req, i);
             question.setActive(true);
             merged.add(question);
@@ -207,9 +284,34 @@ public class ScreeningQuestionnaireService {
                 && screeningInvitationRepository.existsByScreeningStageId(question.getScreeningStage().getId());
     }
 
+    // Etapa homogênea: o tipo da questão tem que casar com o tipo da etapa. Sem isto, a
+    // empresa poderia misturar uma pergunta de vídeo com duas múltiplas escolhas na mesma etapa,
+    // e a tela de resposta (que decide a UI inteira por ScreeningStage.kind) não teria como
+    // renderizar as duas coisas. Vale pros dois lados -- VIDEO_RESPONSE só em etapa VIDEO, e
+    // etapa VIDEO só aceita VIDEO_RESPONSE.
+    private void assertTypeMatchesStage(ScreeningStage stage, ScreeningQuestionType type) {
+        boolean videoStage = stage.getKind() == ScreeningStageKind.VIDEO;
+        boolean videoQuestion = type == ScreeningQuestionType.VIDEO_RESPONSE;
+
+        if (videoStage && !videoQuestion) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "A video stage only accepts video questions.");
+        }
+        if (!videoStage && videoQuestion) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "A video question can only be used in a video stage.");
+        }
+    }
+
     private void applyQuestionFields(ScreeningQuestion question, ScreeningQuestionRequestDTO request, int orderIndex) {
         if (request.type() == null) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400), "Question 'type' is required.");
+        }
+        // LIKERT_SCALE so existe dentro de etapa BEHAVIORAL, e la os itens vem do banco fixo --
+        // nunca por este caminho, que e o do conteudo escrito pela empresa.
+        if (request.type() == ScreeningQuestionType.LIKERT_SCALE) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Likert items belong to a behavioral stage and cannot be created manually.");
         }
         if (request.prompt() == null || request.prompt().isBlank()) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400), "Question 'prompt' is required.");
@@ -234,7 +336,8 @@ public class ScreeningQuestionnaireService {
             question.setOptions(options);
             question.setCorrectOptionIndex(request.correctOptionIndex());
         } else {
-            // ESSAY não usa gabarito -- a empresa só lê o texto (ver ScreeningAnswer).
+            // ESSAY e VIDEO_RESPONSE não usam gabarito -- a empresa lê o texto ou assiste ao
+            // vídeo e decide (ver ScreeningAnswer).
             question.setOptions(new ArrayList<>());
             question.setCorrectOptionIndex(null);
         }
@@ -289,22 +392,35 @@ public class ScreeningQuestionnaireService {
         );
     }
 
-    private ScreeningStageResponseDTO toStageResponseDTO(ScreeningStage stage) {
-        List<ScreeningQuestionResponseDTO> questions = stage.getQuestions().stream()
+    // Público desde o Prompt 3/7: AssessmentTemplateController devolve a etapa recém-gerada
+    // por um molde, e ela tem que sair no MESMO formato que o formulário da vaga já consome.
+    public ScreeningStageResponseDTO toStageResponseDTO(ScreeningStage stage) {
+        long activeCount = stage.getQuestions().stream()
                 .filter(ScreeningQuestion::getActive)
-                .map(q -> new ScreeningQuestionResponseDTO(
-                        q.getId(), q.getType(), q.getPrompt(),
-                        q.getOptions(), q.getCorrectOptionIndex()))
-                .toList();
+                .count();
+
+        // Etapa comportamental devolve a lista VAZIA pro formulario da vaga: os itens nao sao
+        // editaveis, e devolve-los faria o form fazer round-trip de 50 questoes que ele nem
+        // deveria conhecer. `behavioralItemCount` e o que a tela precisa exibir.
+        List<ScreeningQuestionResponseDTO> questions = stage.isBehavioral()
+                ? List.of()
+                : stage.getQuestions().stream()
+                        .filter(ScreeningQuestion::getActive)
+                        .map(q -> new ScreeningQuestionResponseDTO(
+                                q.getId(), q.getType(), q.getPrompt(),
+                                q.getOptions(), q.getCorrectOptionIndex()))
+                        .toList();
 
         return new ScreeningStageResponseDTO(
                 stage.getId(),
+                stage.getKind(),
                 stage.getOrderIndex(),
                 stage.getTitle(),
                 stage.getInstructions(),
                 stage.getResponseDeadlineDays(),
                 stage.getActive(),
-                questions
+                questions,
+                stage.isBehavioral() ? (int) activeCount : null
         );
     }
 }

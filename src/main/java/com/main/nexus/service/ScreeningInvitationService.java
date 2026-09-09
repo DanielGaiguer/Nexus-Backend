@@ -9,6 +9,7 @@ import com.main.nexus.dto.ScreeningInvitationSummaryDTO;
 import com.main.nexus.dto.ScreeningProcessSummaryDTO;
 import com.main.nexus.dto.ScreeningStageStatusDTO;
 import com.main.nexus.dto.ScreeningSubmissionRequestDTO;
+import com.main.nexus.dto.ScreeningTraitProfileDTO;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
@@ -18,7 +19,9 @@ import com.main.nexus.model.ScreeningInvitation;
 import com.main.nexus.model.ScreeningQuestion;
 import com.main.nexus.model.ScreeningQuestionnaire;
 import com.main.nexus.model.ScreeningStage;
+import com.main.nexus.model.ScreeningTraitScore;
 import com.main.nexus.model.User;
+import com.main.nexus.model.enums.BigFiveDimension;
 import com.main.nexus.model.enums.PendingIntentType;
 import com.main.nexus.model.enums.ScreeningInvitationStatus;
 import com.main.nexus.model.enums.ScreeningQuestionType;
@@ -28,6 +31,7 @@ import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +78,11 @@ public class ScreeningInvitationService {
 
     @Autowired
     private CompanyAccessService companyAccessService;
+
+    // Só pra ecoar o teto pro front na tela de resposta -- o teto que decide de verdade é
+    // aplicado em ScreeningVideoService, depois do upload.
+    @org.springframework.beans.factory.annotation.Value("${nexus.screening.video.max-size-bytes}")
+    private Long videoMaxSizeBytes;
 
     // GATE — chamado por MatchService.professionalShowsInterest/professionalAccepts e por
     // ProposalService.submitProposal antes de aplicar a ação de verdade.
@@ -245,8 +254,15 @@ public class ScreeningInvitationService {
         return saved;
     }
 
+    // O que o submit devolve pro controller. `wasLastStage` só é significativo quando
+    // `autoAdvanced` é true (etapa BEHAVIORAL, que se aprova sozinha) -- é o sinal de que a ação
+    // pendente (interesse/aceite) precisa ser retomada agora, porque nenhuma decisão da empresa
+    // virá depois pra fazer isso. Numa etapa QUESTIONS a retomada continua acontecendo lá em
+    // approveStage, como sempre.
+    public record SubmitResult(ScreeningInvitation invitation, boolean autoAdvanced, boolean wasLastStage) {}
+
     @Transactional
-    public ScreeningInvitation submit(Long invitationId, Long professionalId, ScreeningSubmissionRequestDTO request) {
+    public SubmitResult submit(Long invitationId, Long professionalId, ScreeningSubmissionRequestDTO request) {
         ScreeningInvitation invitation = findById(invitationId);
         validateProfessionalOwnership(invitation, professionalId);
         assertPending(invitation);
@@ -269,11 +285,38 @@ public class ScreeningInvitationService {
             }
         }
 
+        // Resposta de vídeo é a única que já existe ANTES do submit: foi criada na confirmação
+        // do upload (ver ScreeningVideoService.confirmUpload). Aqui ela é reaproveitada, nunca
+        // recriada -- recriar duplicaria a linha e perderia a URL do arquivo.
+        Map<Long, ScreeningAnswer> alreadyAnswered = new HashMap<>();
+        for (ScreeningAnswer existing : invitation.getAnswers()) {
+            if (existing.getScreeningQuestion() != null) {
+                alreadyAnswered.put(existing.getScreeningQuestion().getId(), existing);
+            }
+        }
+
         int correctCount = 0;
         int totalMultipleChoiceCount = 0;
 
         for (ScreeningQuestion question : questions) {
             ScreeningAnswerSubmitDTO submittedAnswer = submitted.get(question.getId());
+
+            // VIDEO_RESPONSE conta como respondida pela existência do arquivo, não por um campo
+            // no corpo do submit -- que continua sendo um POST JSON só, sem multipart. Um upload
+            // que falhou reprova ESTA questão e nada mais: as outras respostas da etapa seguem
+            // válidas, e o candidato regrava sem refazer a etapa inteira.
+            if (question.getType() == ScreeningQuestionType.VIDEO_RESPONSE) {
+                ScreeningAnswer videoAnswer = alreadyAnswered.get(question.getId());
+                if (videoAnswer == null || videoAnswer.getVideoUrl() == null) {
+                    throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                            "Missing video answer for question " + question.getId() + ".");
+                }
+                if (submittedAnswer != null) {
+                    videoAnswer.setTimeSpentSeconds(submittedAnswer.timeSpentSeconds());
+                }
+                continue;
+            }
+
             if (submittedAnswer == null) {
                 throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                         "Missing answer for question " + question.getId() + ".");
@@ -293,6 +336,16 @@ public class ScreeningInvitationService {
                 if (correct) {
                     correctCount++;
                 }
+            } else if (question.getType() == ScreeningQuestionType.LIKERT_SCALE) {
+                Integer value = submittedAnswer.selectedOptionIndex();
+                if (value == null || value < 0 || value >= LIKERT_POINTS) {
+                    throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                            "Question " + question.getId() + " expects a Likert answer from 0 to "
+                          + (LIKERT_POINTS - 1) + ".");
+                }
+                answer.setSelectedOptionIndex(value);
+                // `correct` fica null de propósito: não existe resposta certa aqui, e um false
+                // seria lido como erro na tela de resultado.
             } else {
                 answer.setEssayText(submittedAnswer.essayText());
             }
@@ -300,36 +353,130 @@ public class ScreeningInvitationService {
             invitation.getAnswers().add(answer);
         }
 
+        // Numa etapa BEHAVIORAL não há gabarito nenhum, então autoScorePercent fica null e o
+        // resultado é o perfil de traços -- ver computeTraitScores.
         Double autoScorePercent = totalMultipleChoiceCount > 0
                 ? (correctCount / (double) totalMultipleChoiceCount) * 100.0
                 : null;
 
         invitation.setAutoScorePercent(autoScorePercent);
         invitation.setTotalTimeSpentSeconds(request.totalTimeSpentSeconds());
+        // Continua sendo GRAVADO em etapa comportamental (é telemetria da tentativa, e apagá-la
+        // seria perder dado sem motivo) -- o que muda é que toDetailDTO nunca o serializa pra
+        // empresa nessa etapa: num teste sem resposta certa, "trocou de aba 3 vezes" não indica
+        // nada e só convida a uma leitura errada.
         invitation.setTabSwitchCount(request.tabSwitchCount());
         invitation.setSubmittedAt(LocalDateTime.now());
-        // A decisão de avançar é sempre manual agora -- nunca fecha sozinho, mesmo sem
-        // dissertativa (diferente do modelo de rodada única anterior).
-        invitation.setStatus(ScreeningInvitationStatus.SUBMITTED);
+
+        boolean behavioral = stage.isBehavioral();
+        if (behavioral) {
+            computeTraitScores(invitation, questions);
+        }
+
+        // ETAPA COMPORTAMENTAL É SEMPRE INFORMATIVA: aprova sozinha no ato do envio e segue o
+        // fluxo. Nunca vira SUBMITTED (não existe decisão da empresa a tomar), nunca vira
+        // REPROVED, nunca bloqueia o avanço. Decisão confirmada com o usuário -- reprovar
+        // alguém por traço de personalidade é exatamente a exposição que este desenho fecha.
+        // Nas demais etapas nada muda: a decisão de avançar continua manual.
+        if (behavioral) {
+            invitation.setStatus(ScreeningInvitationStatus.APPROVED);
+            invitation.setDecidedAt(LocalDateTime.now());
+        } else {
+            invitation.setStatus(ScreeningInvitationStatus.SUBMITTED);
+        }
 
         ScreeningInvitation saved = screeningInvitationRepository.save(invitation);
 
         Project project = stage.getScreeningQuestionnaire().getProject();
         for (User companyMember : companyAccessService.operationalRecipients(project.getCompany())) {
-            notificationService.notifyScreeningSubmitted(
-                    companyMember, saved.getProfessional().getName(),
-                    project.getTitle(), stage.getTitle(), saved.getId());
-            emailService.send(
-                    companyMember.getEmail(),
-                    "Etapa do processo seletivo respondida — Nexus",
-                    "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
-                    saved.getProfessional().getName() + " respondeu a etapa \"" + stage.getTitle() +
-                    "\" do projeto \"" + project.getTitle() + "\".\n\n" +
-                    "Acesse o Nexus para aprovar ou reprovar o avanço.\n\nEquipe Nexus"
-            );
+            if (behavioral) {
+                notificationService.notifyBehavioralProfileAvailable(
+                        companyMember, saved.getProfessional().getName(),
+                        project.getTitle(), stage.getTitle(), saved.getId());
+                emailService.send(
+                        companyMember.getEmail(),
+                        "Perfil comportamental disponível — Nexus",
+                        "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
+                        saved.getProfessional().getName() + " respondeu a etapa \"" + stage.getTitle() +
+                        "\" do projeto \"" + project.getTitle() + "\".\n\n" +
+                        "Esta etapa é informativa e não exige decisão: o perfil já está anexado ao " +
+                        "candidato. " + ScreeningTraitProfileDTO.DISCLAIMER + "\n\nEquipe Nexus"
+                );
+            } else {
+                notificationService.notifyScreeningSubmitted(
+                        companyMember, saved.getProfessional().getName(),
+                        project.getTitle(), stage.getTitle(), saved.getId());
+                emailService.send(
+                        companyMember.getEmail(),
+                        "Etapa do processo seletivo respondida — Nexus",
+                        "Olá " + project.getCompany().getCompanyName() + ",\n\n" +
+                        saved.getProfessional().getName() + " respondeu a etapa \"" + stage.getTitle() +
+                        "\" do projeto \"" + project.getTitle() + "\".\n\n" +
+                        "Acesse o Nexus para aprovar ou reprovar o avanço.\n\nEquipe Nexus"
+                );
+            }
         }
 
-        return saved;
+        if (behavioral) {
+            StageDecision decision = advanceAfterApproval(saved);
+            return new SubmitResult(decision.invitation(), true, decision.wasLastStage());
+        }
+        return new SubmitResult(saved, false, false);
+    }
+
+    // Quantidade de pontos da escala Likert (0..4 no wire, 1..5 na pontuação). Fixa: é a mesma
+    // pra todo item do inventário, por isso não é guardada por questão.
+    private static final int LIKERT_POINTS = 5;
+
+    // Soma por dimensão e normaliza pra 0-100. Item reverso entra como (6 - resposta), ver
+    // ScreeningQuestion.reverseScored e a nota de polaridade em BigFiveDimension.
+    //
+    // Normalização: com n itens numa dimensão, o bruto vai de n (respondeu 1 em tudo) a 5n
+    // (respondeu 5 em tudo), então (bruto - n) / (4n) leva pra 0..1. Isso é posição dentro da
+    // escala, NÃO percentil populacional -- não existe amostra normativa brasileira por trás.
+    private void computeTraitScores(ScreeningInvitation invitation, List<ScreeningQuestion> questions) {
+        Map<Long, ScreeningAnswer> answerByQuestion = new HashMap<>();
+        for (ScreeningAnswer answer : invitation.getAnswers()) {
+            answerByQuestion.put(answer.getScreeningQuestion().getId(), answer);
+        }
+
+        Map<BigFiveDimension, int[]> accumulator = new EnumMap<>(BigFiveDimension.class);
+        for (ScreeningQuestion question : questions) {
+            if (question.getType() != ScreeningQuestionType.LIKERT_SCALE
+                    || question.getTraitDimension() == null) {
+                continue;
+            }
+            ScreeningAnswer answer = answerByQuestion.get(question.getId());
+            if (answer == null || answer.getSelectedOptionIndex() == null) {
+                continue;
+            }
+            int value = answer.getSelectedOptionIndex() + 1;
+            int scored = Boolean.TRUE.equals(question.getReverseScored())
+                    ? (LIKERT_POINTS + 1) - value
+                    : value;
+
+            // [0] = soma bruta, [1] = itens respondidos.
+            int[] totals = accumulator.computeIfAbsent(question.getTraitDimension(), d -> new int[2]);
+            totals[0] += scored;
+            totals[1] += 1;
+        }
+
+        invitation.getTraitScores().clear();
+        for (Map.Entry<BigFiveDimension, int[]> entry : accumulator.entrySet()) {
+            int raw = entry.getValue()[0];
+            int count = entry.getValue()[1];
+            if (count == 0) {
+                continue;
+            }
+            double normalized = ((raw - count) / (double) ((LIKERT_POINTS - 1) * count)) * 100.0;
+
+            ScreeningTraitScore score = new ScreeningTraitScore();
+            score.setScreeningInvitation(invitation);
+            score.setDimension(entry.getKey());
+            score.setScore(Math.round(normalized * 10.0) / 10.0);
+            score.setAnsweredItemCount(count);
+            invitation.getTraitScores().add(score);
+        }
     }
 
     // DECISÃO — empresa
@@ -343,6 +490,7 @@ public class ScreeningInvitationService {
     public StageDecision approveStage(Long invitationId, Long companyId, String comment) {
         ScreeningInvitation invitation = findById(invitationId);
         validateCompanyOwnership(invitation, companyId);
+        assertDecidable(invitation);
 
         if (invitation.getStatus() != ScreeningInvitationStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
@@ -354,6 +502,14 @@ public class ScreeningInvitationService {
         invitation.setCompanyDecisionComment(comment);
         ScreeningInvitation saved = screeningInvitationRepository.save(invitation);
 
+        return advanceAfterApproval(saved);
+    }
+
+    // A parte de "aprovou, e agora?" -- abre a próxima etapa ativa e avisa o profissional, ou
+    // sinaliza que era a última. Extraída de approveStage porque a etapa BEHAVIORAL passa pelo
+    // mesmo caminho sem nunca ter uma decisão de empresa (ver submit): a única diferença lá é
+    // quem disparou a aprovação, não o que acontece depois dela.
+    private StageDecision advanceAfterApproval(ScreeningInvitation saved) {
         ScreeningStage currentStage = saved.getScreeningStage();
         ScreeningQuestionnaire questionnaire = currentStage.getScreeningQuestionnaire();
         ScreeningStage nextStage = findNextActiveStage(questionnaire, currentStage);
@@ -394,6 +550,7 @@ public class ScreeningInvitationService {
     public ScreeningInvitation reproveStage(Long invitationId, Long companyId, String comment) {
         ScreeningInvitation invitation = findById(invitationId);
         validateCompanyOwnership(invitation, companyId);
+        assertDecidable(invitation);
 
         if (invitation.getStatus() != ScreeningInvitationStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
@@ -689,6 +846,18 @@ public class ScreeningInvitationService {
         }
     }
 
+    // Etapa comportamental não é decidida pela empresa -- ela já se aprovou sozinha no submit e
+    // é informativa por definição. Na prática o status dela nunca é SUBMITTED, então a checagem
+    // seguinte já barraria; esta existe pra dar a mensagem certa em vez de "só uma etapa enviada
+    // pode ser aprovada", e pra a regra continuar valendo se o estado escorregar por outro
+    // caminho no futuro.
+    private void assertDecidable(ScreeningInvitation invitation) {
+        if (invitation.getScreeningStage().isBehavioral()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "A behavioral stage is informational only: it is never approved or reproved.");
+        }
+    }
+
     private void assertPending(ScreeningInvitation invitation) {
         if (!PENDING_STATUSES.contains(invitation.getStatus())) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
@@ -703,9 +872,21 @@ public class ScreeningInvitationService {
         ScreeningQuestionnaire questionnaire = stage.getScreeningQuestionnaire();
         Project project = questionnaire.getProject();
 
+        Map<Long, ScreeningAnswer> answersByQuestion = new HashMap<>();
+        for (ScreeningAnswer answer : invitation.getAnswers()) {
+            if (answer.getScreeningQuestion() != null) {
+                answersByQuestion.put(answer.getScreeningQuestion().getId(), answer);
+            }
+        }
+
         List<ScreeningAttemptQuestionDTO> questions = stage.getQuestions().stream()
                 .filter(ScreeningQuestion::getActive)
-                .map(q -> new ScreeningAttemptQuestionDTO(q.getId(), q.getType(), q.getPrompt(), q.getOptions()))
+                .map(q -> {
+                    ScreeningAnswer existing = answersByQuestion.get(q.getId());
+                    return new ScreeningAttemptQuestionDTO(
+                            q.getId(), q.getType(), q.getPrompt(), q.getOptions(),
+                            existing != null && existing.getVideoUrl() != null);
+                })
                 .toList();
 
         return new ScreeningAttemptDTO(
@@ -713,6 +894,7 @@ public class ScreeningInvitationService {
                 questionnaire.getTitle(),
                 questionnaire.getInstructions(),
                 stage.getTitle(),
+                stage.getKind(),
                 stageDisplayRank(questionnaire, stage),
                 countDisplayStages(questionnaire, stage),
                 stage.getInstructions(),
@@ -720,7 +902,13 @@ public class ScreeningInvitationService {
                 invitation.getDeadlineAt(),
                 project.getTitle(),
                 project.getCompany().getCompanyName(),
-                questions
+                questions,
+                invitation.getVideoConsentAcceptedAt() != null,
+                // Já aceitou -> devolve o texto que ELA leu; ainda não -> o texto vigente.
+                invitation.getVideoConsentText() != null
+                        ? invitation.getVideoConsentText()
+                        : ScreeningVideoService.RECORDING_CONSENT_TEXT,
+                videoMaxSizeBytes
         );
     }
 
@@ -738,7 +926,8 @@ public class ScreeningInvitationService {
                 invitation.getSentAt(),
                 invitation.getDeadlineAt(),
                 invitation.getSubmittedAt(),
-                invitation.getAutoScorePercent()
+                invitation.getAutoScorePercent(),
+                ScreeningTraitProfileDTO.from(invitation.getTraitScores())
         );
     }
 
@@ -750,7 +939,15 @@ public class ScreeningInvitationService {
         Project project = questionnaire.getProject();
         Professional professional = invitation.getProfessional();
 
-        List<ScreeningAnswerDetailDTO> answers = invitation.getAnswers().stream()
+        // ETAPA COMPORTAMENTAL, VISÃO DA EMPRESA: devolve o perfil agregado e NÃO a resposta
+        // item a item. O agregado é o que informa a contratação; "Ofendo as pessoas: concordo
+        // totalmente" é dado psicológico bruto que não melhora nenhuma decisão e amplia muito a
+        // exposição. O próprio profissional continua vendo as respostas dele (é dado dele).
+        boolean hideItemAnswers = stage.isBehavioral() && forCompany;
+
+        List<ScreeningAnswerDetailDTO> answers = hideItemAnswers
+                ? List.of()
+                : invitation.getAnswers().stream()
                 .map(a -> new ScreeningAnswerDetailDTO(
                         a.getId(),
                         a.getScreeningQuestion().getId(),
@@ -761,6 +958,8 @@ public class ScreeningInvitationService {
                         a.getScreeningQuestion().getCorrectOptionIndex(),
                         a.getCorrect(),
                         a.getEssayText(),
+                        a.getVideoUrl() != null,
+                        a.getVideoDurationSeconds(),
                         a.getTimeSpentSeconds()
                 ))
                 .toList();
@@ -777,6 +976,7 @@ public class ScreeningInvitationService {
                 questionnaire.getInstructions(),
                 stage.getId(),
                 stage.getTitle(),
+                stage.getKind(),
                 stageDisplayRank(questionnaire, stage),
                 countDisplayStages(questionnaire, stage),
                 stage.getInstructions(),
@@ -791,8 +991,10 @@ public class ScreeningInvitationService {
                 invitation.getSubmittedAt(),
                 invitation.getDecidedAt(),
                 invitation.getTotalTimeSpentSeconds(),
-                forCompany ? invitation.getTabSwitchCount() : null,
+                // Suprimido também pra empresa numa etapa comportamental -- ver submit.
+                forCompany && !stage.isBehavioral() ? invitation.getTabSwitchCount() : null,
                 invitation.getAutoScorePercent(),
+                ScreeningTraitProfileDTO.from(invitation.getTraitScores()),
                 invitation.getCompanyDecisionComment(),
                 invitation.getPendingIntentType(),
                 invitation.getPendingProposal() != null ? invitation.getPendingProposal().getId() : null,

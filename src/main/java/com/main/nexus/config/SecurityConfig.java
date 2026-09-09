@@ -146,6 +146,10 @@ public class SecurityConfig {
                 
                 .requestMatchers("/api/map/**").hasAnyRole("PROFESSIONAL", "COMPANY", "ADMIN")
 
+                // Biblioteca de testes reutilizaveis da empresa. O guard de PAPEL (membro ACTIVE)
+                // fica em AssessmentTemplateService; aqui so o de PERFIL.
+                .requestMatchers("/api/assessment-templates/**").hasRole("COMPANY")
+
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

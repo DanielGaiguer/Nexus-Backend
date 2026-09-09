@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -77,8 +78,37 @@ public class ScreeningInvitation {
     @Column(columnDefinition = "TEXT")
     private String companyDecisionComment;
 
+    // CONSENTIMENTO DE GRAVAÇÃO (imagem e voz) -- registrado no momento em que o candidato vai
+    // gravar, nesta tentativa específica. NÃO reaproveita o consentimento geral de cadastro
+    // (UserConsent): aquele é sobre a conta e o uso da plataforma; este é sobre ceder rosto e
+    // voz para UM processo seletivo, de UMA empresa. Sem ele, o endpoint que assina o upload
+    // recusa (ver ScreeningVideoService.createUploadTicket).
+    //
+    // O texto exibido é guardado por extenso, e não uma versão/flag: é o que permite provar
+    // depois o que exatamente a pessoa leu quando aceitou -- mesmo raciocínio do
+    // documentVersion de UserConsent, resolvido aqui por snapshot porque este texto não é um
+    // documento legal versionado.
+    private LocalDateTime videoConsentAcceptedAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String videoConsentText;
+
     @OneToMany(mappedBy = "screeningInvitation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ScreeningAnswer> answers = new ArrayList<>();
+
+    // Perfil de traços -- uma linha por dimensão, preenchido no submit APENAS quando a etapa é
+    // BEHAVIORAL (vazio em todas as outras). É o campo que faz o resultado desta etapa ser um
+    // perfil e não uma nota; autoScorePercent acima fica null aqui, de propósito. Sem repositório
+    // próprio, pelo mesmo motivo de ScreeningAnswer: só existe sob uma invitation, cascateia com
+    // ela.
+    // @BatchSize porque toSummaryDTO passou a ler esta coleção, e ele roda EM LOOP: uma vez por
+    // card do Kanban e por linha das listas de match/proposta/comparação (sete caminhos, ver
+    // getSummariesFor). Sem isto, cada linha dispara um SELECT próprio -- inclusive nas etapas
+    // não-comportamentais, onde a coleção vem vazia. Mesmo tamanho usado em
+    // ScreeningStage.questions e ScreeningQuestionnaire.stages.
+    @OneToMany(mappedBy = "screeningInvitation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
+    private List<ScreeningTraitScore> traitScores = new ArrayList<>();
 
     // RETOMADA AUTOMÁTICA -- a ação do profissional (interesse/aceite) que ficou pendente até o
     // processo de etapas terminar aprovado. Carregada de etapa em etapa (cada nova invitation
@@ -194,6 +224,22 @@ public class ScreeningInvitation {
         this.autoScorePercent = autoScorePercent;
     }
 
+    public LocalDateTime getVideoConsentAcceptedAt() {
+        return videoConsentAcceptedAt;
+    }
+
+    public void setVideoConsentAcceptedAt(LocalDateTime videoConsentAcceptedAt) {
+        this.videoConsentAcceptedAt = videoConsentAcceptedAt;
+    }
+
+    public String getVideoConsentText() {
+        return videoConsentText;
+    }
+
+    public void setVideoConsentText(String videoConsentText) {
+        this.videoConsentText = videoConsentText;
+    }
+
     public String getCompanyDecisionComment() {
         return companyDecisionComment;
     }
@@ -208,6 +254,14 @@ public class ScreeningInvitation {
 
     public void setAnswers(List<ScreeningAnswer> answers) {
         this.answers = answers != null ? answers : new ArrayList<>();
+    }
+
+    public List<ScreeningTraitScore> getTraitScores() {
+        return traitScores;
+    }
+
+    public void setTraitScores(List<ScreeningTraitScore> traitScores) {
+        this.traitScores = traitScores != null ? traitScores : new ArrayList<>();
     }
 
     public PendingIntentType getPendingIntentType() {

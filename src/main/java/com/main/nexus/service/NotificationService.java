@@ -515,6 +515,24 @@ public class NotificationService {
             "/company/screening-invitations/" + invitationId
         );
     }
+    // Espelho informativo de notifyScreeningSubmitted para a etapa BEHAVIORAL: o texto NAO pede
+    // decisao, porque nao existe decisao a tomar -- a etapa se aprovou sozinha no envio (ver
+    // ScreeningInvitationService.submit). Reusa o mesmo NotificationType de propósito: pro
+    // usuario continua sendo "o candidato respondeu uma etapa", e nenhum mapeamento de tipo no
+    // front precisa mudar por causa disto.
+    @Async
+    public void notifyBehavioralProfileAvailable(User companyUser,
+                                                 String professionalName, String projectTitle,
+                                                 String stageTitle, Long invitationId) {
+        notify(
+            companyUser,
+            NotificationType.SCREENING_SUBMITTED,
+            "Perfil comportamental disponível",
+            professionalName + " respondeu a etapa \"" + stageTitle + "\" do projeto \"" + projectTitle +
+            "\" -- etapa informativa, o perfil já está anexado ao candidato.",
+            "/company/screening-invitations/" + invitationId
+        );
+    }
     @Async
     public void notifyScreeningDeclined(User companyUser,
                                         String professionalName, String projectTitle, String stageTitle) {

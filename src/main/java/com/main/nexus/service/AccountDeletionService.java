@@ -85,6 +85,7 @@ public class AccountDeletionService {
     @Autowired private CommissionChargeRepository commissionChargeRepository;
     @Autowired private NfseInvoiceRepository nfseInvoiceRepository;
     @Autowired private SupabaseStorageService storageService;
+    @Autowired private ScreeningVideoService screeningVideoService;
     @Autowired private MercadoPagoClient mercadoPago;
     @Autowired private TokenService tokenService;
     @Autowired private EmailService emailService;
@@ -236,6 +237,11 @@ public class AccountDeletionService {
         deleteFileQuietly(p.getResume(), storageService::deleteResume);
         deleteFileQuietly(p.getProfilePhotoUrl(), storageService::deleteProfilePhoto);
         deleteProposalAttachmentFiles(p.getId());
+        // (a) vídeos de resposta de triagem: o ARQUIVO é apagado como currículo/foto/anexo; a
+        // linha ScreeningAnswer continua intacta sob a categoria (c), como todo o resto das
+        // respostas de triagem. A exceção existe porque anonimizar o nome não desidentifica um
+        // rosto e uma voz -- ver ScreeningVideoService.purgeVideosForProfessional.
+        purgeScreeningVideosQuietly(p.getId());
         previousProjectRepository.deleteByProfessionalId(p.getId());
         professionalCredentialRepository.deleteByProfessionalId(p.getId());
 
@@ -262,6 +268,22 @@ public class AccountDeletionService {
         p.getPreferredTypes().clear();
         p.getPreferredOpportunityTypes().clear();
         professionalRepository.save(p);
+    }
+
+    // Mesma tolerância a falha dos outros deletes de arquivo deste serviço: a exclusão da conta
+    // (direito do titular) nunca trava porque o storage está fora do ar. A diferença é que aqui
+    // a sobra tem peso -- SupabaseStorageService loga WARN em vez de engolir.
+    private void purgeScreeningVideosQuietly(Long professionalId) {
+        try {
+            int removed = screeningVideoService.purgeVideosForProfessional(professionalId);
+            if (removed > 0) {
+                log.info("LGPD: {} vídeo(s) de triagem removidos do storage do profissional {}.",
+                        removed, professionalId);
+            }
+        } catch (Exception e) {
+            log.warn("LGPD: falha ao remover vídeos de triagem do profissional {}: {}",
+                    professionalId, e.getMessage());
+        }
     }
 
     private void anonymizeCompany(User user) {

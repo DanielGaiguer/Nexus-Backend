@@ -1,8 +1,11 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.ScreeningStageKind;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -39,6 +42,24 @@ public class ScreeningStage {
     // (re)construir a lista.
     @Column(nullable = false)
     private Integer orderIndex = 0;
+
+    // Natureza da etapa -- ver ScreeningStageKind. O DEFAULT no columnDefinition é o que faz
+    // toda etapa JÁ CADASTRADA virar QUESTIONS no ALTER TABLE do ddl-auto, sem backfill (mesmo
+    // padrão de Company.type). Imutável na prática depois de criada: mudar o tipo de uma etapa
+    // que já tem gente respondendo trocaria o instrumento debaixo dela (ver
+    // ScreeningQuestionnaireService.mergeStages).
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20,
+            columnDefinition = "VARCHAR(20) DEFAULT 'QUESTIONS'")
+    private ScreeningStageKind kind = ScreeningStageKind.QUESTIONS;
+
+    // De qual AssessmentTemplate esta etapa foi gerada, se foi. Long solto, SEM FK de propósito:
+    // a etapa é uma CÓPIA independente e não pode passar a depender do ciclo de vida do molde
+    // (que pode ser desativado depois). Serve só pra agrupar depois -- "como foram os candidatos
+    // de todas as vagas neste teste" -- que sem esta coluna seria impossível reconstruir. null
+    // em toda etapa escrita à mão no formulário da vaga.
+    @Column(name = "source_template_id")
+    private Long sourceTemplateId;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -81,6 +102,26 @@ public class ScreeningStage {
 
     public void setOrderIndex(Integer orderIndex) {
         this.orderIndex = orderIndex;
+    }
+
+    public ScreeningStageKind getKind() {
+        return kind;
+    }
+
+    public void setKind(ScreeningStageKind kind) {
+        this.kind = kind != null ? kind : ScreeningStageKind.QUESTIONS;
+    }
+
+    public boolean isBehavioral() {
+        return kind == ScreeningStageKind.BEHAVIORAL;
+    }
+
+    public Long getSourceTemplateId() {
+        return sourceTemplateId;
+    }
+
+    public void setSourceTemplateId(Long sourceTemplateId) {
+        this.sourceTemplateId = sourceTemplateId;
     }
 
     public String getTitle() {

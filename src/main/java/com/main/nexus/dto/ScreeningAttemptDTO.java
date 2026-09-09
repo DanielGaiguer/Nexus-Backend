@@ -1,6 +1,7 @@
 package com.main.nexus.dto;
 
 import com.main.nexus.model.enums.ScreeningInvitationStatus;
+import com.main.nexus.model.enums.ScreeningStageKind;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,6 +15,9 @@ public record ScreeningAttemptDTO(
         // nenhuma tela.
         String questionnaireInstructions,
         String stageTitle,
+        // Decide a UI inteira da tela de resposta: QUESTIONS renderiza pergunta a pergunta,
+        // BEHAVIORAL renderiza a escala Likert fixa de 5 pontos (ver ScreeningStageKind).
+        ScreeningStageKind stageKind,
         Integer stageOrderIndex,
         Integer totalStages,
         String instructions,
@@ -21,5 +25,10 @@ public record ScreeningAttemptDTO(
         LocalDateTime deadlineAt,
         String projectTitle,
         String companyName,
-        List<ScreeningAttemptQuestionDTO> questions
+        List<ScreeningAttemptQuestionDTO> questions,
+        // Só relevante numa etapa VIDEO. `videoConsentAccepted` false = a tela tem que colher o
+        // aceite antes de deixar gravar (ver ScreeningVideoService).
+        boolean videoConsentAccepted,
+        String videoConsentText,
+        Long videoMaxSizeBytes
 ) {}

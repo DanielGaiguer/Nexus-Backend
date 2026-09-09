@@ -1,5 +1,6 @@
 package com.main.nexus.model;
 
+import com.main.nexus.model.enums.BigFiveDimension;
 import com.main.nexus.model.enums.ScreeningQuestionType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -67,6 +68,20 @@ public class ScreeningQuestion {
     @Column
     private Integer correctOptionIndex;
 
+    // ── Só LIKERT_SCALE (itens de etapa BEHAVIORAL); null/false em MULTIPLE_CHOICE e ESSAY ──
+
+    // A qual dimensão do Big Five este item soma. Copiado de BehavioralItem.dimension quando a
+    // etapa comportamental é montada -- a empresa nunca escolhe isto.
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private BigFiveDimension traitDimension;
+
+    // Item invertido: concordar com ele DIMINUI a dimensão. Pontuado como (6 - resposta) em
+    // ScreeningInvitationService.computeTraitScores. Ver a nota de polaridade em
+    // BigFiveDimension.
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean reverseScored = false;
+
     public Long getId() {
         return id;
     }
@@ -129,5 +144,21 @@ public class ScreeningQuestion {
 
     public void setCorrectOptionIndex(Integer correctOptionIndex) {
         this.correctOptionIndex = correctOptionIndex;
+    }
+
+    public BigFiveDimension getTraitDimension() {
+        return traitDimension;
+    }
+
+    public void setTraitDimension(BigFiveDimension traitDimension) {
+        this.traitDimension = traitDimension;
+    }
+
+    public Boolean getReverseScored() {
+        return reverseScored;
+    }
+
+    public void setReverseScored(Boolean reverseScored) {
+        this.reverseScored = reverseScored != null && reverseScored;
     }
 }

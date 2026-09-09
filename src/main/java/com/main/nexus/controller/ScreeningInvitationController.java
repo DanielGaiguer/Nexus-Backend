@@ -5,6 +5,10 @@ import com.main.nexus.dto.ScreeningInvitationDetailDTO;
 import com.main.nexus.dto.ScreeningProcessSummaryDTO;
 import com.main.nexus.dto.ScreeningStageDecisionRequestDTO;
 import com.main.nexus.dto.ScreeningSubmissionRequestDTO;
+import com.main.nexus.dto.ScreeningVideoConfirmRequestDTO;
+import com.main.nexus.dto.ScreeningVideoConsentDTO;
+import com.main.nexus.dto.ScreeningVideoPlaybackDTO;
+import com.main.nexus.dto.ScreeningVideoUploadTicketDTO;
 import com.main.nexus.dto.UserDTO;
 import com.main.nexus.model.Match;
 import com.main.nexus.model.ScreeningInvitation;
@@ -15,6 +19,7 @@ import com.main.nexus.service.CompanyAccessService;
 import com.main.nexus.service.MatchService;
 import com.main.nexus.service.ProfessionalService;
 import com.main.nexus.service.ScreeningInvitationService;
+import com.main.nexus.service.ScreeningVideoService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
@@ -25,6 +30,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -46,6 +52,9 @@ public class ScreeningInvitationController {
     // dependência circular porque controllers nunca são injetados em services.
     @Autowired
     private MatchService matchService;
+
+    @Autowired
+    private ScreeningVideoService screeningVideoService;
 
     // EMPRESA — decisão por etapa
 
@@ -106,8 +115,17 @@ public class ScreeningInvitationController {
     @PostMapping("/{id}/submit")
     public ResponseEntity<ScreeningInvitationDetailDTO> submit(
             @PathVariable Long id, @RequestBody ScreeningSubmissionRequestDTO request) {
-        ScreeningInvitation invitation = screeningInvitationService.submit(id, getLoggedProfessionalId(), request);
-        return ResponseEntity.ok(screeningInvitationService.toDetailDTO(invitation, false));
+        ScreeningInvitationService.SubmitResult result =
+                screeningInvitationService.submit(id, getLoggedProfessionalId(), request);
+
+        // Etapa BEHAVIORAL se aprova sozinha no envio (nunca passa por approve/reprove), entao a
+        // retomada da acao pendente, que numa etapa normal aconteceria no /approve da empresa,
+        // precisa acontecer aqui quando ela era a ultima etapa. Sem isto, um processo que termina
+        // numa etapa comportamental ficaria parado pra sempre.
+        if (result.autoAdvanced() && result.wasLastStage()) {
+            resumePendingIntent(result.invitation());
+        }
+        return ResponseEntity.ok(screeningInvitationService.toDetailDTO(result.invitation(), false));
     }
 
     // Retomada automática da ação que ficou esperando o processo de etapas terminar aprovado
@@ -140,6 +158,70 @@ public class ScreeningInvitationController {
                 screeningInvitationService.notifyProposalScreeningCompleted(invitation);
             }
         }
+    }
+
+    // VÍDEO ASSÍNCRONO — o arquivo NUNCA passa por aqui. O backend assina, o browser sobe
+    // direto pro Supabase (bucket privado) e volta pra confirmar; assistir também é sempre por
+    // link assinado de curta validade. Ver ScreeningVideoService.
+
+    // Consentimento de gravação DESTA tentativa -- separado do consentimento geral de cadastro
+    // (UserConsent), porque ceder imagem e voz pra um processo seletivo específico é outra
+    // finalidade.
+    @GetMapping("/{id}/video/consent")
+    public ResponseEntity<ScreeningVideoConsentDTO> videoConsent(@PathVariable Long id) {
+        ScreeningInvitation invitation = screeningInvitationService.findById(id);
+        screeningInvitationService.validateParticipant(invitation, null, getLoggedProfessionalId());
+        return ResponseEntity.ok(new ScreeningVideoConsentDTO(
+                invitation.getId(),
+                invitation.getVideoConsentAcceptedAt() != null,
+                invitation.getVideoConsentAcceptedAt(),
+                invitation.getVideoConsentText() != null
+                        ? invitation.getVideoConsentText()
+                        : ScreeningVideoService.RECORDING_CONSENT_TEXT));
+    }
+
+    @PostMapping("/{id}/video/consent")
+    public ResponseEntity<ScreeningVideoConsentDTO> acceptVideoConsent(@PathVariable Long id) {
+        ScreeningInvitation invitation =
+                screeningVideoService.acceptRecordingConsent(id, getLoggedProfessionalId());
+        return ResponseEntity.ok(new ScreeningVideoConsentDTO(
+                invitation.getId(), true,
+                invitation.getVideoConsentAcceptedAt(),
+                invitation.getVideoConsentText()));
+    }
+
+    // Só o dono da tentativa, com prazo aberto e consentimento já registrado -- os três guards
+    // ficam em ScreeningVideoService.createUploadTicket.
+    @PostMapping("/{id}/video/upload-url")
+    public ResponseEntity<ScreeningVideoUploadTicketDTO> videoUploadUrl(
+            @PathVariable Long id,
+            @RequestParam Long questionId,
+            @RequestParam String contentType) {
+        return ResponseEntity.ok(screeningVideoService.createUploadTicket(
+                id, questionId, getLoggedProfessionalId(), contentType));
+    }
+
+    // Confirmação pós-upload: é aqui que o teto de tamanho real é conferido (o arquivo já está
+    // no bucket, então o backend mede no Supabase em vez de acreditar no cliente).
+    @PostMapping("/{id}/video/confirm")
+    public ResponseEntity<String> confirmVideoUpload(
+            @PathVariable Long id, @RequestBody ScreeningVideoConfirmRequestDTO request) {
+        screeningVideoService.confirmUpload(id, getLoggedProfessionalId(), request);
+        return ResponseEntity.ok("Video answer saved.");
+    }
+
+    // Assistir: dono da tentativa OU empresa dona da vaga. Qualquer outro para em 403 antes de
+    // qualquer link ser gerado.
+    @GetMapping("/{id}/video/{questionId}/playback")
+    public ResponseEntity<ScreeningVideoPlaybackDTO> videoPlayback(
+            @PathVariable Long id, @PathVariable Long questionId) {
+        UserDTO logged = getLoggedUser();
+        boolean isCompany = "COMPANY".equals(logged.role());
+        Long companyId = isCompany ? getLoggedCompanyId() : null;
+        Long professionalId = isCompany ? null : getLoggedProfessionalId();
+
+        return ResponseEntity.ok(
+                screeningVideoService.playbackUrl(id, questionId, companyId, professionalId));
     }
 
     // PROCESSOS SELETIVOS — telas de acompanhamento ("Processos Seletivos" no menu, acima de

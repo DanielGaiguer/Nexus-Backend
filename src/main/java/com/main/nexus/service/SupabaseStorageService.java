@@ -1,5 +1,7 @@
 package com.main.nexus.service;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +34,13 @@ public class SupabaseStorageService {
 
     @Value("${supabase.bucket.proposal-attachments}")
     private String proposalAttachmentsBucket;
+
+    // Videos de resposta de triagem. UNICO bucket PRIVADO do sistema -- os outros tres sao
+    // publicos e servem URL direta. Imagem e voz de um candidato identificavel nao podem ficar
+    // atras de "o path tem um UUID, ninguem adivinha": aqui todo acesso passa por signed URL de
+    // curta validade, gerada sob guard (ver ScreeningVideoService).
+    @Value("${supabase.bucket.screening-videos}")
+    private String screeningVideosBucket;
 
     @Value("${supabase.service-key}")
     private String serviceKey;
@@ -217,6 +226,214 @@ public class SupabaseStorageService {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400),
                     "Attachment size must not exceed 15MB.");
         }
+    }
+
+    // ── VIDEO DE TRIAGEM (bucket privado) ──────────────────────────────────────────────
+    //
+    // Fluxo diferente dos outros tres uploads DE PROPOSITO. Ali o arquivo atravessa
+    // browser -> route handler do Next -> Spring -> Supabase, com buffer inteiro em memoria nos
+    // dois saltos do meio; com 50MB de video e alguns candidatos ao mesmo tempo isso derruba o
+    // backend. Aqui o Spring so ASSINA: o browser sobe direto pro Supabase com a signed URL, e
+    // o backend volta a participar apenas na confirmacao.
+    //
+    // Consequencia que precisa ficar explicita: como o arquivo nao passa por aqui, nao da pra
+    // validar antes. O limite de tamanho do BUCKET (configurado no painel, ver
+    // application.properties) e a unica trava preventiva; a checagem em
+    // screeningVideoSizeBytes acontece depois do upload e serve pra recusar e apagar.
+
+    private static final java.util.Set<String> SCREENING_VIDEO_CONTENT_TYPES = java.util.Set.of(
+            "video/webm", "video/mp4", "video/quicktime");
+
+    // uploadUrl ja absoluta e pronta pro browser; objectUrl e o que fica gravado em
+    // ScreeningAnswer.videoUrl.
+    public record VideoUploadTicket(String uploadUrl, String token, String objectUrl) {}
+
+    // Validacao declarada, no mesmo molde das outras tres deste service -- roda ANTES de assinar
+    // (content-type) e de novo na confirmacao (tamanho real medido no Supabase).
+    public void validateScreeningVideoContentType(String contentType) {
+        if (contentType == null || !SCREENING_VIDEO_CONTENT_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Only WebM, MP4 and QuickTime video files are accepted.");
+        }
+    }
+
+    public void validateScreeningVideoSize(long sizeBytes, long maxSizeBytes) {
+        if (sizeBytes <= 0) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "The uploaded video is empty.");
+        }
+        if (sizeBytes > maxSizeBytes) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400),
+                    "Video size must not exceed " + (maxSizeBytes / (1024 * 1024)) + "MB.");
+        }
+    }
+
+    public VideoUploadTicket createScreeningVideoUploadTicket(
+            Long invitationId, Long questionId, String contentType, int ttlSeconds) {
+        validateScreeningVideoContentType(contentType);
+
+        String path = "screenings/" + invitationId + "/" + questionId + "/"
+                + UUID.randomUUID() + "." + videoExtension(contentType);
+        String signUrl = supabaseUrl + "/storage/v1/object/upload/sign/"
+                + screeningVideosBucket + "/" + path;
+
+        HttpHeaders headers = serviceHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        // expiresIn nao e suportado por toda versao do endpoint de upload assinado; quando for
+        // ignorado vale o default do Supabase. Mandar e inofensivo e da o TTL curto onde ha
+        // suporte.
+        HttpEntity<Map<String, Object>> entity =
+                new HttpEntity<>(Map.of("expiresIn", ttlSeconds), headers);
+
+        Map<?, ?> body;
+        try {
+            body = restTemplate.exchange(signUrl, HttpMethod.POST, entity, Map.class).getBody();
+        } catch (Exception e) {
+            log.error("Supabase signed upload URL failed: bucket={}, path={}",
+                    screeningVideosBucket, path, e);
+            throw new ResponseStatusException(HttpStatusCode.valueOf(502),
+                    "Failed to prepare the video upload. Please try again.", e);
+        }
+
+        Object relative = body != null ? body.get("url") : null;
+        if (relative == null) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(502),
+                    "Storage did not return an upload URL.");
+        }
+
+        String uploadUrl = supabaseUrl + "/storage/v1" + relative;
+        return new VideoUploadTicket(uploadUrl, extractToken(uploadUrl), screeningVideoObjectUrl(path));
+    }
+
+    // Signed URL de LEITURA, curta. Nunca devolvida sem passar pelo guard de
+    // ScreeningVideoService -- este metodo por si so nao autoriza ninguem.
+    public String signScreeningVideoUrl(String objectUrl, int ttlSeconds) {
+        String path = screeningVideoPath(objectUrl);
+        if (path == null) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(404), "Video not found.");
+        }
+
+        String signUrl = supabaseUrl + "/storage/v1/object/sign/" + screeningVideosBucket + "/" + path;
+        HttpHeaders headers = serviceHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity =
+                new HttpEntity<>(Map.of("expiresIn", ttlSeconds), headers);
+
+        Map<?, ?> body;
+        try {
+            body = restTemplate.exchange(signUrl, HttpMethod.POST, entity, Map.class).getBody();
+        } catch (Exception e) {
+            log.error("Supabase signed read URL failed: bucket={}, path={}",
+                    screeningVideosBucket, path, e);
+            throw new ResponseStatusException(HttpStatusCode.valueOf(502),
+                    "Failed to prepare the video playback link. Please try again.", e);
+        }
+
+        Object relative = body != null ? body.get("signedURL") : null;
+        if (relative == null) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(404),
+                    "This video is no longer available.");
+        }
+        return supabaseUrl + "/storage/v1" + relative;
+    }
+
+    // Tamanho real do objeto ja no bucket, medido no Supabase -- e o que permite recusar um
+    // arquivo grande DEPOIS do upload direto. Devolve null quando nao da pra saber (objeto
+    // ausente, ou a consulta de metadados falhou): quem chama decide o que fazer com a duvida,
+    // aqui nao se inventa um numero.
+    public Long screeningVideoSizeBytes(String objectUrl) {
+        String path = screeningVideoPath(objectUrl);
+        if (path == null) {
+            return null;
+        }
+        int slash = path.lastIndexOf('/');
+        String folder = slash > 0 ? path.substring(0, slash) : "";
+        String name = slash > 0 ? path.substring(slash + 1) : path;
+
+        HttpHeaders headers = serviceHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(
+                Map.of("prefix", folder, "limit", 100, "search", name), headers);
+
+        try {
+            List<?> items = restTemplate.exchange(
+                    supabaseUrl + "/storage/v1/object/list/" + screeningVideosBucket,
+                    HttpMethod.POST, entity, List.class).getBody();
+            if (items == null) {
+                return null;
+            }
+            for (Object item : items) {
+                if (!(item instanceof Map<?, ?> row) || !name.equals(row.get("name"))) {
+                    continue;
+                }
+                if (row.get("metadata") instanceof Map<?, ?> metadata
+                        && metadata.get("size") instanceof Number size) {
+                    return size.longValue();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Supabase object metadata unavailable: bucket={}, path={}: {}",
+                    screeningVideosBucket, path, e.getMessage());
+        }
+        return null;
+    }
+
+    public void deleteScreeningVideo(String objectUrl) {
+        String path = screeningVideoPath(objectUrl);
+        if (path == null) {
+            return;
+        }
+        HttpHeaders headers = serviceHeaders();
+        try {
+            restTemplate.exchange(
+                    supabaseUrl + "/storage/v1/object/" + screeningVideosBucket + "/" + path,
+                    HttpMethod.DELETE, new HttpEntity<Void>(headers), String.class);
+        } catch (Exception e) {
+            // Mesma falha silenciosa dos outros deletes deste service: a operacao do usuario
+            // (excluir a conta) nunca trava por causa da limpeza do arquivo. Aqui, porem, a
+            // sobra tem peso diferente de uma foto orfa -- por isso e log de WARN, nao silencio.
+            log.warn("Screening video not deleted from storage (path={}): {}", path, e.getMessage());
+        }
+    }
+
+    // Forma canonica gravada em ScreeningAnswer.videoUrl: o endpoint AUTENTICADO do objeto, nao
+    // o /public/... dos outros buckets. E uma URL de verdade (e reversivel pra path, que e o que
+    // assinar e apagar precisam), mas inutil colada no browser -- exatamente o que se quer.
+    private String screeningVideoObjectUrl(String path) {
+        return supabaseUrl + "/storage/v1/object/" + screeningVideosBucket + "/" + path;
+    }
+
+    private String screeningVideoPath(String objectUrl) {
+        if (objectUrl == null || objectUrl.isBlank()) {
+            return null;
+        }
+        String prefix = supabaseUrl + "/storage/v1/object/" + screeningVideosBucket + "/";
+        return objectUrl.startsWith(prefix) ? objectUrl.substring(prefix.length()) : null;
+    }
+
+    private String extractToken(String signedUrl) {
+        int marker = signedUrl.indexOf("token=");
+        if (marker < 0) {
+            return null;
+        }
+        String token = signedUrl.substring(marker + "token=".length());
+        int amp = token.indexOf('&');
+        return amp >= 0 ? token.substring(0, amp) : token;
+    }
+
+    private String videoExtension(String contentType) {
+        return switch (contentType) {
+            case "video/mp4" -> "mp4";
+            case "video/quicktime" -> "mov";
+            default -> "webm";
+        };
+    }
+
+    private HttpHeaders serviceHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + serviceKey);
+        headers.set("apikey", serviceKey);
+        return headers;
     }
 
     private String getExtension(String filename) {

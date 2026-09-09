@@ -18,5 +18,10 @@ public record ScreeningInvitationSummaryDTO(
         LocalDateTime sentAt,
         LocalDateTime deadlineAt,
         LocalDateTime submittedAt,
-        Double autoScorePercent
+        // null numa etapa BEHAVIORAL -- la nao ha resposta certa pra contar.
+        Double autoScorePercent,
+        // Perfil de tracos, null fora de etapa BEHAVIORAL. Chega ate o card do Kanban por este
+        // campo (PipelineCardDTO.latestScreening) -- INFORMATIVO, como o resto do badge: nada no
+        // pipeline le estes numeros como criterio de avanco.
+        ScreeningTraitProfileDTO traitProfile
 ) {}

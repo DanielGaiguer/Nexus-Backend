@@ -39,6 +39,21 @@ public class ScreeningAnswer {
     @Column(columnDefinition = "TEXT")
     private String essayText;
 
+    // VIDEO_RESPONSE -- forma canônica: o endpoint AUTENTICADO do objeto no bucket privado
+    // (ver SupabaseStorageService), não uma URL que o browser consiga abrir sozinho. Toda
+    // exibição passa por uma signed URL de curta validade gerada sob guard. Diferente dos
+    // outros campos de resposta, este é preenchido ANTES do submit: o vídeo sobe primeiro, num
+    // endpoint próprio, e o submit apenas confere que existe.
+    @Column(length = 500)
+    private String videoUrl;
+
+    // Duração APROXIMADA, medida pelo MediaRecorder no client -- informativa, não confiável.
+    // O backend não abre o container do arquivo pra conferir (dependência nova, desproporcional
+    // nesta versão): o que ele garante de verdade é só o teto de TAMANHO. Ver
+    // nexus.screening.video.max-size-bytes.
+    @Column
+    private Integer videoDurationSeconds;
+
     // Computado no submit (MULTIPLE_CHOICE) -- null para ESSAY, que não tem gabarito.
     @Column
     private Boolean correct;
@@ -86,6 +101,22 @@ public class ScreeningAnswer {
 
     public void setEssayText(String essayText) {
         this.essayText = essayText;
+    }
+
+    public String getVideoUrl() {
+        return videoUrl;
+    }
+
+    public void setVideoUrl(String videoUrl) {
+        this.videoUrl = videoUrl;
+    }
+
+    public Integer getVideoDurationSeconds() {
+        return videoDurationSeconds;
+    }
+
+    public void setVideoDurationSeconds(Integer videoDurationSeconds) {
+        this.videoDurationSeconds = videoDurationSeconds;
     }
 
     public Boolean getCorrect() {

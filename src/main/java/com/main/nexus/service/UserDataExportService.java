@@ -8,13 +8,17 @@ import com.main.nexus.model.Professional;
 import com.main.nexus.model.Project;
 import com.main.nexus.model.Proposal;
 import com.main.nexus.model.Review;
+import com.main.nexus.dto.ScreeningLikertScale;
+import com.main.nexus.dto.ScreeningTraitProfileDTO;
 import com.main.nexus.model.ScreeningAnswer;
 import com.main.nexus.model.ScreeningInvitation;
+import com.main.nexus.model.ScreeningTraitScore;
 import com.main.nexus.model.SupportConversation;
 import com.main.nexus.model.SupportMessage;
 import com.main.nexus.model.User;
 import com.main.nexus.model.UserConsent;
 import com.main.nexus.model.enums.AuthorType;
+import com.main.nexus.model.enums.ScreeningQuestionType;
 import com.main.nexus.model.enums.UserType;
 import com.main.nexus.repository.CommissionChargeRepository;
 import com.main.nexus.repository.CompanyBillingProfileRepository;
@@ -82,6 +86,7 @@ public class UserDataExportService {
     @Autowired private MessageRepository messageRepository;
     @Autowired private UserConsentRepository consentRepository;
     @Autowired private ScreeningInvitationRepository screeningInvitationRepository;
+    @Autowired private ScreeningVideoService screeningVideoService;
     @Autowired private SupportConversationRepository supportConversationRepository;
     @Autowired private SupportMessageRepository supportMessageRepository;
     @Autowired private NotificationRepository notificationRepository;
@@ -284,9 +289,60 @@ public class UserDataExportService {
                     "tabSwitchCount", si.getTabSwitchCount(),
                     "autoScorePercent", si.getAutoScorePercent(),
                     "companyDecisionComment", si.getCompanyDecisionComment(),
+                    // Perfil comportamental: vazio fora de etapa BEHAVIORAL. Entra AQUI, no
+                    // export do proprio titular, e nao em screeningForCompany -- mesma regua
+                    // ja aplicada ao resto: a empresa exporta o que e dela, o candidato
+                    // exporta o que e dele.
+                    "behavioralProfile", behavioralProfile(si.getTraitScores()),
                     "myAnswers", screeningAnswers(si.getAnswers())));
         }
         return out;
+    }
+
+    private Map<String, Object> behavioralProfile(List<ScreeningTraitScore> traitScores) {
+        if (traitScores == null || traitScores.isEmpty()) {
+            return null;
+        }
+        List<Map<String, Object>> dimensions = new ArrayList<>();
+        for (ScreeningTraitScore t : traitScores) {
+            dimensions.add(obj(
+                    "dimension", t.getDimension().name(),
+                    "label", t.getDimension().label(),
+                    "score0to100", t.getScore(),
+                    "answeredItemCount", t.getAnsweredItemCount()));
+        }
+        return obj(
+                "dimensions", dimensions,
+                // O aviso viaja junto tambem aqui: este JSON e entregue direto ao titular, sem
+                // passar por nenhuma tela que pudesse exibi-lo por fora.
+                "disclaimer", ScreeningTraitProfileDTO.DISCLAIMER);
+    }
+
+    // null quando a questao nem era de video. Quando era, o objeto diz explicitamente se o
+    // arquivo ainda existe -- "sumiu sem explicacao" nao e resposta aceitavel num pedido de
+    // portabilidade.
+    private Map<String, Object> videoExport(ScreeningAnswer a) {
+        boolean isVideoQuestion = a.getScreeningQuestion() != null
+                && a.getScreeningQuestion().getType() == ScreeningQuestionType.VIDEO_RESPONSE;
+        if (!isVideoQuestion && a.getVideoDurationSeconds() == null) {
+            return null;
+        }
+
+        String url = screeningVideoService.exportPlaybackUrl(a);
+        if (url == null) {
+            return obj(
+                    "available", false,
+                    "durationSeconds", a.getVideoDurationSeconds(),
+                    "note", a.getVideoUrl() == null
+                            ? "O arquivo de vídeo foi removido do armazenamento."
+                            : "Não foi possível gerar o link de download deste vídeo agora.");
+        }
+        return obj(
+                "available", true,
+                "durationSeconds", a.getVideoDurationSeconds(),
+                "downloadUrl", url,
+                "downloadUrlValidForSeconds", screeningVideoService.exportUrlTtlSeconds(),
+                "note", "Link temporário: baixe o arquivo antes de ele expirar.");
     }
 
     private List<Map<String, Object>> screeningAnswers(List<ScreeningAnswer> answers) {
@@ -299,7 +355,17 @@ public class UserDataExportService {
                     "question", a.getScreeningQuestion() != null ? a.getScreeningQuestion().getPrompt() : null,
                     "questionType", a.getScreeningQuestion() != null
                             ? a.getScreeningQuestion().getType().name() : null,
+                    // Video: entra SO aqui, no export do proprio titular. screeningForCompany
+                    // nao recebe nada disso -- imagem e voz de candidato nao sao dado que a
+                    // empresa porta consigo (minimizacao de dado de terceiro, mesma regua ja
+                    // aplicada as respostas: aquele export nunca teve "myAnswers").
+                    "video", videoExport(a),
                     "selectedOptionIndex", a.getSelectedOptionIndex(),
+                    // So preenchido em item LIKERT_SCALE -- sem o rotulo, um "3" solto no JSON
+                    // entregue ao titular nao diz nada.
+                    "likertAnswer", a.getScreeningQuestion() != null
+                            && a.getScreeningQuestion().getType() == ScreeningQuestionType.LIKERT_SCALE
+                            ? ScreeningLikertScale.labelFor(a.getSelectedOptionIndex()) : null,
                     "essayText", a.getEssayText(),
                     "correct", a.getCorrect(),
                     "timeSpentSeconds", a.getTimeSpentSeconds()));

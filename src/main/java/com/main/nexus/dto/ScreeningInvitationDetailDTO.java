@@ -2,6 +2,7 @@ package com.main.nexus.dto;
 
 import com.main.nexus.model.enums.PendingIntentType;
 import com.main.nexus.model.enums.ScreeningInvitationStatus;
+import com.main.nexus.model.enums.ScreeningStageKind;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -19,6 +20,11 @@ public record ScreeningInvitationDetailDTO(
         String questionnaireInstructions,
         Long screeningStageId,
         String stageTitle,
+        // Diz à tela de revisão o que ela está olhando. Sem isto o front teria que INFERIR o tipo
+        // da etapa ("tem traitProfile, logo é comportamental"), o que falha justamente no caso
+        // que mais importa: uma etapa comportamental ainda não respondida não tem perfil nenhum,
+        // e apareceria como uma etapa de perguntas vazia.
+        ScreeningStageKind stageKind,
         Integer stageOrderIndex,
         Integer totalStages,
         String instructions,
@@ -38,7 +44,12 @@ public record ScreeningInvitationDetailDTO(
         // Visível só quando o DTO é montado para a empresa -- null para o profissional.
         Integer tabSwitchCount,
         // Referência/sugestão, calculada só das questões MULTIPLE_CHOICE -- nunca decide sozinha.
+        // null numa etapa BEHAVIORAL: ali não existe resposta certa, e o resultado é o
+        // traitProfile abaixo, não uma nota.
         Double autoScorePercent,
+        // Perfil de traços do Big Five -- preenchido só em etapa BEHAVIORAL, null nas demais. O
+        // aviso obrigatório viaja dentro dele (ver ScreeningTraitProfileDTO).
+        ScreeningTraitProfileDTO traitProfile,
         String companyDecisionComment,
 
         // Contexto de qual ação ficou pendente por causa desta etapa -- pendingProposalId só
