@@ -7,6 +7,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,7 +21,10 @@ public class NexusApplication {
 		SpringApplication.run(NexusApplication.class, args);
 	}
 
+	// Anotação no @Bean, e não na classe: @Profile("!test") em NexusApplication desligaria a
+	// aplicação inteira sob teste. Ver a nota nos seeds de config/ para o porquê.
 	@Bean
+	@Profile("!test")
 	CommandLineRunner seedAdmin(UserRepository userRepository, PasswordEncoder passwordEncoder) {
 		return args -> {
 			if (userRepository.existsByEmail("admin@gmail.com")) return;

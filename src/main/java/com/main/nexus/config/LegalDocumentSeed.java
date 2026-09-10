@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 
 // Semeia a v1 (ativa) de cada documento legal no bootstrap, se ainda nao existe
@@ -21,7 +22,12 @@ import org.springframework.core.io.ClassPathResource;
 // {{DPO_NAME}} / {{DPO_EMAIL}} da Politica de Privacidade aqui. Trocar o DPO
 // depois = Admin publica uma nova versao da Politica (fluxo correto de "mudanca
 // relevante" da LGPD).
+// NÃO roda sob o profile `test`: `mvnw test` sobe o contexto completo (ver
+// NexusApplicationTests) contra o MySQL de desenvolvimento, e os CommandLineRunner são
+// executados junto. Sem esta exclusão, rodar a suíte escrevia/alterava linhas no banco de dev a
+// cada execução -- o que obrigava a limpeza manual depois de cada rodada de QA.
 @Configuration
+@Profile("!test")
 public class LegalDocumentSeed {
 
     private static final Logger log = LoggerFactory.getLogger(LegalDocumentSeed.class);

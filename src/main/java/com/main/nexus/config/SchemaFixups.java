@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 // Correções pontuais de schema que o ddl-auto=update não faz sozinho (ele cria
@@ -16,7 +17,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 // (unique composto match_id + answered_by). O índice único antigo, só em
 // match_id, continuaria no banco e bloquearia a 2ª resposta (a do outro lado).
 // Este runner detecta e derruba esse índice legado uma única vez.
+// NÃO roda sob o profile `test`: `mvnw test` sobe o contexto completo (ver
+// NexusApplicationTests) contra o MySQL de desenvolvimento, e os CommandLineRunner são
+// executados junto. Sem esta exclusão, rodar a suíte escrevia/alterava linhas no banco de dev a
+// cada execução -- o que obrigava a limpeza manual depois de cada rodada de QA.
+// Vale também para os ALTER TABLE daqui: são idempotentes, mas continuam sendo escrita
+// no schema do banco de dev disparada por uma rodada de teste.
 @Configuration
+@Profile("!test")
 public class SchemaFixups {
 
     private static final Logger log = LoggerFactory.getLogger(SchemaFixups.class);

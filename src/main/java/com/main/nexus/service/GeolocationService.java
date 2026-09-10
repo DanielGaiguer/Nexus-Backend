@@ -2,7 +2,7 @@ package com.main.nexus.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.net.URLEncoder;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.slf4j.Logger;
@@ -13,6 +13,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class GeolocationService {
@@ -98,9 +99,7 @@ public class GeolocationService {
         String fullAddress = String.format("%s, %s, %s, Brazil", street, city, state);
 
         // LocationIQ — converte o endereço em coordenadas
-        String locationIqUrl = "https://us1.locationiq.com/v1/search?key=" + locationIqApiKey
-                + "&q=" + URLEncoder.encode(fullAddress, StandardCharsets.UTF_8)
-                + "&format=json&limit=1&countrycodes=br";
+        URI locationIqUrl = buildGeocodeUri(fullAddress);
 
         JsonNode geoResult = null;
         Exception lastFailure = null;
@@ -140,6 +139,39 @@ public class GeolocationService {
         double lon = geoResult.get(0).path("lon").asDouble();
 
         return new AddressData(lat, lon, city, state);
+    }
+
+    /**
+     * Monta a URI de geocodificação. Devolve {@link URI}, e não String, DE PROPÓSITO.
+     *
+     * A sobrecarga {@code getForObject(String, ...)} do RestTemplate trata o argumento como um
+     * URI TEMPLATE e o repassa ao UriTemplateHandler, que re-encoda a string. Uma URL montada à
+     * mão com o endereço já percent-encoded saía daqui encodada DUAS vezes: {@code %C3%A7} virava
+     * {@code %25C3%25A7}.
+     *
+     * Em endereço sem acento o estrago é invisível -- só as vírgulas viram {@code %252C}, ruído
+     * que o geocoder ignora. Em endereço acentuado o estrago cai DENTRO da palavra ("Praça" vira
+     * literalmente "Pra%C3%A7a"), nada casa, e a LocationIQ responde 404 "Unable to geocode" --
+     * derrubando o cadastro de quem mora numa rua com acento, que é a maioria delas.
+     *
+     * Passar um URI já pronto pula o template handler inteiro: a sobrecarga
+     * {@code getForObject(URI, ...)} usa a URI como está.
+     */
+    private URI buildGeocodeUri(String fullAddress) {
+        return UriComponentsBuilder.fromUriString("https://us1.locationiq.com/v1/search")
+                .queryParam("key", locationIqApiKey)
+                .queryParam("q", fullAddress)
+                .queryParam("format", "json")
+                .queryParam("limit", 1)
+                .queryParam("countrycodes", "br")
+                .build()
+                .encode(StandardCharsets.UTF_8)
+                .toUri();
+    }
+
+    // Visível para teste -- é o que permite verificar o encoding sem bater na rede.
+    URI geocodeUriFor(String fullAddress) {
+        return buildGeocodeUri(fullAddress);
     }
 
     private static AddressData fallbackFor(String cleanCep, String city, String state) {

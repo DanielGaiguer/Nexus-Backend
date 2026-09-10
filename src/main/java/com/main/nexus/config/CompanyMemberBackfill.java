@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 // Toda Company já cadastrada vira "1 membro OWNER ACTIVE" (o próprio User atual),
 // sem exigir ação manual -- mesmo espírito one-shot idempotente do SchemaFixups e
@@ -18,7 +19,12 @@ import org.springframework.context.annotation.Configuration;
 //
 // Idempotente: pula qualquer Company que já tem linha em tb_company_member.
 // NÃO toca em tb_company.user_id (o @OneToOne legado continua existindo).
+// NÃO roda sob o profile `test`: `mvnw test` sobe o contexto completo (ver
+// NexusApplicationTests) contra o MySQL de desenvolvimento, e os CommandLineRunner são
+// executados junto. Sem esta exclusão, rodar a suíte escrevia/alterava linhas no banco de dev a
+// cada execução -- o que obrigava a limpeza manual depois de cada rodada de QA.
 @Configuration
+@Profile("!test")
 public class CompanyMemberBackfill {
 
     private static final Logger log = LoggerFactory.getLogger(CompanyMemberBackfill.class);
